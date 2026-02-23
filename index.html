@@ -1,0 +1,1421 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="theme-color" content="#0f172a">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <title>內部POS系統</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/js/all.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <style>
+        html { background-color: #0f172a; min-height: 100%; min-height: -webkit-fill-available; }
+        body { background-color: transparent; color: #f1f5f9; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; -webkit-tap-highlight-color: transparent; padding-top: env(safe-area-inset-top); padding-bottom: env(safe-area-inset-bottom); min-height: 100vh; min-height: -webkit-fill-available; }
+        /* Safari 專用：固定全螢幕背景層，延伸到安全區域，消除頂部/底部白條 */
+        #bg-fill { position: fixed; z-index: -1; background-color: #0f172a; top: calc(-1 * env(safe-area-inset-top, 0px)); left: calc(-1 * env(safe-area-inset-left, 0px)); width: calc(100vw + env(safe-area-inset-left, 0px) + env(safe-area-inset-right, 0px)); height: calc(100vh + env(safe-area-inset-top, 0px) + env(safe-area-inset-bottom, 0px)); height: calc(100dvh + env(safe-area-inset-top, 0px) + env(safe-area-inset-bottom, 0px)); min-height: 100vh; -webkit-min-height: -webkit-fill-available; }
+        .pt-safe-top { padding-top: env(safe-area-inset-top, 0px); }
+        .glass { background: rgba(30, 41, 59, 0.95); backdrop-filter: blur(12px); border: 1px solid rgba(255,255,255,0.08); }
+        .input-dark { background: #1e293b; border: 1px solid #334155; color: white; outline: none; transition: border-color 0.2s; }
+        .input-dark:focus { border-color: #eab308; }
+        .pill-btn { display: inline-flex; align-items: center; justify-content: center; padding: 6px 14px; margin-right: 6px; border-radius: 9999px; border: 1px solid #475569; color: #cbd5e1; font-size: 13px; font-weight: 600; background: rgba(30, 41, 59, 0.5); cursor: pointer; transition: all 0.2s; white-space: nowrap; }
+        .pill-btn.active { background: #eab308; color: #000; border-color: #eab308; box-shadow: 0 0 10px rgba(234, 179, 8, 0.3); }
+        .main-tab { flex: 1; text-align: center; padding: 10px 0; color: #94a3b8; font-weight: bold; border-bottom: 2px solid transparent; transition: all 0.2s; cursor: pointer; }
+        .main-tab.active { color: #eab308; border-bottom-color: #eab308; }
+        .loader { border: 2px solid #334155; border-top: 2px solid #eab308; border-radius: 50%; width: 16px; height: 16px; animation: spin 0.8s linear infinite; display:inline-block; }
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        #category-sort-list { -webkit-overflow-scrolling: touch; }
+        .spec-tag { font-size: 0.7rem; padding: 2px 6px; border-radius: 4px; background: #334155; color: #94a3b8; margin-right: 4px; display: inline-flex; items-center: center; }
+        .mobile-nav-item { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 8px 0; color: #64748b; font-size: 10px; transition: color 0.2s; }
+        .mobile-nav-item i { font-size: 20px; margin-bottom: 2px; }
+        .mobile-nav-item.active { color: #eab308; }
+        .accordion-content { max-height: 0; overflow: hidden; transition: max-height 0.3s ease-out; background: #020617; border-bottom: 1px solid #1e293b; }
+        .accordion-content.open { max-height: 5000px; transition: max-height 0.5s ease-in; }
+        .list-row { border-bottom: 1px solid #334155; padding: 12px 8px; cursor: pointer; transition: background 0.2s; }
+        .list-row:hover { background: #1e293b; }
+        .list-row-exp { border-bottom: 1px solid #334155; padding: 12px 8px; background: rgba(69, 10, 10, 0.2); }
+        .cp-box { display: flex; flex-direction: column; align-items: flex-end; justify-content: center; line-height: 1.2; }
+        .cp-cost { font-size: 10px; color: #64748b; }
+        .pb-safe { padding-bottom: max(1rem, env(safe-area-inset-bottom, 1rem)); }
+        /* 直屏時結帳區塊：蓋過底導覽、固定高度、清單可捲動、確認結帳固定可見 */
+        #cart-panel.mobile-cart-open { height: 100dvh !important; max-height: 100dvh !important; display: flex !important; flex-direction: column !important; overflow: hidden; z-index: 60 !important; }
+        #cart-panel.mobile-cart-open #cart-items { flex: 1 1 0; min-height: 0; overflow-y: auto; -webkit-overflow-scrolling: touch; }
+        #cart-panel.mobile-cart-open .cart-footer-wrap { flex-shrink: 0; }
+        #cart-panel.mobile-cart-open > div:first-child { padding-top: env(safe-area-inset-top); }
+        /* 手機版：結帳區塊可上下拖曳 */
+        #cart-footer-drag-handle { touch-action: none; -webkit-user-select: none; user-select: none; cursor: grab; }
+        #cart-footer-drag-handle:active { cursor: grabbing; }
+        #cart-footer-draggable { transition: transform 0.15s ease-out; }
+        #cart-footer-draggable.dragging { transition: none; }
+        /* 手機版：結帳清單 footer 預設位置往上一些 */
+        @media (max-width: 767px) {
+            #cart-panel.mobile-cart-open #cart-footer-draggable {
+                transform: translateY(-120px);
+            }
+        }
+        /* 手機版：總金額與確認結帳同一行，省高度讓按鈕一定露出 */
+        @media (max-width: 767px) {
+            #cart-panel .cart-footer-wrap .cart-total-row-mobile { gap: 10px; }
+            #cart-panel .cart-footer-wrap .cart-confirm-btn-mobile { flex: 1; min-width: 0; }
+        }
+    </style>
+</head>
+<body class="h-screen flex flex-col md:flex-row overflow-hidden select-none">
+    <div id="bg-fill" aria-hidden="true"></div>
+    <div id="login-overlay" class="fixed inset-0 z-50 bg-slate-950 flex items-center justify-center p-4 pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]">
+        <div class="glass p-8 rounded-2xl w-full max-w-sm flex flex-col gap-4 text-center shadow-2xl border-slate-800">
+            <h1 id="login-version" class="text-3xl font-bold text-yellow-500 mb-2 tracking-wider">POS</h1>
+            <input type="text" id="login-user" placeholder="帳號" class="p-3 rounded-xl input-dark text-center text-lg">
+            <input type="password" id="login-pass" placeholder="密碼" class="p-3 rounded-xl input-dark text-center text-lg">
+            <div class="flex items-center justify-center gap-2 mt-2"><input type="checkbox" id="remember-me" class="w-4 h-4 rounded border-slate-600 bg-slate-800 text-yellow-500"><label for="remember-me" class="text-slate-400 text-sm">保持登入</label></div>
+            <button onclick="doLogin()" class="bg-gradient-to-r from-yellow-600 to-yellow-500 text-black font-bold py-3 rounded-xl mt-4 shadow-lg active:scale-95 transition">登入系統</button>
+        </div>
+    </div>
+
+    <aside class="hidden md:flex w-20 bg-slate-900 flex-col items-center py-6 border-r border-slate-800 z-20 shrink-0 gap-6">
+        <div class="text-2xl text-yellow-500 font-bold mb-4"><i class="fa-solid fa-cube"></i></div>
+        <button id="d-nav-pos" onclick="switchView('pos')" class="nav-btn w-12 h-12 rounded-xl text-yellow-400 bg-slate-800 flex items-center justify-center transition"><i class="fa-solid fa-cash-register text-xl"></i></button>
+        <button id="d-nav-report" onclick="openReport()" class="nav-btn w-12 h-12 rounded-xl text-slate-500 hover:text-yellow-400 flex items-center justify-center transition"><i class="fa-solid fa-file-invoice-dollar text-xl"></i></button>
+        <button id="d-nav-pending" onclick="openPending()" class="nav-btn w-12 h-12 rounded-xl text-slate-500 hover:text-yellow-400 flex items-center justify-center transition"><i class="fa-solid fa-wallet text-xl"></i></button>
+        <button id="d-nav-history" onclick="openHistory()" class="nav-btn w-12 h-12 rounded-xl text-slate-500 hover:text-yellow-400 flex items-center justify-center transition"><i class="fa-solid fa-chart-pie text-xl"></i></button>
+        <button id="d-nav-restock" onclick="switchView('restock')" class="nav-btn w-12 h-12 rounded-xl text-slate-500 hover:text-yellow-400 flex items-center justify-center transition"><i class="fa-solid fa-dolly text-xl"></i></button>
+        <button id="d-nav-setting" onclick="switchView('setting')" class="nav-btn w-12 h-12 rounded-xl text-slate-500 hover:text-yellow-400 flex items-center justify-center transition"><i class="fa-solid fa-gear text-xl"></i></button>
+        <div class="mt-auto"><button onclick="softRefresh()" class="w-12 h-12 text-blue-500 hover:bg-slate-800 rounded-xl flex items-center justify-center"><i class="fa-solid fa-sync"></i></button></div>
+    </aside>
+
+    <main class="flex-1 flex flex-col relative bg-slate-950 overflow-hidden w-full">
+        <header class="h-14 min-h-[3.5rem] glass flex items-center justify-between px-4 border-b border-slate-800 shrink-0 z-10">
+            <div class="flex items-center gap-2"><span class="font-bold text-slate-100 text-lg">POS</span><span id="user-badge" class="text-[10px] bg-slate-800 text-yellow-500 px-2 py-0.5 rounded-full border border-slate-700">未登入</span></div>
+            <div id="sync-status" class="text-xs text-slate-500 flex items-center gap-2"><span class="loader"></span> 載入中</div>
+        </header>
+
+        <div id="view-pos" class="view-section flex-1 flex flex-col md:flex-row overflow-hidden relative">
+            <div class="flex-1 flex flex-col h-full overflow-hidden">
+                <div class="p-3 flex flex-col gap-3 shrink-0 bg-slate-900/50">
+                    <div class="relative"><i class="fa-solid fa-search absolute left-3 top-3 text-slate-500"></i><input type="text" id="search-input" onkeyup="filterItems()" placeholder="搜尋名稱 / 編號..." class="w-full pl-10 pr-4 py-2.5 rounded-xl input-dark text-sm"></div>
+                    <div class="flex border-b border-slate-800">
+                        <div onclick="switchMainTab('phone')" id="tab-phone" class="main-tab active">📱 二手機</div>
+                        <div onclick="switchMainTab('accessory')" id="tab-accessory" class="main-tab">🔌 配件</div>
+                        <div onclick="switchMainTab('service')" id="tab-service" class="main-tab">🛠️ 服務</div>
+                    </div>
+                    <div id="sub-cat-scroll" class="flex gap-2 overflow-x-auto no-scrollbar py-1"></div>
+                </div>
+                <div id="item-grid" class="flex-1 overflow-y-auto p-3 grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-3 content-start pb-24 md:pb-4"></div>
+            </div>
+            <div id="cart-panel" class="hidden md:flex w-80 bg-slate-900 border-l border-slate-800 flex-col h-full max-h-[100dvh] md:max-h-none min-h-0 z-30 absolute md:static inset-0 md:inset-auto">
+                <div class="p-3 border-b border-slate-800 flex justify-between items-center bg-slate-800/50 shrink-0"><h2 class="font-bold text-white">結帳清單</h2><button onclick="toggleMobileCart('pos',false)" class="md:hidden text-slate-400 p-2"><i class="fa-solid fa-chevron-down"></i></button><button onclick="clearCart()" class="text-xs text-red-400 hidden md:block">清空</button></div>
+                <div id="cart-items" class="flex-1 min-h-0 overflow-y-auto p-3 space-y-2"></div>
+                <div id="cart-footer-draggable" class="shrink-0">
+                    <div id="cart-footer-drag-handle" class="md:hidden py-2 flex items-center justify-center gap-1 text-slate-500 text-xs border-t border-slate-700 bg-slate-800/80">
+                        <span class="w-8 h-0.5 rounded bg-slate-600"></span><span>可上下拖曳</span><span class="w-8 h-0.5 rounded bg-slate-600"></span>
+                    </div>
+                    <div class="cart-footer-wrap p-2 md:p-4 bg-slate-800 border-t border-slate-700 space-y-2 md:space-y-3 pb-safe">
+                    <div class="grid grid-cols-2 gap-1.5 md:gap-2"><input type="text" id="cust-name" class="w-full py-1.5 md:p-2 rounded-lg input-dark text-xs md:text-sm text-center" placeholder="客戶名稱"><div class="flex items-center justify-center py-1.5 md:p-2 bg-slate-700/50 rounded-lg"><span id="staff-name" class="text-[10px] md:text-xs font-bold">--</span></div></div>
+                    <div class="grid grid-cols-3 gap-1 md:gap-2 text-center text-[10px] md:text-xs">
+                        <label><input type="radio" name="pay" value="cash" checked class="peer hidden"><div class="py-1.5 md:p-2 rounded border border-slate-600 peer-checked:bg-green-600 peer-checked:text-white cursor-pointer">現金</div></label>
+                        <label><input type="radio" name="pay" value="linepay" class="peer hidden"><div class="py-1.5 md:p-2 rounded border border-slate-600 peer-checked:bg-green-500 peer-checked:text-black cursor-pointer">Line Pay</div></label>
+                        <label><input type="radio" name="pay" value="credit" class="peer hidden"><div class="py-1.5 md:p-2 rounded border border-slate-600 peer-checked:bg-red-600 peer-checked:text-white cursor-pointer">掛帳</div></label>
+                    </div>
+                    <div class="cart-total-row-mobile flex flex-row md:flex-col items-center justify-between md:justify-start gap-2 md:gap-0">
+                        <div class="flex justify-between items-center flex-shrink-0 md:w-full"><span class="text-slate-400 text-xs md:text-sm cart-total-label">總金額</span><span class="text-xl md:text-2xl font-bold text-yellow-400 ml-2 md:ml-0" id="cart-total">0</span></div>
+                        <button onclick="confirmCheckout()" class="cart-confirm-btn-mobile flex-1 md:w-full min-w-0 bg-yellow-500 hover:bg-yellow-400 text-black font-bold py-2.5 md:py-3 rounded-xl shadow-lg active:scale-95 transition text-sm md:text-base">確認結帳</button>
+                    </div>
+                    </div>
+                </div>
+            </div>
+            <div id="mobile-float-bar-pos" onclick="toggleMobileCart('pos', true)" class="md:hidden fixed bottom-16 left-4 right-4 bg-yellow-500 text-black p-3 rounded-xl shadow-2xl flex justify-between items-center z-40 transform translate-y-24 transition-transform duration-300"><div class="font-bold flex items-center gap-2"><div class="bg-black text-yellow-500 w-6 h-6 rounded-full flex items-center justify-center text-xs" id="mob-count">0</div> 待結帳</div><div class="font-mono font-bold text-lg" id="mob-total">0</div></div>
+        </div>
+
+        <div id="view-report" class="hidden view-section flex-1 flex flex-col overflow-hidden p-4">
+            <h2 class="text-xl font-bold text-white mb-4">今日帳務</h2>
+            <div class="grid grid-cols-2 md:grid-cols-3 gap-3 mb-4">
+                <div class="glass p-3 rounded-xl border-l-4 border-green-500"><div class="text-[10px] text-slate-400">現金實收 (扣支出)</div><div class="text-lg font-bold text-white" id="today-cash">0</div></div>
+                <div class="glass p-3 rounded-xl border-l-4 border-red-500"><div class="text-[10px] text-slate-400">待收帳款</div><div class="text-lg font-bold text-red-400" id="today-pending">0</div></div>
+                <div class="glass p-3 rounded-xl border-l-4 border-yellow-500"><div class="text-[10px] text-slate-400">今日毛利 (售價-成本)</div><div class="text-lg font-bold text-yellow-400" id="today-profit">0</div></div>
+                <div class="glass p-3 rounded-xl border-l-4 border-purple-500"><div class="text-[10px] text-slate-400">潛在毛利 (未結)</div><div class="text-lg font-bold text-purple-400" id="today-pot">0</div></div>
+                <div class="glass p-3 rounded-xl border-l-4 border-orange-500"><div class="text-[10px] text-slate-400">今日總支出</div><div class="text-lg font-bold text-orange-400" id="today-exp">0</div></div>
+                <div class="glass p-3 rounded-xl border-l-4 border-slate-500"><div class="text-[10px] text-slate-400">贈品成本</div><div class="text-lg font-bold text-slate-400" id="today-gift">0</div></div>
+            </div>
+            <div class="flex text-xs text-slate-400 px-3 pb-2 border-b border-slate-700">
+                <div class="flex-1">時間 / 項目</div>
+                <div class="w-24 text-right">金額 / 淨利</div>
+                <div class="w-16 text-right">狀態</div>
+            </div>
+            <div id="today-list" class="flex-1 overflow-y-auto pb-20"></div>
+        </div>
+
+        <div id="view-pending" class="hidden view-section flex-1 flex flex-col overflow-hidden p-4">
+            <h2 class="text-xl font-bold text-white mb-4">未結帳款</h2>
+            <div id="pending-list" class="flex-1 overflow-y-auto pb-20"></div>
+        </div>
+
+        <div id="view-history" class="hidden view-section flex-1 flex flex-col overflow-hidden p-4">
+            <div class="flex justify-between items-center mb-4"><h2 class="text-xl font-bold text-white">歷史查詢</h2><div class="flex gap-2"><button onclick="setQuickDate('week')" class="bg-slate-800 px-3 py-1 rounded text-xs text-slate-300">本週</button><button onclick="setQuickDate('month')" class="bg-slate-800 px-3 py-1 rounded text-xs text-slate-300">本月</button></div></div>
+            <div class="flex gap-2 mb-4"><input type="date" id="h-start" class="flex-1 input-dark p-2 rounded text-sm"><input type="date" id="h-end" class="flex-1 input-dark p-2 rounded text-sm"><button onclick="doHistorySearch()" class="bg-yellow-600 w-10 rounded flex items-center justify-center"><i class="fa-solid fa-search"></i></button></div>
+            <div class="grid grid-cols-2 md:grid-cols-3 gap-3 mb-4">
+                <div class="glass p-3 rounded-xl border-l-4 border-green-500"><div class="text-[10px] text-slate-400">期間現金實收</div><div class="text-lg font-bold text-white" id="h-cash">0</div></div>
+                <div class="glass p-3 rounded-xl border-l-4 border-red-500"><div class="text-[10px] text-slate-400">期間待收帳款</div><div class="text-lg font-bold text-red-400" id="h-pending">0</div></div>
+                <div class="glass p-3 rounded-xl border-l-4 border-yellow-500"><div class="text-[10px] text-slate-400">期間毛利</div><div class="text-lg font-bold text-yellow-400" id="h-profit">0</div></div>
+                <div class="glass p-3 rounded-xl border-l-4 border-purple-500"><div class="text-[10px] text-slate-400">期間潛在毛利</div><div class="text-lg font-bold text-purple-400" id="h-pot">0</div></div>
+                <div class="glass p-3 rounded-xl border-l-4 border-orange-500"><div class="text-[10px] text-slate-400">期間總支出</div><div class="text-lg font-bold text-orange-400" id="h-exp">0</div></div>
+                <div class="glass p-3 rounded-xl border-l-4 border-slate-500"><div class="text-[10px] text-slate-400">期間贈品成本</div><div class="text-lg font-bold text-slate-400" id="h-gift">0</div></div>
+            </div>
+            <div class="flex text-xs text-slate-400 px-3 pb-2 border-b border-slate-700">
+                <div class="flex-1">時間 / 項目</div>
+                <div class="w-24 text-right">金額 / 淨利</div>
+                <div class="w-16 text-right">狀態</div>
+            </div>
+            <div id="history-list" class="flex-1 overflow-y-auto pb-20"></div>
+        </div>
+
+        <div id="view-restock" class="hidden view-section flex-1 flex flex-col md:flex-row overflow-hidden relative">
+            <div class="flex-1 flex flex-col h-full overflow-hidden">
+                <div class="p-3 flex flex-col gap-3 shrink-0 bg-slate-900/50">
+                    <div class="flex gap-4 border-b border-slate-700 pb-2"><button onclick="setRestockMode('inventory')" id="rm-inv" class="pill-btn active">🔌 配件進貨</button><button onclick="setRestockMode('expense')" id="rm-exp" class="pill-btn">💸 雜項與薪資</button></div>
+                    <div id="rs-toolbar-inv" class="flex flex-col gap-2"><div class="relative"><i class="fa-solid fa-search absolute left-3 top-3 text-slate-500"></i><input type="text" id="rs-search" onkeyup="renderRestockGrid()" placeholder="搜尋庫存品項..." class="w-full pl-10 pr-4 py-2 rounded-xl input-dark text-sm"></div><div id="rs-cat-scroll" class="flex gap-2 overflow-x-auto no-scrollbar py-1 items-center"></div></div>
+                    <div id="rs-toolbar-exp" class="hidden flex gap-2"><button onclick="addExpItem('營運雜支')" class="flex-1 bg-slate-800 p-3 rounded-lg border border-slate-700 text-xs font-bold text-yellow-500">新增雜支</button><button onclick="addExpItem('薪資/抽成')" class="flex-1 bg-slate-800 p-3 rounded-lg border border-slate-700 text-xs font-bold text-pink-500">新增薪資</button></div>
+                </div>
+                <div id="rs-grid" class="flex-1 overflow-y-auto p-3 grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-3 content-start pb-24 md:pb-4"></div>
+            </div>
+            <div id="rs-cart-panel" class="hidden md:flex w-80 bg-slate-900 border-l border-slate-800 flex-col h-full z-30 absolute md:static inset-0 md:inset-auto">
+                <div class="p-3 border-b border-slate-800 flex justify-between items-center bg-slate-800/50"><h2 class="font-bold text-white">進貨清單</h2><button onclick="toggleMobileCart('restock',false)" class="md:hidden text-slate-400 p-2"><i class="fa-solid fa-chevron-down"></i></button><button onclick="clearRestockCart()" class="text-xs text-red-400 hidden md:block">清空</button></div>
+                <div id="rs-cart-items" class="flex-1 overflow-y-auto p-3 space-y-2"></div>
+                <div class="p-4 bg-slate-800 border-t border-slate-700 space-y-3"><div class="flex justify-between items-end"><span class="text-slate-400 text-sm">總支出</span><span class="text-2xl font-bold text-red-400" id="rs-cart-total">0</span></div><button onclick="submitRestock()" class="w-full bg-red-600 hover:bg-red-500 text-white font-bold py-3 rounded-xl shadow-lg active:scale-95 transition">確認送出</button></div>
+            </div>
+            <div id="mobile-float-bar-restock" onclick="toggleMobileCart('restock', true)" class="md:hidden fixed bottom-16 left-4 right-4 bg-red-600 text-white p-3 rounded-xl shadow-2xl flex justify-between items-center z-40 transform translate-y-24 transition-transform duration-300 hidden"><div class="font-bold flex items-center gap-2"><div class="bg-white text-red-600 w-6 h-6 rounded-full flex items-center justify-center text-xs" id="rs-mob-count">0</div> 待入庫</div><div class="font-mono font-bold text-lg" id="rs-mob-total">0</div></div>
+        </div>
+
+        <div id="view-setting" class="hidden view-section flex-1 p-6 flex flex-col gap-4 overflow-y-auto pb-20">
+            <h2 class="text-2xl font-bold text-white">系統設定</h2>
+            
+            <!-- 同步資料 -->
+            <div class="flex items-center gap-3">
+                <button onclick="softRefresh()" class="w-10 h-10 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-purple-400 flex items-center justify-center transition shrink-0" title="同步資料">
+                    <i class="fa-solid fa-sync"></i>
+                </button>
+                <span class="text-sm text-slate-500">點擊重整</span>
+            </div>
+            
+            <!-- 公司配件管理（可收納） -->
+            <div class="glass rounded-xl border-l-4 border-blue-500 overflow-hidden">
+                <button onclick="toggleSettingSection('company-template')" class="w-full p-4 flex items-center justify-between hover:bg-slate-800/50 transition">
+                    <div class="flex items-center gap-3">
+                        <i class="fa-solid fa-box text-blue-400 text-xl"></i>
+                        <h3 class="font-bold text-lg text-blue-400">公司配件管理</h3>
+                    </div>
+                    <i id="company-template-icon" class="fa-solid fa-chevron-down text-slate-400 transition-transform"></i>
+                </button>
+                <div id="company-template-content" class="hidden px-4 pb-4 space-y-3">
+                    <div class="grid grid-cols-3 gap-2">
+                        <input type="text" id="new-cp-name" class="col-span-3 input-dark p-2 rounded text-sm" placeholder="品名 (如: 20W快充頭)">
+                        <input type="number" id="new-cp-cost" class="input-dark p-2 rounded text-sm" placeholder="成本">
+                        <input type="number" id="new-cp-price" class="input-dark p-2 rounded text-sm" placeholder="售價">
+                        <button onclick="addNewCompanyTemplate()" class="bg-blue-600 hover:bg-blue-500 text-white rounded font-bold text-sm py-2">新增</button>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- 配件分類排序（進入獨立頁面） -->
+            <div class="glass rounded-xl border-l-4 border-green-500 overflow-hidden">
+                <button onclick="openCategorySortPage()" class="w-full p-4 flex items-center justify-between hover:bg-slate-800/50 transition">
+                    <div class="flex items-center gap-3">
+                        <i class="fa-solid fa-list-ol text-green-400 text-xl"></i>
+                        <h3 class="font-bold text-lg text-green-400">配件分類排序</h3>
+                    </div>
+                    <i class="fa-solid fa-chevron-right text-slate-400"></i>
+                </button>
+                <p class="px-4 pb-3 text-xs text-slate-500">點擊進入排序頁面</p>
+            </div>
+            
+            <!-- 版本與登出 -->
+            <div class="glass p-4 rounded-xl space-y-4">
+                <div class="flex justify-between">
+                    <span class="text-slate-400">版本</span>
+                    <span id="setting-version" class="text-yellow-500 font-mono"></span>
+                </div>
+                <button onclick="doLogout()" class="w-full p-3 rounded-lg bg-red-900/50 text-red-400 border border-red-900">登出系統</button>
+            </div>
+        </div>
+        
+        <!-- 配件分類排序獨立頁面 -->
+        <div id="view-category-sort" class="hidden view-section flex-1 flex flex-col overflow-hidden p-4 pb-24 md:pb-4">
+            <div class="p-4 border-b border-slate-700 flex items-center gap-3 shrink-0">
+                <button onclick="closeCategorySortPage()" class="w-10 h-10 flex items-center justify-center rounded-lg bg-slate-800 text-slate-400 hover:text-white transition">
+                    <i class="fa-solid fa-arrow-left"></i>
+                </button>
+                <h2 class="text-xl font-bold text-white">配件分類排序</h2>
+            </div>
+            <div class="flex-1 flex flex-col p-4 overflow-hidden">
+                <p class="text-sm text-slate-400 mb-3">桌機：拖動左側握把調整順序。手機：按住左側握把約 0.35 秒後拖曳，其他區域可上下捲動。</p>
+                <div id="category-sort-list" class="flex-1 space-y-2 overflow-y-auto min-h-0 pb-4"></div>
+                <button onclick="saveCategoryOrderAndClose()" class="w-full bg-green-600 hover:bg-green-500 text-white rounded-xl font-bold py-3 mt-4 shrink-0">儲存順序</button>
+            </div>
+        </div>
+    </main>
+
+    <nav class="md:hidden fixed bottom-0 w-full h-16 bg-slate-950 border-t border-slate-800 flex z-50"><div onclick="switchView('pos')" id="m-nav-pos" class="mobile-nav-item active"><i class="fa-solid fa-cash-register"></i>收銀</div><div onclick="openReport()" id="m-nav-report" class="mobile-nav-item"><i class="fa-solid fa-file-invoice-dollar"></i>今日</div><div onclick="openPending()" id="m-nav-pending" class="mobile-nav-item"><i class="fa-solid fa-wallet"></i>未結</div><div onclick="openHistory()" id="m-nav-history" class="mobile-nav-item"><i class="fa-solid fa-chart-pie"></i>歷史</div><div onclick="switchView('restock')" id="m-nav-restock" class="mobile-nav-item"><i class="fa-solid fa-dolly"></i>進貨</div><div onclick="switchView('setting')" id="m-nav-setting" class="mobile-nav-item"><i class="fa-solid fa-gear"></i>設定</div></nav>
+
+    <script>
+        // 版本號：每次改程式請往上加 (v35 → v35.1 → v35.2 …)
+        const POS_VERSION = 'v36.5';
+
+        let DB = { inv: [], sales: [], pending: [], history: [], companyTemplates: [] }; 
+        let Cart = [], RestockCart = [];
+        let BlackList = { orders: [], items: [] }; 
+        // API 基礎 URL（開發環境：localhost，生產環境：Railway）
+        // 本地開發時改回：'http://localhost:3001/api'
+        const API_BASE_URL = 'https://web-production-4ab5e4.up.railway.app/api';
+        
+        // API 封裝函數（取代 google.script.run）
+        const API = {
+          verifyLogin: async (username, password) => {
+            try {
+              console.log('發送登入請求到:', `${API_BASE_URL}/login`);
+              const res = await fetch(`${API_BASE_URL}/login`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ username, password })
+              });
+              console.log('收到回應，狀態:', res.status);
+              if (!res.ok) {
+                throw new Error(`HTTP ${res.status}: ${res.statusText}`);
+              }
+              const data = await res.json();
+              console.log('解析後的資料:', data);
+              return data;
+            } catch (error) {
+              console.error('API 請求失敗:', error);
+              throw error;
+            }
+          },
+          getInventory: async () => {
+            const res = await fetch(`${API_BASE_URL}/inventory`);
+            return await res.json();
+          },
+          checkoutOrder: async (data) => {
+            const res = await fetch(`${API_BASE_URL}/checkout`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(data)
+            });
+            return await res.json();
+          },
+          handleTransaction: async (data) => {
+            const res = await fetch(`${API_BASE_URL}/transaction`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(data)
+            });
+            return await res.json();
+          },
+          handleRestock: async (data) => {
+            const res = await fetch(`${API_BASE_URL}/restock`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(data)
+            });
+            return await res.json();
+          },
+          getTodaySalesOnly: async () => {
+            const res = await fetch(`${API_BASE_URL}/today-sales`);
+            return await res.json();
+          },
+          getPendingOrders: async () => {
+            const res = await fetch(`${API_BASE_URL}/pending`);
+            return await res.json();
+          },
+          changePhoneStatus: async (id, status) => {
+            const res = await fetch(`${API_BASE_URL}/phone/status`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ id, status })
+            });
+            return await res.json();
+          },
+          getHistory: async (startDate, endDate) => {
+            const res = await fetch(`${API_BASE_URL}/history?start=${startDate}&end=${endDate}`);
+            return await res.json();
+          },
+          addCompanyTemplate: async (name, cost, price) => {
+            const res = await fetch(`${API_BASE_URL}/company-template`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ name, cost: Number(cost), price: Number(price) })
+            });
+            return await res.json();
+          }
+        };
+        
+        let ItemRegistry = {}; 
+        let User = { name: '', isAdmin: false };
+        let UI = { tab: 'phone', sub: '', rsMode: 'inventory', rsCat: 'all' };
+        let cartFooterTranslateY = 0;
+        const CART_FOOTER_DRAG_MAX_UP = 280;
+        const CART_FOOTER_DRAG_MAX_DOWN = 20;
+
+        function resetCartFooterDrag() {
+            const el = document.getElementById('cart-footer-draggable');
+            if (el) { el.style.transform = ''; el.classList.remove('dragging'); cartFooterTranslateY = 0; }
+        }
+        function initCartFooterDrag() {
+            const handle = document.getElementById('cart-footer-drag-handle');
+            const block = document.getElementById('cart-footer-draggable');
+            if (!handle || !block) return;
+            let startY = 0, startTranslate = 0;
+            handle.addEventListener('touchstart', function(e) {
+                if (e.touches.length !== 1) return;
+                startY = e.touches[0].clientY;
+                startTranslate = cartFooterTranslateY;
+                block.classList.add('dragging');
+            }, { passive: true });
+            handle.addEventListener('touchmove', function(e) {
+                if (e.touches.length !== 1) return;
+                e.preventDefault();
+                const dy = e.touches[0].clientY - startY;
+                let next = startTranslate + dy;
+                if (next > CART_FOOTER_DRAG_MAX_DOWN) next = CART_FOOTER_DRAG_MAX_DOWN;
+                if (next < -CART_FOOTER_DRAG_MAX_UP) next = -CART_FOOTER_DRAG_MAX_UP;
+                cartFooterTranslateY = next;
+                block.style.transform = 'translateY(' + next + 'px)';
+            }, { passive: false });
+            handle.addEventListener('touchend', function() { block.classList.remove('dragging'); }, { passive: true });
+        }
+
+        window.onload = () => { 
+            document.title = '內部POS系統 ' + POS_VERSION + ' (Stable)';
+            const loginVer = document.getElementById('login-version');
+            if (loginVer) loginVer.textContent = 'POS ' + POS_VERSION;
+            const settingVer = document.getElementById('setting-version');
+            if (settingVer) settingVer.textContent = POS_VERSION + ' Stable';
+            initCartFooterDrag();
+            // 載入記住的帳號密碼
+            try { 
+                const lastUser = localStorage.getItem('pos_last_user'); 
+                if (lastUser) { 
+                    const el = document.getElementById('login-user'); 
+                    if (el) el.value = lastUser; 
+                }
+                const lastPass = localStorage.getItem('pos_last_pass'); 
+                if (lastPass) { 
+                    const el = document.getElementById('login-pass'); 
+                    if (el) el.value = lastPass; 
+                }
+                // 如果有記住的帳號密碼，自動勾選記住選項
+                if (lastUser && lastPass) {
+                    const rem = document.getElementById('remember-me');
+                    if (rem) rem.checked = true;
+                }
+            } catch(e) { console.error('載入記住的帳號密碼失敗', e); }
+            const passInput = document.getElementById('login-pass');
+            if (passInput) { passInput.addEventListener('keypress', function (e) { if (e.key === 'Enter') doLogin(); }); }
+            loadBlacklist(); 
+            document.addEventListener('keydown', function(e) {
+                if (e.key === 'Escape') {
+                    if (document.querySelector('.swal2-container')) Swal.close();
+                    else if (document.getElementById('cart-panel') && document.getElementById('cart-panel').classList.contains('mobile-cart-open')) toggleMobileCart('pos', false);
+                }
+                if (e.key === 'Enter' && !document.querySelector('.swal2-container') && document.activeElement && document.activeElement.tagName !== 'INPUT' && document.activeElement.tagName !== 'TEXTAREA') {
+                    if (document.getElementById('view-pos') && !document.getElementById('view-pos').classList.contains('hidden') && Cart.length > 0) confirmCheckout();
+                }
+            });
+            try { const s = localStorage.getItem('pos_user_v30'); if (s) { User = JSON.parse(s); initSystem(); } } catch(e) { console.error('Auto login fail', e); }
+        };
+
+        function loadBlacklist() { try { const s = localStorage.getItem('pos_blacklist_v32'); if (s) BlackList = JSON.parse(s); } catch(e) { console.error('Load blacklist fail', e); } }
+        function saveBlacklist() { localStorage.setItem('pos_blacklist_v32', JSON.stringify(BlackList)); }
+
+        async function doLogin() { 
+            const u = document.getElementById('login-user').value.trim(); 
+            const p = document.getElementById('login-pass').value.trim(); 
+            if (!u || !p) {
+                showError('請輸入帳號與密碼');
+                return;
+            }
+            
+            // 顯示載入中
+            const btn = document.querySelector('button[onclick="doLogin()"]');
+            const originalText = btn ? btn.textContent : '';
+            if (btn) {
+                btn.disabled = true;
+                btn.textContent = '登入中...';
+            }
+            
+            try {
+                console.log('=== 開始登入流程 ===');
+                console.log('帳號:', u);
+                console.log('API URL:', API_BASE_URL);
+                
+                const result = await API.verifyLogin(u, p);
+                console.log('登入結果:', result);
+                
+                if (result && result.success) {
+                    const isAdmin = result.user.role === 'admin';
+                    console.log('登入成功，使用者:', result.user.name, '管理員:', isAdmin);
+                    loginSuccess(result.user.name || result.user.username, isAdmin, result.user.username || u);
+                } else {
+                    console.error('登入失敗:', result?.message);
+                    showError(result?.message || '登入失敗');
+                }
+            } catch (e) {
+                console.error('=== 登入錯誤 ===', e);
+                let errorMsg = '登入失敗：';
+                if (e.message && e.message.includes('Failed to fetch')) {
+                    errorMsg += '無法連接到後端伺服器。請確認：\n1. 後端伺服器正在運行 (http://localhost:3001)\n2. 瀏覽器允許連接到 localhost';
+                } else if (e.message && e.message.includes('CORS')) {
+                    errorMsg += 'CORS 錯誤，請使用本地伺服器打開 HTML 檔案';
+                } else {
+                    errorMsg += e.message || '未知錯誤';
+                }
+                showError(errorMsg);
+            } finally {
+                if (btn) {
+                    btn.disabled = false;
+                    btn.textContent = originalText || '登入系統';
+                }
+            }
+        }
+        function showError(msg) { if (typeof Swal !== 'undefined') { Swal.fire({icon:'error', title:msg, background:'#1e293b', color:'white'}); } else { alert(msg); } }
+        function loginSuccess(n, a, u) { 
+            User = { name: n, isAdmin: a, username: u }; 
+            const rem = document.getElementById('remember-me'); 
+            const uEl = document.getElementById('login-user');
+            const pEl = document.getElementById('login-pass');
+            
+            if(rem && rem.checked) { 
+                // 記住帳號和密碼
+                localStorage.setItem('pos_user_v30', JSON.stringify(User)); 
+                if(uEl) localStorage.setItem('pos_last_user', uEl.value.trim()); 
+                if(pEl) localStorage.setItem('pos_last_pass', pEl.value.trim());
+            } else {
+                // 不記住：清除已保存的密碼，但保留帳號（方便下次輸入）
+                localStorage.removeItem('pos_last_pass');
+                if(uEl) localStorage.setItem('pos_last_user', uEl.value.trim());
+            }
+            initSystem(); 
+        }
+        function initSystem() { 
+            document.getElementById('login-overlay').style.display = 'none'; 
+            document.getElementById('user-badge').innerText = User.name; 
+            document.getElementById('staff-name').innerText = User.name; 
+            console.log('使用者權限:', User);
+            // 限制 a002 帳號不能使用「今日」和「未結」功能
+            if(User && User.username === 'a002') {
+                ['d-nav-report','d-nav-pending','m-nav-report','m-nav-pending'].forEach(id => { 
+                    const el = document.getElementById(id); 
+                    if(el) {
+                        el.classList.add('opacity-30', 'pointer-events-none');
+                        el.style.cursor = 'not-allowed';
+                    }
+                }); 
+            } 
+            fetchData(); 
+        }
+        async function fetchData() { 
+            try {
+                console.log('開始載入庫存資料...');
+                const d = await API.getInventory();
+                console.log('收到資料:', d);
+                if (d.status === 'error') { 
+                    document.getElementById('sync-status').innerHTML = '<span class="text-red-500">● 同步失敗</span>'; 
+                    if (typeof Swal !== 'undefined') Swal.fire({ icon: 'error', title: '載入失敗', text: d.msg || '請重新整理', background: '#1e293b', color: 'white' }); 
+                    return; 
+                }
+                DB.inv = d.inventory || []; 
+                DB.sales = d.todaySales || []; 
+                DB.companyTemplates = d.companyTemplates || []; 
+                console.log('庫存資料筆數:', DB.inv.length);
+                console.log('手機資料:', DB.inv.filter(i => i.type === 'phone').length);
+                console.log('配件資料:', DB.inv.filter(i => i.type === 'accessory').length);
+                document.getElementById('sync-status').innerHTML = '<span class="text-green-500">● 已同步</span>'; 
+                if(UI.tab === 'phone') switchMainTab('phone'); 
+                renderReport(); 
+            } catch(e) { 
+                console.error('Data Parse Error', e); 
+                document.getElementById('sync-status').innerHTML = '<span class="text-red-500">● 連線失敗</span>'; 
+            }
+        }
+        function softRefresh() {
+            Swal.fire({title: '同步中...', toast: true, position: 'top-end', showConfirmButton: false, didOpen: () => { Swal.showLoading(); }});
+            fetchData();
+            setTimeout(() => Swal.close(), 800);
+        }
+
+        function switchView(v) { 
+            document.querySelectorAll('.view-section').forEach(e => e.classList.add('hidden')); document.getElementById('view-'+v).classList.remove('hidden'); document.querySelectorAll('.nav-btn').forEach(b => b.classList.replace('text-yellow-400','text-slate-500')); const d = document.getElementById('d-nav-'+v); if(d) d.classList.replace('text-slate-500','text-yellow-400'); document.querySelectorAll('.mobile-nav-item').forEach(b => b.classList.remove('active')); const m = document.getElementById('m-nav-'+v); if(m) m.classList.add('active'); if(window.innerWidth < 768) { document.getElementById('mobile-float-bar-pos').classList.add('translate-y-24'); document.getElementById('mobile-float-bar-restock').classList.add('translate-y-24'); } 
+            if (v === 'setting') {
+                // 設定頁面打開時，不自動展開任何區塊
+            }
+        }
+        function toggleSettingSection(sectionId) {
+            const content = document.getElementById(sectionId + '-content');
+            const icon = document.getElementById(sectionId + '-icon');
+            if (!content || !icon) return;
+            
+            const isHidden = content.classList.contains('hidden');
+            if (isHidden) {
+                content.classList.remove('hidden');
+                icon.classList.remove('fa-chevron-down');
+                icon.classList.add('fa-chevron-up');
+            } else {
+                content.classList.add('hidden');
+                icon.classList.remove('fa-chevron-up');
+                icon.classList.add('fa-chevron-down');
+            }
+        }
+        function openCategorySortPage() {
+            document.getElementById('view-setting').classList.add('hidden');
+            document.getElementById('view-category-sort').classList.remove('hidden');
+            renderCategorySortList();
+        }
+        function closeCategorySortPage() {
+            document.getElementById('view-category-sort').classList.add('hidden');
+            document.getElementById('view-setting').classList.remove('hidden');
+        }
+        function saveCategoryOrderAndClose() {
+            saveCategoryOrder();
+            closeCategorySortPage();
+        }
+        function getCategoryOrder() {
+            try {
+                const saved = localStorage.getItem('pos_category_order_v1');
+                if (saved) return JSON.parse(saved);
+            } catch(e) {}
+            return null;
+        }
+        function saveCategoryOrderToStorage(order) {
+            try {
+                localStorage.setItem('pos_category_order_v1', JSON.stringify(order));
+            } catch(e) {
+                console.error('Save category order fail', e);
+            }
+        }
+        function getOrderedCategories() {
+            const allCats = new Set(DB.inv.filter(i=>i.type==='accessory' && i.category && !i.isHidden).map(i=>i.category));
+            const savedOrder = getCategoryOrder();
+            if (savedOrder && Array.isArray(savedOrder)) {
+                // 使用保存的順序，但也要包含新出現的分類
+                const ordered = savedOrder.filter(c => allCats.has(c));
+                const newCats = Array.from(allCats).filter(c => !savedOrder.includes(c)).sort();
+                return [...ordered, ...newCats];
+            }
+            return Array.from(allCats).sort();
+        }
+        function switchMainTab(t) { 
+            UI.tab = t; document.querySelectorAll('.main-tab').forEach(e => e.classList.remove('active')); document.getElementById('tab-'+t).classList.add('active'); const sub = document.getElementById('sub-cat-scroll'); sub.innerHTML = ''; 
+            if (t === 'phone') { ['庫存中','客訂中','寄賣中'].forEach(s => sub.appendChild(createPill(s, () => filterItems('status', s)))); if(sub.firstChild) sub.firstChild.click(); } else if (t === 'accessory') { const btn = document.createElement('div'); btn.className = 'pill-btn border-blue-500 text-blue-400'; btn.innerHTML = '🏢 公司貨'; btn.onclick = () => { document.querySelectorAll('.pill-btn').forEach(b=>b.classList.remove('active')); btn.classList.add('active'); renderCompanyAccessoryGrid(); }; sub.appendChild(btn); const transferBtn = document.createElement('div'); transferBtn.className = 'pill-btn border-purple-500 text-purple-400'; transferBtn.innerHTML = '🚚 調貨'; transferBtn.onclick = () => { document.querySelectorAll('.pill-btn').forEach(b=>b.classList.remove('active')); transferBtn.classList.add('active'); renderDirectTransferGrid(); }; sub.appendChild(transferBtn); const cats = getOrderedCategories(); cats.forEach(c => sub.appendChild(createPill(c, () => filterItems('cat', c)))); if(sub.childNodes[1]) sub.childNodes[1].click(); } else { renderServiceGrid(); } 
+        }
+        function createPill(t, f) { const d = document.createElement('div'); d.className = 'pill-btn'; d.innerText = t; d.onclick = () => { document.querySelectorAll('.pill-btn').forEach(b=>b.classList.remove('active')); d.classList.add('active'); f(); }; return d; }
+        
+        function filterItems(mode, val) { 
+            const term = document.getElementById('search-input').value.toLowerCase(); const grid = document.getElementById('item-grid'); grid.innerHTML = ''; 
+            let list = DB.inv.filter(i => { if (i.isHidden && !i.category.includes("加工好電池")) return false; if(term) return (i.name.toLowerCase().includes(term) || String(i.stock_id).includes(term)) && i.type === UI.tab; if(UI.tab === 'phone') return i.type === 'phone' && i.status_label === val; if(UI.tab === 'accessory') return i.type === 'accessory' && i.category === val; return false; }); 
+            if(list.length === 0) { grid.innerHTML = '<div class="col-span-full text-center text-slate-600 mt-10">無資料</div>'; return; } 
+            list.forEach(i => { let color = i.type==='phone' ? 'border-blue-500' : 'border-green-500'; let price = i.price > 0 ? `$${i.price.toLocaleString()}` : (i.defaultPrice > 0 ? `$${i.defaultPrice.toLocaleString()}` : ''); let idBadge = i.type==='phone' ? `<span class="text-[10px] bg-slate-800 px-1 rounded text-slate-400">#${i.stock_id}</span>` : ''; let specs = ''; if(i.type === 'phone') { if(i.battery) specs += `<span class="spec-tag"><i class="fa-solid fa-battery-half mr-1"></i>${i.battery}%</span>`; if(i.ios) specs += `<span class="spec-tag">iOS ${i.ios}</span>`; } let switchBtn = ''; if(i.type === 'phone') { switchBtn = `<button onclick="event.stopPropagation(); changeStatus('${i.id}', '${i.status_label}')" class="absolute top-2 right-2 w-8 h-8 rounded-full bg-slate-800 hover:bg-slate-700 text-slate-400 flex items-center justify-center transition shadow-lg"><i class="fa-solid fa-repeat text-xs"></i></button>`; } grid.innerHTML += `<div onclick="triggerAddToCart('${i.id}')" class="glass p-3 rounded-xl border-l-4 ${color} relative group active:scale-95 transition">${switchBtn}<div class="flex justify-between mb-1">${idBadge}<span class="text-xs font-bold text-slate-400">庫: ${i.stock}</span></div><div class="font-bold text-sm text-slate-200 line-clamp-2 leading-tight h-9">${i.name}</div><div class="mt-1 flex flex-wrap gap-1">${specs}</div><div class="mt-2 text-right font-bold text-yellow-500">${price}</div></div>`; }); 
+        }
+
+        async function triggerAddToCart(id) { 
+            const i = DB.inv.find(x => String(x.id) === String(id)); 
+            if(!i) { Swal.fire({icon:'error', title:'找不到商品', text:`ID: ${id}`, background:'#1e293b', color:'white'}); return; } 
+            let p = i.price, q = 1; 
+            let defPrice = i.defaultPrice > 0 ? i.defaultPrice : (i.price > 0 ? i.price : ''); 
+            if (i.type === 'accessory' || i.price === 0) { 
+                const { value } = await Swal.fire({ title: i.name, html: `<input id="sw-p" type="number" class="swal2-input" placeholder="單價" value="${defPrice}"><input id="sw-q" type="number" class="swal2-input" placeholder="數量" value="1">`, background: '#1e293b', color: 'white', preConfirm: () => [document.getElementById('sw-p').value, document.getElementById('sw-q').value] }); 
+                if(!value) return; 
+                p = parseInt(value[0]); q = parseInt(value[1]); 
+            } 
+            Cart.push({ ...i, price: p, quantity: q, itemId: i.id, originalPrice: p, isGift: false }); 
+            renderCart(); 
+        }
+
+        function parseDate(dateValue) {
+            if (!dateValue) return null;
+            if (typeof dateValue === 'string' && dateValue.includes('/')) {
+                try {
+                    return new Date(dateValue.replace(/\s*下午\s*/, ' ').replace(/\s*上午\s*/, ' '));
+                } catch (e) {
+                    return null;
+                }
+            }
+            return new Date(dateValue);
+        }
+        
+        function formatDate(dateValue) {
+            const d = parseDate(dateValue);
+            if (!d || isNaN(d.getTime())) return 'Invalid Date';
+            return d.toLocaleString('zh-TW');
+        }
+        
+        function renderOrderRow(g) {
+            if (BlackList.orders.includes(g.orderId)) return ''; 
+            let statusClass = g.status==='Pending' ? 'text-red-400' : 'text-green-400';
+            let statusText = g.status==='Pending' ? '未結' : '已結';
+            let netColor = g.net >= 0 ? 'text-green-400' : 'text-red-400';
+            let details = g.items.map(it => {
+                if (BlackList.items.includes(it.orderId + '_' + it.itemId)) return ''; 
+                let p = Number(it.salePrice) - Number(it.cost);
+                let pc = p >= 0 ? 'text-green-400' : 'text-red-400';
+                let dName = it.itemName;
+                let prefix = '';
+                if(it.type === 'new_phone') prefix = '(新)';
+                else if(it.type === 'phone' || it.type === 'peer_phone') prefix = '(二)';
+                else if(it.type === 'accessory') prefix = '(配)';
+                else if(it.type === 'repair') prefix = '(維)';
+                else if(it.type === 'wrap') prefix = '(包)';
+                else if(it.type === 'direct_transfer') prefix = '(調)';
+                else if(it.type === 'shipping') prefix = '(運)';
+                if(prefix && !dName.includes(prefix)) { dName = prefix + ' ' + dName; }
+                // 二手機類型：顯示編號（優先使用 stock_id，如果沒有則使用 itemId）
+                if((it.type === 'phone' || it.type === 'new_phone' || it.type === 'peer_phone') && !dName.includes('#')) {
+                    const stockId = it.stock_id || it.itemId || '';
+                    if(stockId) { dName += ` #${stockId}`; }
+                } else if(it.stock_id && !dName.includes('#')) { 
+                    dName += ` #${it.stock_id}`; 
+                }
+                if(it.salePrice === 0 && it.cost > 0 && !dName.includes('(贈)')) { dName += ' <span class="text-red-400 text-[10px] border border-red-400 px-1 rounded">贈</span>'; }
+                let itemKey = `RET_${it.orderId}_${it.itemId}`;
+                ItemRegistry[itemKey] = { ...it, customer: g.customer };
+                let safeCost = Number(it.cost) || 0;
+                return `
+                <div id="item-row-${it.itemId}" class="p-3 bg-slate-900 border-b border-slate-800 last:border-0 grid grid-cols-12 gap-2 items-center text-xs">
+                    <div class="col-span-5">
+                        <div class="text-slate-200 font-bold">${dName}</div>
+                        <div class="text-[10px] text-slate-500 mt-0.5">${formatDate(it.time)}</div>
+                    </div>
+                    <div class="col-span-3 text-right text-yellow-500 font-mono">$${(Number(it.salePrice) || 0).toLocaleString()}</div>
+                    <div class="col-span-2 cp-box">
+                        <span class="cp-cost">本 ${safeCost.toLocaleString()}</span>
+                        <span class="${pc} font-bold">利 ${p.toLocaleString()}</span>
+                    </div>
+                    <div class="col-span-2 text-right">
+                         ${it.type === 'direct_transfer' ? `<button onclick="confirmDeleteOrderItem('${it.orderId}', '${it.itemId}')" class="text-red-400 border border-red-900 bg-red-950/30 px-2 py-1 rounded hover:bg-red-900 transition">刪</button>` : `<button onclick="handleReturnFromRegistry('${itemKey}')" class="text-red-400 border border-red-900 bg-red-950/30 px-2 py-1 rounded hover:bg-red-900 transition">退</button>`}
+                    </div>
+                </div>`;
+            }).join('');
+            if (details.trim() === '') return '';
+            return `
+            <div id="group-${g.orderId}" class="border-b border-slate-700 bg-slate-900/20">
+                <div onclick="this.nextElementSibling.classList.toggle('open')" class="list-row flex justify-between items-center">
+                    <div class="flex-1">
+                        <div class="text-white text-sm font-bold">${g.customer || '過路客'}</div>
+                        <div class="text-xs text-slate-500">${formatDate(g.time)}</div>
+                    </div>
+                    <div class="w-24 text-right">
+                        <div id="total-${g.orderId}" class="text-yellow-500 font-mono text-sm">$${(Number(g.total) || 0).toLocaleString()}</div>
+                        <div class="text-xs font-mono ${netColor}">利 ${(Number(g.net) || 0).toLocaleString()}</div>
+                    </div>
+                    <div class="w-12 text-right text-xs flex flex-col items-end gap-1">
+                        <span class="${statusClass}">${statusText}</span>
+                        ${g.status === 'Pending' ? `<button onclick="event.stopPropagation(); settle('${g.orderId}', ${g.total})" class="text-[10px] bg-green-900 text-green-200 px-1.5 rounded border border-green-700 hover:bg-green-800">入帳</button>` : ''}
+                        <button onclick="event.stopPropagation(); confirmDeleteOrder('${g.orderId}')" class="text-[10px] bg-red-900 text-red-200 px-1.5 rounded border border-red-700 hover:bg-red-800">刪單</button>
+                    </div>
+                </div>
+                <div class="accordion-content shadow-inner">${details}</div>
+            </div>`;
+        }
+
+        function renderExpenseRow(i) {
+            let c = Number(i.cost) || 0;
+            return `<div class="list-row-exp flex justify-between items-center"><div class="flex-1"><div class="text-slate-300 text-sm">${i.itemName}</div><div class="text-xs text-slate-500">${formatDate(i.time)}</div></div><div class="text-red-400 font-mono text-sm">-$${c.toLocaleString()}</div><div class="w-12 text-right text-xs text-slate-500">支出</div></div>`;
+        }
+
+        function openReport() { 
+            // 限制 a002 帳號不能使用「今日」功能
+            if (User && User.username === 'a002') {
+                Swal.fire({ icon: 'warning', title: '權限不足', text: '此帳號無法使用「今日帳務」功能', background: '#1e293b', color: 'white' });
+                return;
+            }
+            switchView('report'); 
+            renderReport(); 
+        }
+        function renderReport() {
+            let stats = { cash:0, pending:0, profit:0, pot:0, exp:0, gift:0 };
+            const div = document.getElementById('today-list'); div.innerHTML='';
+            const groups = {};
+            DB.sales.slice().reverse().forEach(i => {
+                if(BlackList.orders.includes(i.orderId)) return;
+                if(BlackList.items.includes(i.orderId + '_' + i.itemId)) return;
+                if(i.status === 'Returned' || i.status === 'Deleted') return; 
+                if(i.category === '調整入庫') return; 
+                if(i.type === 'expense' || i.type === 'restock' || i.type === 'salary') {
+                    let cost = Number(i.cost) || 0;
+                    stats.exp += Math.abs(cost); 
+                    stats.cash -= Math.abs(cost);
+                    div.innerHTML += renderExpenseRow(i);
+                } else {
+                    if(!groups[i.orderId]) groups[i.orderId] = { ...i, items:[], total:0, net:0 };
+                    groups[i.orderId].items.push(i);
+                    let sale = Number(i.salePrice) || 0;
+                    let cost = Number(i.cost) || 0;
+                    groups[i.orderId].total += sale;
+                    groups[i.orderId].net += (sale - cost); 
+                    if (i.status === 'Completed') { 
+                        stats.cash += sale; 
+                        if(i.type!=='wrap') stats.profit += (sale - cost); 
+                    }
+                    else if (i.status === 'Pending') { 
+                        stats.pending += sale; 
+                        if(i.type!=='wrap') stats.pot += (sale - cost); 
+                    }
+                    if (sale===0 && cost>0) stats.gift += cost;
+                }
+            });
+            Object.values(groups).forEach(g => { div.innerHTML += renderOrderRow(g); });
+            document.getElementById('today-cash').innerText = stats.cash.toLocaleString();
+            document.getElementById('today-pending').innerText = stats.pending.toLocaleString();
+            document.getElementById('today-profit').innerText = stats.profit.toLocaleString();
+            document.getElementById('today-pot').innerText = stats.pot.toLocaleString();
+            document.getElementById('today-exp').innerText = stats.exp.toLocaleString();
+            document.getElementById('today-gift').innerText = stats.gift.toLocaleString();
+        }
+
+        function openPending() { 
+            // 限制 a002 帳號不能使用「未結」功能
+            if (User && User.username === 'a002') {
+                Swal.fire({ icon: 'warning', title: '權限不足', text: '此帳號無法使用「未結帳款」功能', background: '#1e293b', color: 'white' });
+                return;
+            }
+            switchView('pending'); 
+            loadPending(); 
+        }
+        async function loadPending() { 
+            const d = document.getElementById('pending-list'); 
+            d.innerHTML = '<div class="text-center mt-10"><span class="loader"></span></div>'; 
+            try {
+                const res = await API.getPendingOrders(); 
+                DB.pending = res || [];
+                renderPendingList(); 
+            } catch(e) {
+                console.error('載入未結帳款失敗:', e);
+                d.innerHTML = '<div class="text-center text-red-500 mt-10">載入失敗，請重試</div>';
+            }
+        }
+
+        function renderPendingList() {
+            const d = document.getElementById('pending-list'); d.innerHTML = '';
+            if(DB.pending.length === 0) { d.innerHTML='<div class="text-center text-slate-500 mt-10">無未結帳款</div>'; return; } 
+            const groups = {}; 
+            DB.pending.forEach(i => { 
+                if(BlackList.orders.includes(i.orderId)) return;
+                if(BlackList.items.includes(i.orderId + '_' + i.itemId)) return;
+                if(i.status === 'Returned' || i.status === 'Deleted') return; 
+                if(!groups[i.customer]) groups[i.customer] = { ...i, items:[], total:0, net:0 }; 
+                let sale = Number(i.salePrice) || 0;
+                let cost = Number(i.cost) || 0;
+                groups[i.customer].items.push(i); 
+                groups[i.customer].total += sale; 
+                groups[i.customer].net += (sale - cost);
+            });
+            Object.values(groups).forEach(g => { d.innerHTML += renderOrderRow(g); }); 
+        }
+
+        function openHistory() { switchView('history'); setQuickDate('month'); }
+        function setQuickDate(m) { const n = new Date(); const t = d => d.toISOString().split('T')[0]; const s = new Date(); if(m==='month') s.setDate(1); document.getElementById('h-end').value = t(n); document.getElementById('h-start').value = t(s); doHistorySearch(); }
+        async function doHistorySearch() { 
+            const s = document.getElementById('h-start').value; 
+            const e = document.getElementById('h-end').value; 
+            if(!s || !e) return; 
+            Swal.showLoading(); 
+            try {
+                const res = await API.getHistory(s, e);
+                Swal.close(); 
+                DB.history = res || [];
+                renderHistoryList(); 
+            } catch(err) {
+                Swal.close();
+                console.error('載入歷史記錄失敗:', err);
+                Swal.fire({icon:'error', title:'載入失敗', text: err.message || '請重試', background:'#1e293b'});
+            }
+        }
+        function renderHistoryList() {
+            const div = document.getElementById('history-list'); div.innerHTML='';
+            let stats = { cash:0, pending:0, profit:0, pot:0, exp:0, gift:0 };
+            const groups = {};
+            DB.history.forEach(i => {
+                if(BlackList.orders.includes(i.orderId)) return;
+                if(BlackList.items.includes(i.orderId + '_' + i.itemId)) return;
+                if(i.status === 'Returned' || i.status === 'Deleted') return; 
+                if(i.category === '調整入庫') return; 
+                if(i.type === 'expense' || i.type === 'restock' || i.type === 'salary') {
+                    let cost = i.cost || 0;
+                    stats.exp += Math.abs(cost);
+                    div.innerHTML += renderExpenseRow(i);
+                } else {
+                    if(!groups[i.orderId]) groups[i.orderId] = { ...i, items:[], total:0, net:0 };
+                    groups[i.orderId].items.push(i);
+                    let sale = i.salePrice || 0;
+                    let cost = i.cost || 0;
+                    groups[i.orderId].total += sale;
+                    groups[i.orderId].net += (sale - cost);
+                    if (i.status === 'Completed') { stats.cash += sale; if(i.type!=='wrap') stats.profit += (sale - cost); }
+                    else if (i.status === 'Pending') { stats.pending += sale; if(i.type!=='wrap') stats.pot += (sale - cost); }
+                    if (i.salePrice===0 && i.cost>0) stats.gift += cost;
+                }
+            });
+            document.getElementById('h-cash').innerText = stats.cash.toLocaleString();
+            document.getElementById('h-pending').innerText = stats.pending.toLocaleString();
+            document.getElementById('h-profit').innerText = stats.profit.toLocaleString();
+            document.getElementById('h-pot').innerText = stats.pot.toLocaleString();
+            document.getElementById('h-exp').innerText = stats.exp.toLocaleString();
+            document.getElementById('h-gift').innerText = stats.gift.toLocaleString();
+            Object.values(groups).reverse().forEach(g => { div.innerHTML += renderOrderRow(g); });
+        }
+
+        function toggleAcc(id) { document.getElementById(id).classList.toggle('open'); }
+        
+        async function handleReturnFromRegistry(key) {
+            const item = ItemRegistry[key];
+            if (!item) { Swal.fire({icon:'error', title:'資料錯誤', text:'找不到商品資料'}); return; }
+            const { orderId, itemId, type, itemName, quantity, cost, salePrice, customer } = item;
+            const r = await Swal.fire({
+                title: '確認退貨？', text: `${itemName} 將回補庫存`, icon: 'warning', showCancelButton: true, background: '#1e293b', color: 'white'
+            });
+            if (r.isConfirmed) {
+                BlackList.items.push(orderId + '_' + itemId);
+                saveBlacklist();
+                let row = document.getElementById(`item-row-${itemId}`);
+                if(row) { row.style.opacity = "0"; setTimeout(() => row.remove(), 300); }
+                let totalEl = document.getElementById(`total-${orderId}`);
+                if (totalEl) {
+                    let currentTotal = parseInt(totalEl.innerText.replace(/[^0-9-]/g, '')) || 0;
+                    let newTotal = currentTotal - salePrice;
+                    totalEl.innerText = `$${newTotal.toLocaleString()}`;
+                    if (newTotal <= 0) {
+                        let groupEl = document.getElementById(`group-${orderId}`);
+                        if(groupEl) { groupEl.style.opacity = "0"; setTimeout(() => groupEl.remove(), 500); }
+                    }
+                }
+                try {
+                    // handleTransaction 已經處理配件和庫存電池的退貨回補（寫入進出庫流水帳和回補庫存）
+                    // 不需要再調用 handleRestock，避免重複寫入
+                    await API.handleTransaction({action:'return', orderId:orderId, itemId: itemId, quantity: quantity});
+                    if (type === 'phone' || type === 'new_phone' || type === 'peer_phone') {
+                        await API.changePhoneStatus(itemId, '庫存中');
+                    }
+                    // 配件和庫存電池的退貨回補已經在 handleTransaction 中處理，不需要再調用 handleRestock
+                    if(!document.getElementById('view-report').classList.contains('hidden')) renderReport();
+                    if(!document.getElementById('view-pending').classList.contains('hidden')) renderPendingList();
+                    if(!document.getElementById('view-history').classList.contains('hidden')) renderHistoryList();
+                    Swal.fire({icon:'success', title:'退貨完成', timer:1000, background:'#1e293b'});
+                } catch(e) {
+                    console.error('退貨失敗:', e);
+                    Swal.fire({icon:'error', title:'退貨失敗', text: e.message || '請重試', background:'#1e293b'});
+                }
+            }
+        }
+        
+        async function confirmDeleteOrder(oid) {
+            const { value: password } = await Swal.fire({
+                title: '刪除整筆訂單', text: '請輸入管理員密碼', input: 'password', showCancelButton: true, background: '#1e293b', color: 'white'
+            });
+            if (password === 'Apple168168') {
+                BlackList.orders.push(oid);
+                saveBlacklist();
+                if(!document.getElementById('view-report').classList.contains('hidden')) renderReport();
+                if(!document.getElementById('view-pending').classList.contains('hidden')) renderPendingList();
+                if(!document.getElementById('view-history').classList.contains('hidden')) renderHistoryList();
+                try {
+                    await API.handleTransaction({action: 'delete', orderId: oid, person: User.name});
+                    Swal.fire({icon:'success', title:'訂單已刪除', timer:1000, background:'#1e293b'});
+                } catch(e) {
+                    Swal.fire({icon:'error', title:'刪除失敗', text: e.message || '請重試', background:'#1e293b'});
+                }
+            } else if (password) {
+                Swal.fire({icon:'error', title:'密碼錯誤', background:'#1e293b'});
+            }
+        }
+        async function confirmDeleteOrderItem(orderId, itemId) {
+            const { value: password } = await Swal.fire({
+                title: '刪除此項目', text: '請輸入管理員密碼', input: 'password', showCancelButton: true, background: '#1e293b', color: 'white'
+            });
+            if (password === 'Apple168168') {
+                BlackList.items.push(orderId + '_' + itemId);
+                saveBlacklist();
+                let row = document.getElementById(`item-row-${itemId}`);
+                if(row) { row.style.opacity = "0"; setTimeout(() => row.remove(), 300); }
+                let totalEl = document.getElementById(`total-${orderId}`);
+                if (totalEl) {
+                    // 找到這個項目的金額
+                    const item = ItemRegistry[`RET_${orderId}_${itemId}`];
+                    if (item) {
+                        let currentTotal = parseInt(totalEl.innerText.replace(/[^0-9-]/g, '')) || 0;
+                        let newTotal = currentTotal - (Number(item.salePrice) || 0);
+                        totalEl.innerText = `$${newTotal.toLocaleString()}`;
+                        if (newTotal <= 0) {
+                            let groupEl = document.getElementById(`group-${orderId}`);
+                            if(groupEl) { groupEl.style.opacity = "0"; setTimeout(() => groupEl.remove(), 500); }
+                        }
+                    }
+                }
+                try {
+                    // 調貨項目直接刪除，不需要回補庫存
+                    await API.handleTransaction({action: 'delete_item', orderId: orderId, itemId: itemId, person: User.name});
+                    if(!document.getElementById('view-report').classList.contains('hidden')) renderReport();
+                    if(!document.getElementById('view-pending').classList.contains('hidden')) renderPendingList();
+                    if(!document.getElementById('view-history').classList.contains('hidden')) renderHistoryList();
+                    Swal.fire({icon:'success', title:'項目已刪除', timer:1000, background:'#1e293b'});
+                } catch(e) {
+                    console.error('刪除項目失敗:', e);
+                    Swal.fire({icon:'error', title:'刪除失敗', text: e.message || '請重試', background:'#1e293b'});
+                }
+            } else if (password) {
+                Swal.fire({icon:'error', title:'密碼錯誤', background:'#1e293b'});
+            }
+        }
+
+        async function settle(oid, amt) { 
+            const r = await Swal.fire({title:'入帳', input:'number', inputValue:amt, background:'#1e293b', color:'white'});
+            if(r.value) {
+                try {
+                    await API.handleTransaction({action:'settle', orderId:oid, realAmount:r.value});
+                    loadPending(); 
+                    fetchData(); 
+                    Swal.fire({icon:'success', title:'已入帳', timer:1000, background:'#1e293b'});
+                } catch(e) {
+                    console.error('入帳失敗:', e);
+                    Swal.fire({icon:'error', title:'入帳失敗', text: e.message || '請重試', background:'#1e293b'});
+                }
+            }
+        }
+        
+        function renderCompanyAccessoryGrid() { const grid = document.getElementById('item-grid'); grid.innerHTML = ''; if(DB.companyTemplates.length === 0) { grid.innerHTML = '<div class="col-span-full text-center text-slate-500 mt-10">尚無公司配件模板，請至設定新增</div>'; return; } DB.companyTemplates.forEach(t => { grid.innerHTML += `<div onclick="addCompanyTemplateToCart('${t.name}', ${t.cost}, ${t.price})" class="glass p-3 rounded-xl border-l-4 border-blue-400 cursor-pointer active:scale-95 transition group"><div class="flex justify-between mb-1"><span class="text-xs font-bold text-blue-400">公司貨</span></div><div class="font-bold text-sm text-slate-200 line-clamp-2 leading-tight h-9">${t.name}</div><div class="mt-2 text-right font-bold text-yellow-500">$${t.price.toLocaleString()}</div></div>`; }); }
+        function updateCategoryNumbers(list) {
+            Array.from(list.children).forEach((child, i) => {
+                const numSpan = child.querySelector('span:last-child');
+                if (numSpan) numSpan.textContent = i + 1;
+            });
+        }
+        function renderCategorySortList() {
+            const list = document.getElementById('category-sort-list');
+            if (!list) return;
+            const cats = getOrderedCategories();
+            list.innerHTML = '';
+            if (cats.length === 0) {
+                list.innerHTML = '<div class="text-center text-slate-500 py-4">尚無配件分類</div>';
+                return;
+            }
+            let draggedElement = null;
+            const isTouch = 'ontouchstart' in window;
+            
+            cats.forEach((cat, idx) => {
+                const item = document.createElement('div');
+                item.className = 'flex items-center gap-2 p-3 bg-slate-800 rounded-lg border border-slate-700 transition select-none';
+                item.draggable = false;
+                item.dataset.category = cat;
+                item.innerHTML = `
+                    <div class="category-sort-handle flex items-center justify-center w-10 h-10 shrink-0 rounded cursor-grab active:cursor-grabbing touch-none">
+                        <i class="fa-solid fa-grip-vertical text-slate-500 text-lg"></i>
+                    </div>
+                    <span class="flex-1 text-white font-medium min-w-0">${cat}</span>
+                    <span class="text-xs text-slate-500 w-6 text-center shrink-0">${idx + 1}</span>
+                `;
+                const handle = item.querySelector('.category-sort-handle');
+                
+                // 桌面版：僅握把可拖曳
+                handle.draggable = true;
+                handle.addEventListener('dragstart', (e) => {
+                    draggedElement = item;
+                    item.classList.add('opacity-50', 'scale-105', 'border-yellow-500');
+                    e.dataTransfer.effectAllowed = 'move';
+                    e.dataTransfer.setData('text/plain', cat);
+                    e.dataTransfer.setDragImage(item, 0, 0);
+                });
+                handle.addEventListener('dragend', () => {
+                    item.classList.remove('opacity-50', 'scale-105', 'border-yellow-500');
+                    draggedElement = null;
+                    updateCategoryNumbers(list);
+                });
+                item.addEventListener('dragover', (e) => {
+                    e.preventDefault();
+                    e.dataTransfer.dropEffect = 'move';
+                    if (draggedElement && draggedElement !== item) {
+                        const rect = item.getBoundingClientRect();
+                        const next = (e.clientY - rect.top) / (rect.bottom - rect.top) > 0.5;
+                        if (next) list.insertBefore(draggedElement, item.nextSibling);
+                        else list.insertBefore(draggedElement, item);
+                    }
+                });
+                item.addEventListener('drop', (e) => e.preventDefault());
+                
+                // 手機版：僅握把可長按拖曳，其他區域自然捲動
+                if (isTouch) {
+                    let dragMode = false;
+                    let longPressTimer = null;
+                    let startX = 0, startY = 0;
+                    const MOVE_THRESHOLD = 12;
+                    
+                    handle.addEventListener('touchstart', (e) => {
+                        dragMode = false;
+                        if (longPressTimer) clearTimeout(longPressTimer);
+                        startX = e.touches[0].clientX;
+                        startY = e.touches[0].clientY;
+                        longPressTimer = setTimeout(() => {
+                            longPressTimer = null;
+                            dragMode = true;
+                            draggedElement = item;
+                            item.classList.add('opacity-90', 'border-yellow-500');
+                            item.style.position = 'relative';
+                            item.style.zIndex = '50';
+                            item.style.boxShadow = '0 4px 20px rgba(234,179,8,0.2)';
+                        }, 350);
+                    }, { passive: true });
+                    
+                    const handleTouchMove = (e) => {
+                        if (!dragMode && longPressTimer) {
+                            const dx = Math.abs(e.touches[0].clientX - startX);
+                            const dy = Math.abs(e.touches[0].clientY - startY);
+                            if (dx > MOVE_THRESHOLD || dy > MOVE_THRESHOLD) {
+                                clearTimeout(longPressTimer);
+                                longPressTimer = null;
+                                return;
+                            }
+                        }
+                        if (!dragMode || draggedElement !== item) return;
+                        e.preventDefault();
+                        const touchY = e.touches[0].clientY;
+                        const allItems = Array.from(list.children);
+                        const currentIndex = allItems.indexOf(item);
+                        let targetIndex = currentIndex;
+                        for (let i = 0; i < allItems.length; i++) {
+                            if (i === currentIndex) continue;
+                            const other = allItems[i];
+                            const rect = other.getBoundingClientRect();
+                            const centerY = rect.top + rect.height / 2;
+                            if (touchY < centerY && currentIndex > i) { targetIndex = i; break; }
+                            else if (touchY > centerY && currentIndex < i) targetIndex = i + 1;
+                        }
+                        if (targetIndex !== currentIndex && targetIndex >= 0 && targetIndex <= allItems.length) {
+                            if (targetIndex > currentIndex) list.insertBefore(item, allItems[targetIndex] || null);
+                            else list.insertBefore(item, allItems[targetIndex]);
+                            updateCategoryNumbers(list);
+                        }
+                    };
+                    handle.addEventListener('touchmove', handleTouchMove, { passive: false });
+                    
+                    const clearDrag = () => {
+                        if (longPressTimer) { clearTimeout(longPressTimer); longPressTimer = null; }
+                        dragMode = false;
+                        if (draggedElement === item) {
+                            item.classList.remove('opacity-90', 'border-yellow-500');
+                            item.style.position = '';
+                            item.style.zIndex = '';
+                            item.style.boxShadow = '';
+                            draggedElement = null;
+                            updateCategoryNumbers(list);
+                        }
+                    };
+                    handle.addEventListener('touchend', clearDrag, { passive: true });
+                    handle.addEventListener('touchcancel', clearDrag, { passive: true });
+                }
+                
+                list.appendChild(item);
+            });
+        }
+        function saveCategoryOrder() {
+            const list = document.getElementById('category-sort-list');
+            if (!list) return;
+            const order = Array.from(list.children).map(item => item.dataset.category).filter(Boolean);
+            saveCategoryOrderToStorage(order);
+            Swal.fire({icon:'success', title:'已儲存', text:'分類順序已更新', timer:1500, background:'#1e293b'});
+            // 如果當前在配件頁面，重新渲染分類
+            if (UI.tab === 'accessory') {
+                switchMainTab('accessory');
+            }
+        }
+        async function addCompanyTemplateToCart(name, cost, price) { const { value: v } = await Swal.fire({ title: name, html: `<input id="p" type="number" class="swal2-input" value="${price}" placeholder="售價"><input id="q" type="number" class="swal2-input" value="1" placeholder="數量">`, background: '#1e293b', color: 'white', preConfirm: () => [document.getElementById('p').value, document.getElementById('q').value] }); if(v) { Cart.push({ type: 'accessory', category: '公司配件', name: name, price: parseInt(v[0]), cost: cost, quantity: parseInt(v[1]), itemId: 'CP-'+Date.now() }); renderCart(); } }
+        async function addNewCompanyTemplate() { const n = document.getElementById('new-cp-name').value.trim(); const c = document.getElementById('new-cp-cost').value; const p = document.getElementById('new-cp-price').value; if(!n || !c || !p) { Swal.fire({icon:'warning', title:'請填寫完整', toast:true, position:'top', background:'#1e293b'}); return; } try { const res = await API.addCompanyTemplate(n, c, p); if(res.status === 'success') { Swal.fire({icon:'success', title:'已新增', toast:true, position:'top', background:'#1e293b'}); document.getElementById('new-cp-name').value=''; document.getElementById('new-cp-cost').value=''; document.getElementById('new-cp-price').value=''; fetchData(); } else { Swal.fire({icon:'error', title:'新增失敗', text: res.msg || '', background:'#1e293b'}); } } catch(e) { Swal.fire({icon:'error', title:'新增失敗', text: e.message || '請重試', background:'#1e293b'}); } }
+        async function changeStatus(id, s) { 
+            let ns = s === '庫存中' ? '客訂中' : '庫存中'; 
+            const r = await Swal.fire({ title: '切換狀態', text: `改為「${ns}」？`, icon: 'question', showCancelButton: true, background: '#1e293b', color: 'white' });
+            if(r.isConfirmed) { 
+                try {
+                    const res = await API.changePhoneStatus(id, s);
+                    if(res.status === 'success'){ 
+                        Swal.fire({title:'已更新', icon:'success', timer:800, background:'#1e293b'}); 
+                        let item = DB.inv.find(x => x.id == id); 
+                        if(item) { item.status_label = ns; filterItems(null, document.querySelector('.pill-btn.active').innerText); } 
+                    }
+                } catch(e) {
+                    console.error('更改狀態失敗:', e);
+                    Swal.fire({icon:'error', title:'更新失敗', text: e.message || '請重試', background:'#1e293b'});
+                }
+            }
+        }
+        function renderServiceGrid() { document.getElementById('item-grid').innerHTML = `<div onclick="modalRepair()" class="glass p-6 rounded-xl border-l-4 border-yellow-500 flex flex-col items-center justify-center gap-2 active:scale-95 transition"><i class="fa-solid fa-screwdriver-wrench text-4xl text-yellow-500"></i><span class="font-bold">維修登記</span></div><div onclick="modalWrap()" class="glass p-6 rounded-xl border-l-4 border-purple-500 flex flex-col items-center justify-center gap-2 active:scale-95 transition"><i class="fa-solid fa-wand-magic-sparkles text-4xl text-purple-500"></i><span class="font-bold">包膜服務</span></div><div onclick="modalNewPhone()" class="glass p-6 rounded-xl border-l-4 border-green-500 flex flex-col items-center justify-center gap-2 active:scale-95 transition"><i class="fa-solid fa-mobile-screen text-4xl text-green-500"></i><span class="font-bold">新機</span></div><div onclick="modalPeerTransfer()" class="glass p-6 rounded-xl border-l-4 border-blue-500 flex flex-col items-center justify-center gap-2 active:scale-95 transition"><i class="fa-solid fa-truck-fast text-4xl text-blue-500"></i><span class="font-bold">同行調貨</span></div><div onclick="modalShipping()" class="glass p-6 rounded-xl border-l-4 border-slate-400 flex flex-col items-center justify-center gap-2 active:scale-95 transition"><i class="fa-solid fa-truck text-4xl text-slate-400"></i><span class="font-bold">運費</span></div>`; }
+        async function addToCart(id) { const i = DB.inv.find(x => x.id == id); if(!i) return; let p = i.price, q = 1; let defPrice = i.defaultPrice > 0 ? i.defaultPrice : (i.price > 0 ? i.price : ''); if (i.type === 'accessory' || i.price === 0) { const { value } = await Swal.fire({ title: i.name, html: `<input id="sw-p" type="number" class="swal2-input" placeholder="單價" value="${defPrice}"><input id="sw-q" type="number" class="swal2-input" placeholder="數量" value="1">`, background: '#1e293b', color: 'white', preConfirm: () => [document.getElementById('sw-p').value, document.getElementById('sw-q').value] }); if(!value) return; p = parseInt(value[0]); q = parseInt(value[1]); } Cart.push({ ...i, price: p, quantity: q, itemId: i.id, originalPrice: p, isGift: false }); renderCart(); }
+        function renderCart() { 
+            const c = document.getElementById('cart-items'); 
+            c.innerHTML = ''; 
+            let t = 0, cn = 0; 
+            Cart.forEach((item, idx) => { 
+                let s = item.price * item.quantity; 
+                t += s; 
+                cn += item.quantity; 
+                let g = item.isGift ? 'text-red-400 border-red-400' : 'text-slate-500 border-slate-600'; 
+                let nameLine = item.name; 
+                if (item.type === 'phone' || item.type === 'new_phone' || item.type === 'peer_phone') { 
+                    if (item.stock_id) nameLine += ' <span class="text-slate-400 text-xs">#' + item.stock_id + '</span>'; 
+                } 
+                nameLine += ' <span class="text-yellow-500 text-xs">x' + item.quantity + '</span>'; 
+                // 配件和所有維修都可以標記為「贈」
+                const showGiftBtn = (item.type === 'accessory' || item.type === 'repair' || item.type === 'shipping');
+                c.innerHTML += `<div class="bg-slate-800 p-2 rounded-lg flex justify-between items-center text-sm"><div class="flex-1"><div class="text-white font-bold">${nameLine}</div><div class="text-xs text-slate-500">$${item.price}</div></div><div class="flex items-center gap-2">${showGiftBtn ? `<button onclick="toggleGift(${idx})" class="text-xs border px-1 rounded ${g}">贈</button>` : ''}<button onclick="Cart.splice(${idx},1);renderCart()" class="text-slate-500 px-2"><i class="fa-solid fa-trash"></i></button></div></div>`; 
+            }); 
+            document.getElementById('cart-total').innerText = t.toLocaleString(); 
+            document.getElementById('mob-total').innerText = '$' + t.toLocaleString(); 
+            document.getElementById('mob-count').innerText = cn; 
+            const f = document.getElementById('mobile-float-bar-pos'); 
+            if(cn > 0) f.classList.remove('translate-y-24'); 
+            else f.classList.add('translate-y-24'); 
+        }
+        function toggleGift(idx) { let item = Cart[idx]; if(item.isGift) { item.isGift = false; item.price = item.originalPrice; item.name = item.name.replace(' (贈)',''); } else { item.isGift = true; item.price = 0; item.name += ' (贈)'; } renderCart(); }
+        function clearRestockCart() { RestockCart=[]; renderRestockCartList(); toggleMobileCart('restock', false); }
+        
+        async function confirmCheckout() { 
+            try {
+                if(Cart.length === 0) return; 
+                const confirm = await Swal.fire({ title: '確定要結帳嗎？', showCancelButton: true, confirmButtonText: '確定結帳', cancelButtonText: '取消', background: '#1e293b', color: 'white' });
+                if (!confirm.isConfirmed) return;
+                const cust = document.getElementById('cust-name').value || '過路客'; 
+                const pay = document.querySelector('input[name="pay"]:checked').value; 
+                const oid = 'ORD' + Date.now().toString().slice(-6); 
+                const items = Cart.map(item => {
+                    let finalName = item.name; 
+                    let prefix = '';
+                    if(item.type === 'new_phone') prefix = '(新) ';
+                    else if(item.type === 'phone' || item.type === 'peer_phone') prefix = '(二) ';
+                    else if(item.type === 'repair') prefix = '(維) ';
+                    else if(item.type === 'wrap') prefix = '(包) ';
+                    else if(item.type === 'direct_transfer') prefix = '(調) ';
+                    else if(item.type === 'shipping') prefix = '(運) ';
+                    let suffix = ''; if(item.type === 'phone' && item.stock_id) { suffix = ` #${item.stock_id}`; }
+                    if(item.type !== 'accessory' && item.type !== 'direct_transfer') finalName = prefix + item.name.replace('(贈)', '').trim() + suffix; 
+                    else finalName = item.name.replace('(贈)', '').trim();
+                    let safePrice = Number(item.price) || 0, safeCost = Number(item.cost) || 0, safeQty = Number(item.quantity) || 1;
+                    if(item.type === 'phone') { let i = DB.inv.find(x => x.id === item.itemId); if(i) i.status_label = '已售出'; }
+                    return { 
+                        itemName: finalName, 
+                        name: item.name || finalName,  // 直接調貨使用 name
+                        type: item.type, 
+                        itemId: item.itemId, 
+                        salePrice: safePrice * safeQty, 
+                        cost: safeCost * safeQty, 
+                        profit: (safePrice - safeCost) * safeQty, 
+                        quantity: safeQty, 
+                        imei: item.imei||'', 
+                        modelName: item.modelName||'', 
+                        reason: item.reason||'',           // 故障原因（更換物品）
+                        description: item.description||'', // 故障描述
+                        isStockBattery: item.isStockBattery, 
+                        isDirectTransfer: item.isDirectTransfer || false,  // 標記為直接調貨
+                        batteryCat: item.batteryCat||'', 
+                        category: item.category||'', 
+                        dealerName: item.dealerName||'', 
+                        customer: item.customer||'' 
+                    };
+                });
+                Swal.fire({ title: '結帳處理中...', html: '正在寫入資料，請勿關閉視窗', allowOutsideClick: false, didOpen: () => { Swal.showLoading(); } }); 
+                try {
+                    const result = await API.checkoutOrder({ orderId: oid, customer: cust, payMethod: pay, person: User.name, items: items });
+                    if (result.status === 'error') { 
+                        Swal.fire({icon:'error', title:'結帳失敗', text: result.msg || '請截圖通知管理員', background: '#1e293b'}); 
+                        return; 
+                    }
+                    Cart = []; 
+                    renderCart(); 
+                    toggleMobileCart('pos', false);
+                    try { const activeBtn = document.querySelector('.pill-btn.active'); if(activeBtn) filterItems(null, activeBtn.innerText); } catch(e) {}
+                    Swal.update({ html: '寫入成功，正在載入今日帳務...' });
+                    try {
+                        const fd = await API.getTodaySalesOnly();
+                        if (fd.status === 'error') { 
+                            Swal.fire({icon:'warning', title:'結帳已寫入', text: '今日帳務同步失敗，請手動重新整理', background: '#1e293b'}); 
+                            return; 
+                        }
+                        DB.sales = fd.todaySales || [];
+                        if (UI.tab === 'phone') switchMainTab('phone');
+                        renderReport();
+                        document.getElementById('sync-status').innerHTML = '<span class="text-green-500">● 已同步</span>';
+                        Swal.fire({icon:'success', title:'結帳完成', timer: 1500, background: '#1e293b'});
+                        fetchData();
+                    } catch(e) { 
+                        console.error('載入今日帳務失敗:', e);
+                        Swal.fire({icon:'success', title:'結帳完成', text: '若今日帳務未更新請手動重新整理', timer: 2000, background: '#1e293b'}); 
+                        fetchData(); 
+                    }
+                } catch(e) {
+                    console.error('結帳失敗:', e);
+                    Swal.fire({icon:'error', title:'結帳失敗', text: '請截圖通知管理員: ' + (e && e.message ? e.message : String(e)), background:'#1e293b'});
+                }
+            } catch(e) {
+                console.error(e);
+                Swal.fire({icon:'error', title:'結帳失敗', text: '請截圖通知管理員: ' + e.message, background:'#1e293b'});
+            }
+        }
+
+        function toggleMobileCart(t, s) { const p = (t==='pos') ? document.getElementById('cart-panel') : document.getElementById('rs-cart-panel'); if(s) { p.classList.remove('hidden'); p.classList.add('flex', 'fixed', 'inset-0', 'z-50'); if (t === 'pos') { p.classList.add('mobile-cart-open'); resetCartFooterDrag(); } } else { if (t === 'pos') { p.classList.remove('mobile-cart-open'); resetCartFooterDrag(); } p.classList.add('hidden'); p.classList.remove('flex', 'fixed', 'inset-0', 'z-50'); } }
+        function setRestockMode(m) { UI.rsMode = m; document.getElementById('rm-inv').className = m==='inventory' ? 'pill-btn active' : 'pill-btn'; document.getElementById('rm-exp').className = m==='expense' ? 'pill-btn active' : 'pill-btn'; if(m === 'inventory') { document.getElementById('rs-toolbar-inv').classList.remove('hidden'); document.getElementById('rs-toolbar-exp').classList.add('hidden'); document.getElementById('mobile-float-bar-restock').classList.remove('hidden'); const sub = document.getElementById('rs-cat-scroll'); sub.innerHTML = ''; sub.appendChild(createRsPill('全部', 'all')); const hiddenBtn = document.createElement('div'); hiddenBtn.className='pill-btn border-pink-500 text-pink-400'; hiddenBtn.innerText='🔧 維修料件'; hiddenBtn.onclick=()=>{ UI.rsCat='hidden_parts'; document.querySelectorAll('.rs-pill').forEach(b=>b.classList.remove('active')); hiddenBtn.classList.add('active'); renderRestockGrid(); }; sub.appendChild(hiddenBtn); const cats = new Set(DB.inv.filter(i=>i.type==='accessory' && i.category && !i.isHidden).map(i=>i.category)); Array.from(cats).sort().forEach(c => sub.appendChild(createRsPill(c, c))); renderRestockGrid(); } else { document.getElementById('rs-toolbar-inv').classList.add('hidden'); document.getElementById('rs-toolbar-exp').classList.remove('hidden'); document.getElementById('mobile-float-bar-restock').classList.add('hidden'); document.getElementById('rs-grid').innerHTML = ''; renderRestockCartList(); } }
+        function createRsPill(t, v) { const d = document.createElement('div'); d.className = 'pill-btn rs-pill'; d.innerText = t; if(UI.rsCat === v) d.classList.add('active'); d.onclick = () => { UI.rsCat = v; document.querySelectorAll('.rs-pill').forEach(b=>b.classList.remove('active')); d.classList.add('active'); renderRestockGrid(); }; return d; }
+        function renderRestockGrid() { if(UI.rsMode === 'expense') return; const term = document.getElementById('rs-search').value.toLowerCase(); const grid = document.getElementById('rs-grid'); grid.innerHTML = ''; let list = DB.inv.filter(i => { if (i.type !== 'accessory') return false; if (term) return i.name.toLowerCase().includes(term); if (UI.rsCat === 'hidden_parts') return i.isHidden; if (UI.rsCat === 'all') return !i.isHidden; return i.category === UI.rsCat; }); if(list.length === 0) { grid.innerHTML = '<div class="col-span-full text-center text-slate-500 mt-4">無符合商品</div>'; return; } list.forEach(i => { let border = i.isHidden ? 'border-pink-500' : 'border-blue-500'; grid.innerHTML += `<div class="glass p-3 rounded-xl border-l-4 ${border} relative group active:scale-95 transition"><button onclick="event.stopPropagation(); editAccessory('${i.id}', '${i.name}', ${i.cost}, ${i.defaultPrice})" class="absolute top-2 right-2 text-slate-500 hover:text-white p-1"><i class="fa-solid fa-pen-to-square"></i></button><div onclick="addRsItem('${i.id}')" class="cursor-pointer"><div class="flex justify-between text-xs text-slate-500"><span>${i.category}</span><span>庫: ${i.stock}</span></div><div class="font-bold text-sm text-slate-200 line-clamp-2 my-1">${i.name}</div><div class="text-right text-xs text-slate-400">成本 $${i.cost}</div></div></div>`; }); }
+        async function editAccessory(id, n, c, p) { const { value: v } = await Swal.fire({ title: '編輯商品', html: `<div class="text-xs text-slate-400 mb-2">${n}</div><label class="text-xs text-slate-500 block text-left">成本</label><input id="sw-edit-c" class="swal2-input" type="number" value="${c}"><label class="text-xs text-slate-500 block text-left mt-2">建議售價</label><input id="sw-edit-p" class="swal2-input" type="number" value="${p}">`, background: '#1e293b', color: 'white', showCancelButton: true, preConfirm: () => [document.getElementById('sw-edit-c').value, document.getElementById('sw-edit-p').value] }); if (v) { google.script.run.withSuccessHandler(res => { if (res === 'SUCCESS') { Swal.fire({title:'已更新', toast:true, position:'top', timer:1000, background:'#1e293b'}); let item = DB.inv.find(x => x.id == id); if(item) { item.cost = parseInt(v[0]); item.defaultPrice = parseInt(v[1]); } renderRestockGrid(); } }).apiUpdateAccessory(id, v[0], v[1]); } }
+        async function addRsItem(id) { const i = DB.inv.find(x=>x.id==id); const {value:q} = await Swal.fire({title:i.name, input:'number', inputValue:1, background:'#1e293b', color:'white'}); if(q) { RestockCart.push({type:'restock', name:i.name, category:i.category, cost:i.cost, quantity:parseInt(q)}); renderRestockCartList(); } }
+        async function addExpItem(type) { const { value } = await Swal.fire({ title: type, html: `<input id="ex-n" class="swal2-input" placeholder="備註 (如: 便當/抽成)"><input id="ex-a" type="number" class="swal2-input" placeholder="金額">`, background:'#1e293b', color:'white', preConfirm:()=>[document.getElementById('ex-n').value, document.getElementById('ex-a').value] }); if(value && value[1]) { RestockCart.push({type: type==='薪資/抽成'?'salary':'expense', name:`[${type}] ${value[0]}`, cost:parseInt(value[1]), quantity:1}); renderRestockCartList(); } }
+        function renderRestockCartList() { const d = document.getElementById('rs-cart-items'); d.innerHTML=''; let t = 0, c = 0; RestockCart.forEach((i, idx) => { t += (i.cost*i.quantity); c += 1; d.innerHTML += `<div class="flex justify-between text-sm bg-slate-900 p-2 rounded mb-1"><span>${i.name} <span class="text-yellow-500">x${i.quantity}</span></span><div class="flex gap-2 items-center"><span class="text-red-400">$${i.cost*i.quantity}</span><i onclick="RestockCart.splice(${idx},1);renderRestockCartList()" class="fa-solid fa-trash text-slate-500 cursor-pointer"></i></div></div>`; }); document.getElementById('rs-cart-total').innerText = t.toLocaleString(); document.getElementById('rs-mob-total').innerText = '$' + t.toLocaleString(); document.getElementById('rs-mob-count').innerText = c; const f = document.getElementById('mobile-float-bar-restock'); if(c > 0 && UI.rsMode === 'inventory') f.classList.remove('translate-y-24'); else f.classList.add('translate-y-24'); }
+        function clearRestockCart() { RestockCart=[]; renderRestockCartList(); toggleMobileCart('restock', false); }
+        async function submitRestock() { 
+            if(RestockCart.length===0) return; 
+            const oid = 'EXP'+Date.now().toString().slice(-6); 
+            try {
+                const r = await API.handleRestock({items:RestockCart, person:User.name, orderId:oid});
+                if(r.status==='error'){ 
+                    Swal.fire({icon:'error', title:'進貨失敗', text: r.msg||'請重試', background:'#1e293b'}); 
+                    return; 
+                }
+                RestockCart=[]; 
+                renderRestockCartList(); 
+                toggleMobileCart('restock', false); 
+                fetchData(); 
+                Swal.fire({icon:'success', title:'已送出', background:'#1e293b'});
+            } catch(err) {
+                Swal.fire({icon:'error', title:'進貨失敗', text: (err&&err.message)||'請重試', background:'#1e293b'});
+            }
+        }
+        async function modalNewPhone() { const {value:v}=await Swal.fire({title:'新機',html:'<input id="n1" class="swal2-input" placeholder="同行名稱"><input id="n2" class="swal2-input" type="number" placeholder="成本"><input id="n3" class="swal2-input" placeholder="IMEI"><input id="n4" class="swal2-input" type="number" placeholder="銷售金額"><input id="n5" class="swal2-input" placeholder="客戶名稱"><input id="n6" class="swal2-input" placeholder="型號（流水用）"><input id="n7" class="swal2-input" placeholder="容量（流水用）"><input id="n8" class="swal2-input" placeholder="顏色（流水用）">',background:'#1e293b', color:'white', preConfirm:()=>[document.getElementById('n1').value,document.getElementById('n2').value,document.getElementById('n3').value,document.getElementById('n4').value,document.getElementById('n5').value,document.getElementById('n6').value,document.getElementById('n7').value,document.getElementById('n8').value]}); if(v&&v[1]&&v[4]){const spec=[v[5],v[6],v[7]].filter(Boolean).join(' '); Cart.push({type:'new_phone',name:'新機 '+v[0]+(spec?' '+spec:''),dealerName:v[0],cost:Number(v[1]),price:Number(v[3]),imei:v[2],customer:v[4],quantity:1,itemId:'NP-'+Date.now()});renderCart();}}
+        async function modalPeerTransfer() { const {value:v}=await Swal.fire({title:'同行調貨',html:'<input id="p1" class="swal2-input" placeholder="同行名稱"><input id="p2" class="swal2-input" type="number" placeholder="成本"><input id="p3" class="swal2-input" placeholder="IMEI"><input id="p4" class="swal2-input" type="number" placeholder="銷售金額"><input id="p5" class="swal2-input" placeholder="客戶名稱"><input id="p6" class="swal2-input" placeholder="型號（流水用）"><input id="p7" class="swal2-input" placeholder="容量（流水用）"><input id="p8" class="swal2-input" placeholder="顏色（流水用）">',background:'#1e293b', color:'white', preConfirm:()=>[document.getElementById('p1').value,document.getElementById('p2').value,document.getElementById('p3').value,document.getElementById('p4').value,document.getElementById('p5').value,document.getElementById('p6').value,document.getElementById('p7').value,document.getElementById('p8').value]}); if(v&&v[1]&&v[4]){const spec=[v[5],v[6],v[7]].filter(Boolean).join(' '); Cart.push({type:'peer_phone',name:'同行 '+v[0]+(spec?' '+spec:''),dealerName:v[0],cost:Number(v[1]),price:Number(v[3]),imei:v[2],customer:v[4],quantity:1,itemId:'PP-'+Date.now()});renderCart();}}
+
+        async function modalRepair() {
+            const { value: t } = await Swal.fire({ input: 'select', inputOptions: { 'gen': '一般', 'stock': '庫存電池' }, background: '#1e293b', color: 'white' });
+            if (!t) return;
+            if (t === 'stock') {
+                // 電池維修：選擇庫存電池，然後顯示維修登記表單
+                const BATTERY_CATS = ['已加工成品電池', '成品大容量電池'];
+                const batteries = DB.inv.filter(i => i.type === 'accessory' && i.category && BATTERY_CATS.includes(i.category) && Number(i.stock) > 0);
+                if (batteries.length === 0) { Swal.fire({ icon: 'warning', title: '無庫存電池', text: '請先至進貨補貨（僅顯示已加工成品電池、成品大容量電池）', background: '#1e293b', color: 'white' }); return; }
+                const options = {}; batteries.forEach(b => { options['b' + b.id] = (b.category || '電池') + ' - ' + b.name + ' (庫存 ' + b.stock + ')'; });
+                const { value: bid } = await Swal.fire({ title: '選擇庫存電池', input: 'select', inputOptions: options, background: '#1e293b', color: 'white' });
+                if (!bid) return;
+                const item = batteries.find(b => 'b' + b.id === bid);
+                // 庫存電池維修：顯示維修登記表單（型號、序號、更換物品、客戶、價格），然後寫入維修紀錄
+                const { value: v } = await Swal.fire({ 
+                    title: '維修登記 - 庫存電池',
+                    html: '<input id="r1" class="swal2-input" placeholder="型號"><input id="r2" class="swal2-input" placeholder="序號（IMEI）"><input id="r3" class="swal2-input" placeholder="更換物品"><input id="r4" class="swal2-input" placeholder="客戶名稱"><input id="r5" class="swal2-input" type="number" placeholder="成本"><input id="r6" class="swal2-input" type="number" placeholder="價格">', 
+                    background: '#1e293b', 
+                    color: 'white', 
+                    preConfirm: () => [
+                        document.getElementById('r1').value,  // 型號
+                        document.getElementById('r2').value,  // 序號（IMEI）
+                        document.getElementById('r3').value,  // 更換物品（故障原因/描述）
+                        document.getElementById('r4').value,  // 客戶名稱
+                        document.getElementById('r5').value,  // 成本
+                        document.getElementById('r6').value   // 價格
+                    ] 
+                });
+                if (v && v[0] && v[4]) { 
+                    Cart.push({ 
+                        type: 'repair', 
+                        name: '維修:庫存電池 ' + item.name, 
+                        modelName: v[0] || '',           // 型號
+                        imei: v[1] || '',                // 序號（IMEI）
+                        reason: v[2] || '',              // 更換物品（故障原因）
+                        description: v[2] || '',         // 故障描述（與更換物品相同）
+                        customer: v[3] || '',            // 客戶名稱
+                        cost: item.cost,                 // 電池成本
+                        price: Number(v[4]) || 0,        // 價格
+                        quantity: 1, 
+                        itemId: item.id,                 // 使用電池的 ID，用於扣庫存
+                        isStockBattery: true,            // 標記為庫存電池維修
+                        batteryCat: item.category || '電池',
+                        batteryName: item.name           // 電池名稱
+                    }); 
+                    renderCart(); 
+                }
+            } else {
+                // 一般維修：輸入型號、序號（IMEI）、更換物品、客戶、成本、價格
+                const { value: v } = await Swal.fire({ 
+                    html: '<input id="r1" class="swal2-input" placeholder="型號"><input id="r2" class="swal2-input" placeholder="序號（IMEI）"><input id="r3" class="swal2-input" placeholder="更換物品"><input id="r4" class="swal2-input" placeholder="客戶名稱"><input id="r5" class="swal2-input" type="number" placeholder="成本"><input id="r6" class="swal2-input" type="number" placeholder="價格">', 
+                    background: '#1e293b', 
+                    color: 'white', 
+                    preConfirm: () => [
+                        document.getElementById('r1').value,  // 型號
+                        document.getElementById('r2').value,  // 序號（IMEI）
+                        document.getElementById('r3').value,  // 更換物品（故障原因/描述）
+                        document.getElementById('r4').value,  // 客戶名稱
+                        document.getElementById('r5').value,  // 成本
+                        document.getElementById('r6').value   // 價格
+                    ] 
+                });
+                if (v && v[0] && v[5]) { 
+                    Cart.push({ 
+                        type: 'repair', 
+                        name: '維修:' + v[0], 
+                        modelName: v[0], 
+                        imei: v[1] || '',           // 序號（IMEI）
+                        reason: v[2] || '',         // 更換物品（故障原因）
+                        description: v[2] || '',    // 故障描述（與更換物品相同）
+                        customer: v[3] || '',       // 客戶名稱
+                        cost: Number(v[4]) || 0,   // 成本（當日叫貨用，僅流水與利潤顯示）
+                        price: Number(v[5]) || 0,   // 價格
+                        quantity: 1, 
+                        itemId: 'REP-' + Date.now(),
+                        isStockBattery: false       // 一般維修，不是庫存電池
+                    }); 
+                    renderCart(); 
+                }
+            }
+        }
+
+        async function modalWrap(){const {value:v}=await Swal.fire({html:'<input id="w1" class="swal2-input" placeholder="項目"><input id="w2" class="swal2-input" placeholder="售價">',background:'#1e293b',preConfirm:()=>[document.getElementById('w1').value,document.getElementById('w2').value]}); if(v){Cart.push({type:'wrap',name:'包膜:'+v[0],cost:0,price:v[1],quantity:1,itemId:'W-'+Date.now()});renderCart();}}
+        async function modalShipping(){const {value:v}=await Swal.fire({title:'運費',input:'number',inputPlaceholder:'金額',background:'#1e293b',color:'white'}); if(v!=null&&v!==''){const amt=Number(v)||0; Cart.push({type:'shipping',name:'運費',cost:amt,price:amt,quantity:1,itemId:'SF-'+Date.now(),originalPrice:amt,isGift:false}); renderCart();}}
+        function renderDirectTransferGrid() {
+            const grid = document.getElementById('item-grid');
+            grid.innerHTML = '';
+            // 顯示一個「新增調貨」的按鈕
+            grid.innerHTML = `<div onclick="modalDirectTransfer()" class="glass p-6 rounded-xl border-l-4 border-purple-500 flex flex-col items-center justify-center gap-2 active:scale-95 transition cursor-pointer"><i class="fa-solid fa-truck-fast text-4xl text-purple-500"></i><span class="font-bold text-white">新增調貨</span><span class="text-xs text-slate-400">點擊新增調貨項目</span></div>`;
+        }
+        async function modalDirectTransfer() {
+            const { value: v } = await Swal.fire({
+                title: '調貨',
+                html: '<input id="dt1" class="swal2-input" placeholder="調貨廠商"><input id="dt2" class="swal2-input" placeholder="品項"><input id="dt3" class="swal2-input" type="number" placeholder="成本"><input id="dt4" class="swal2-input" type="number" placeholder="售價">',
+                background: '#1e293b',
+                color: 'white',
+                preConfirm: () => [
+                    document.getElementById('dt1').value,  // 調貨廠商
+                    document.getElementById('dt2').value,  // 品項
+                    document.getElementById('dt3').value,  // 成本
+                    document.getElementById('dt4').value   // 售價
+                ]
+            });
+            if (v && v[0] && v[1] && v[2] && v[3]) {
+                Cart.push({
+                    type: 'direct_transfer',
+                    name: '調貨: ' + v[1],
+                    dealerName: v[0],  // 調貨廠商
+                    cost: Number(v[2]) || 0,
+                    price: Number(v[3]) || 0,
+                    quantity: 1,
+                    itemId: 'DT-' + Date.now(),
+                    isDirectTransfer: true  // 標記為直接調貨，不扣庫存
+                });
+                renderCart();
+            }
+        }
+        async function doLogout(){ 
+            const result = await Swal.fire({
+                title: '確定要登出嗎？',
+                text: '登出後需要重新輸入帳號密碼',
+                icon: 'question',
+                showCancelButton: true,
+                confirmButtonText: '確定登出',
+                cancelButtonText: '取消',
+                confirmButtonColor: '#ef4444',
+                cancelButtonColor: '#64748b',
+                background: '#1e293b',
+                color: 'white'
+            });
+            if (result.isConfirmed) {
+                localStorage.removeItem('pos_user_v30');
+                location.reload();
+            }
+        }
+    </script>
+</body>
+</html>
