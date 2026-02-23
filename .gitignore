@@ -1,0 +1,8 @@
+_CHECKPOINT_紀錄點/
+.cursor/
+.vscode/
+.clasp.json
+appsscript.json
+*.sh
+*.txt
+.DS_Store
