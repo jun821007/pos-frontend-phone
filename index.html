@@ -1308,7 +1308,7 @@
                 // 庫存電池維修：顯示維修登記表單（型號、序號、更換物品、客戶、價格），然後寫入維修紀錄
                 const { value: v } = await Swal.fire({ 
                     title: '維修登記 - 庫存電池',
-                    html: '<input id="r1" class="swal2-input" placeholder="型號"><input id="r2" class="swal2-input" placeholder="序號（IMEI）"><input id="r3" class="swal2-input" placeholder="更換物品"><input id="r4" class="swal2-input" placeholder="客戶名稱"><input id="r5" class="swal2-input" type="number" placeholder="成本"><input id="r6" class="swal2-input" type="number" placeholder="價格">', 
+                    html: '<input id="r1" class="swal2-input" placeholder="型號"><input id="r2" class="swal2-input" placeholder="序號（IMEI）"><input id="r3" class="swal2-input" placeholder="更換物品"><input id="r4" class="swal2-input" placeholder="客戶名稱"><input id="r5" class="swal2-input" type="number" placeholder="價格（成本已帶入庫存）">', 
                     background: '#1e293b', 
                     color: 'white', 
                     preConfirm: () => [
@@ -1316,8 +1316,7 @@
                         document.getElementById('r2').value,  // 序號（IMEI）
                         document.getElementById('r3').value,  // 更換物品（故障原因/描述）
                         document.getElementById('r4').value,  // 客戶名稱
-                        document.getElementById('r5').value,  // 成本
-                        document.getElementById('r6').value   // 價格
+                        document.getElementById('r5').value   // 價格
                     ] 
                 });
                 if (v && v[0] && v[4]) { 
@@ -1329,7 +1328,7 @@
                         reason: v[2] || '',              // 更換物品（故障原因）
                         description: v[2] || '',         // 故障描述（與更換物品相同）
                         customer: v[3] || '',            // 客戶名稱
-                        cost: item.cost,                 // 電池成本
+                        cost: item.cost || 0,            // 庫存已有成本，自動帶入
                         price: Number(v[4]) || 0,        // 價格
                         quantity: 1, 
                         itemId: item.id,                 // 使用電池的 ID，用於扣庫存
