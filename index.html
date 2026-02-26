@@ -183,7 +183,7 @@
             <div id="rs-cart-panel" class="hidden md:flex w-80 bg-slate-900 border-l border-slate-800 flex-col h-full z-30 absolute md:static inset-0 md:inset-auto">
                 <div class="p-3 border-b border-slate-800 flex justify-between items-center bg-slate-800/50"><h2 class="font-bold text-white">進貨清單</h2><button onclick="toggleMobileCart('restock',false)" class="md:hidden text-slate-400 p-2"><i class="fa-solid fa-chevron-down"></i></button><button onclick="clearRestockCart()" class="text-xs text-red-400 hidden md:block">清空</button></div>
                 <div id="rs-cart-items" class="flex-1 overflow-y-auto p-3 space-y-2"></div>
-                <div class="p-4 bg-slate-800 border-t border-slate-700 space-y-3"><div class="flex justify-between items-end"><span class="text-slate-400 text-sm">總支出</span><span class="text-2xl font-bold text-red-400" id="rs-cart-total">0</span></div><button onclick="submitRestock()" class="w-full bg-red-600 hover:bg-red-500 text-white font-bold py-3 rounded-xl shadow-lg active:scale-95 transition">確認送出</button></div>
+                <div class="p-4 bg-slate-800 border-t border-slate-700 space-y-3"><div class="flex justify-between items-end"><span class="text-slate-400 text-sm">總支出</span><span class="text-2xl font-bold text-red-400" id="rs-cart-total">0</span></div><button id="btn-submit-restock" onclick="submitRestock()" class="w-full bg-red-600 hover:bg-red-500 text-white font-bold py-3 rounded-xl shadow-lg active:scale-95 transition">確認送出</button></div>
             </div>
             <div id="mobile-float-bar-restock" onclick="toggleMobileCart('restock', true)" class="md:hidden fixed bottom-16 left-4 right-4 bg-red-600 text-white p-3 rounded-xl shadow-2xl flex justify-between items-center z-40 transform translate-y-24 transition-transform duration-300 hidden"><div class="font-bold flex items-center gap-2"><div class="bg-white text-red-600 w-6 h-6 rounded-full flex items-center justify-center text-xs" id="rs-mob-count">0</div> 待入庫</div><div class="font-mono font-bold text-lg" id="rs-mob-total">0</div></div>
         </div>
@@ -215,9 +215,29 @@
                         <input type="number" id="new-cp-price" class="input-dark p-2 rounded text-sm" placeholder="售價">
                         <button onclick="addNewCompanyTemplate()" class="bg-blue-600 hover:bg-blue-500 text-white rounded font-bold text-sm py-2">新增</button>
                     </div>
+                    <div id="company-template-list" class="space-y-2 max-h-40 overflow-y-auto"></div>
                 </div>
             </div>
             
+            <!-- 新增配件品項（庫存清單） -->
+            <div class="glass rounded-xl border-l-4 border-amber-500 overflow-hidden">
+                <button onclick="toggleSettingSection('add-accessory')" class="w-full p-4 flex items-center justify-between hover:bg-slate-800/50 transition">
+                    <div class="flex items-center gap-3">
+                        <i class="fa-solid fa-plus text-amber-400 text-xl"></i>
+                        <h3 class="font-bold text-lg text-amber-400">新增配件品項</h3>
+                    </div>
+                    <i id="add-accessory-icon" class="fa-solid fa-chevron-down text-slate-400 transition-transform"></i>
+                </button>
+                <div id="add-accessory-content" class="hidden px-4 pb-4 space-y-3">
+                    <p class="text-xs text-slate-500">ID 自動流水，原始庫存=0</p>
+                    <div class="grid grid-cols-1 gap-2">
+                        <input type="text" id="new-acc-category" class="input-dark p-2 rounded text-sm" placeholder="分類 (如: 保護殼)">
+                        <input type="text" id="new-acc-name" class="input-dark p-2 rounded text-sm" placeholder="品項名稱">
+                        <button onclick="addNewAccessory()" class="bg-amber-600 hover:bg-amber-500 text-white rounded font-bold text-sm py-2">新增</button>
+                    </div>
+                </div>
+            </div>
+
             <!-- 配件分類排序（進入獨立頁面） -->
             <div class="glass rounded-xl border-l-4 border-green-500 overflow-hidden">
                 <button onclick="openCategorySortPage()" class="w-full p-4 flex items-center justify-between hover:bg-slate-800/50 transition">
@@ -344,6 +364,18 @@
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ name, cost: Number(cost), price: Number(price) })
+            });
+            return await res.json();
+          },
+          deleteCompanyTemplate: async (name) => {
+            const res = await fetch(`${API_BASE_URL}/company-template/${encodeURIComponent(name)}`, { method: 'DELETE' });
+            return await res.json();
+          },
+          addAccessory: async (category, name) => {
+            const res = await fetch(`${API_BASE_URL}/accessory`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ category, name })
             });
             return await res.json();
           }
@@ -1136,7 +1168,10 @@
             }
         }
         async function addCompanyTemplateToCart(name, cost, price) { const { value: v } = await Swal.fire({ title: name, html: `<input id="p" type="number" class="swal2-input" value="${price}" placeholder="售價"><input id="q" type="number" class="swal2-input" value="1" placeholder="數量">`, background: '#1e293b', color: 'white', preConfirm: () => [document.getElementById('p').value, document.getElementById('q').value] }); if(v) { Cart.push({ type: 'accessory', category: '公司配件', name: name, price: parseInt(v[0]), cost: cost, quantity: parseInt(v[1]), itemId: 'CP-'+Date.now() }); renderCart(); } }
-        async function addNewCompanyTemplate() { const n = document.getElementById('new-cp-name').value.trim(); const c = document.getElementById('new-cp-cost').value; const p = document.getElementById('new-cp-price').value; if(!n || !c || !p) { Swal.fire({icon:'warning', title:'請填寫完整', toast:true, position:'top', background:'#1e293b'}); return; } try { const res = await API.addCompanyTemplate(n, c, p); if(res.status === 'success') { Swal.fire({icon:'success', title:'已新增', toast:true, position:'top', background:'#1e293b'}); document.getElementById('new-cp-name').value=''; document.getElementById('new-cp-cost').value=''; document.getElementById('new-cp-price').value=''; fetchData(); } else { Swal.fire({icon:'error', title:'新增失敗', text: res.msg || '', background:'#1e293b'}); } } catch(e) { Swal.fire({icon:'error', title:'新增失敗', text: e.message || '請重試', background:'#1e293b'}); } }
+        async function addNewCompanyTemplate() { const n = document.getElementById('new-cp-name').value.trim(); const c = document.getElementById('new-cp-cost').value; const p = document.getElementById('new-cp-price').value; if(!n || !c || !p) { Swal.fire({icon:'warning', title:'請填寫完整', toast:true, position:'top', background:'#1e293b'}); return; } try { const res = await API.addCompanyTemplate(n, c, p); if(res.status === 'success') { Swal.fire({icon:'success', title:'已新增', toast:true, position:'top', background:'#1e293b'}); document.getElementById('new-cp-name').value=''; document.getElementById('new-cp-cost').value=''; document.getElementById('new-cp-price').value=''; fetchData(); renderCompanyTemplateList(); } else { Swal.fire({icon:'error', title:'新增失敗', text: res.msg || '', background:'#1e293b'}); } } catch(e) { Swal.fire({icon:'error', title:'新增失敗', text: e.message || '請重試', background:'#1e293b'}); } }
+        async function addNewAccessory(){const cat=document.getElementById('new-acc-category').value.trim();const nm=document.getElementById('new-acc-name').value.trim();if(!cat||!nm){Swal.fire({icon:'warning',title:'請填寫分類與品項名稱',toast:true,position:'top',background:'#1e293b'});return;}try{const res=await API.addAccessory(cat,nm);if(res.status==='success'){Swal.fire({icon:'success',title:'已新增 '+res.id,toast:true,background:'#1e293b'});document.getElementById('new-acc-category').value='';document.getElementById('new-acc-name').value='';fetchData();}else{Swal.fire({icon:'error',title:'新增失敗',text:res.msg||'',background:'#1e293b'});}}catch(e){Swal.fire({icon:'error',title:'新增失敗',text:e.message||'',background:'#1e293b'});}}
+        function renderCompanyTemplateList(){const el=document.getElementById('company-template-list');if(!el)return;el.innerHTML='';(DB.companyTemplates||[]).forEach(t=>{el.innerHTML+='<div class="flex justify-between p-2 bg-slate-800 rounded"><span>'+t.name+'</span><button onclick="deleteCompanyTemplate(&quot;'+t.name.replace(/"/g,'&quot;')+'&quot;)" class="text-red-400"><i class="fa-solid fa-trash"></i></button></div>';});}
+        async function deleteCompanyTemplate(name){const r=await Swal.fire({title:'確定刪除？',text:name,showCancelButton:true,background:'#1e293b',color:'white'});if(!r.isConfirmed)return;try{const res=await API.deleteCompanyTemplate(name);if(res.status==='success'){Swal.fire({icon:'success',title:'已刪除',toast:true,background:'#1e293b'});fetchData();renderCompanyTemplateList();}else{Swal.fire({icon:'error',title:'刪除失敗',text:res.msg||'',background:'#1e293b'});}}catch(e){Swal.fire({icon:'error',title:'刪除失敗',text:e.message||'',background:'#1e293b'});}}
         async function changeStatus(id, s) { 
             let ns = s === '庫存中' ? '客訂中' : '庫存中'; 
             const r = await Swal.fire({ title: '切換狀態', text: `改為「${ns}」？`, icon: 'question', showCancelButton: true, background: '#1e293b', color: 'white' });
@@ -1154,7 +1189,7 @@
                 }
             }
         }
-        function renderServiceGrid() { document.getElementById('item-grid').innerHTML = `<div onclick="modalRepair()" class="glass p-6 rounded-xl border-l-4 border-yellow-500 flex flex-col items-center justify-center gap-2 active:scale-95 transition"><i class="fa-solid fa-screwdriver-wrench text-4xl text-yellow-500"></i><span class="font-bold">維修登記</span></div><div onclick="modalWrap()" class="glass p-6 rounded-xl border-l-4 border-purple-500 flex flex-col items-center justify-center gap-2 active:scale-95 transition"><i class="fa-solid fa-wand-magic-sparkles text-4xl text-purple-500"></i><span class="font-bold">包膜服務</span></div><div onclick="modalNewPhone()" class="glass p-6 rounded-xl border-l-4 border-green-500 flex flex-col items-center justify-center gap-2 active:scale-95 transition"><i class="fa-solid fa-mobile-screen text-4xl text-green-500"></i><span class="font-bold">新機</span></div><div onclick="modalPeerTransfer()" class="glass p-6 rounded-xl border-l-4 border-blue-500 flex flex-col items-center justify-center gap-2 active:scale-95 transition"><i class="fa-solid fa-truck-fast text-4xl text-blue-500"></i><span class="font-bold">同行調貨</span></div><div onclick="modalShipping()" class="glass p-6 rounded-xl border-l-4 border-slate-400 flex flex-col items-center justify-center gap-2 active:scale-95 transition"><i class="fa-solid fa-truck text-4xl text-slate-400"></i><span class="font-bold">運費</span></div>`; }
+        function renderServiceGrid() { document.getElementById('item-grid').innerHTML = `<div onclick="modalRepair()" class="glass p-6 rounded-xl border-l-4 border-yellow-500 flex flex-col items-center justify-center gap-2 active:scale-95 transition"><i class="fa-solid fa-screwdriver-wrench text-4xl text-yellow-500"></i><span class="font-bold">維修登記</span></div><div onclick="modalWrap()" class="glass p-6 rounded-xl border-l-4 border-purple-500 flex flex-col items-center justify-center gap-2 active:scale-95 transition"><i class="fa-solid fa-wand-magic-sparkles text-4xl text-purple-500"></i><span class="font-bold">包膜服務</span></div><div onclick="modalNewPhone()" class="glass p-6 rounded-xl border-l-4 border-green-500 flex flex-col items-center justify-center gap-2 active:scale-95 transition"><i class="fa-solid fa-mobile-screen text-4xl text-green-500"></i><span class="font-bold">新機</span></div><div onclick="modalPeerTransfer()" class="glass p-6 rounded-xl border-l-4 border-blue-500 flex flex-col items-center justify-center gap-2 active:scale-95 transition"><i class="fa-solid fa-truck-fast text-4xl text-blue-500"></i><span class="font-bold">同行調貨</span></div><div onclick="modalESIM()" class="glass p-6 rounded-xl border-l-4 border-cyan-500 flex flex-col items-center justify-center gap-2 active:scale-95 transition"><i class="fa-solid fa-sim-card text-4xl text-cyan-500"></i><span class="font-bold">eSIM</span></div><div onclick="modalShipping()" class="glass p-6 rounded-xl border-l-4 border-slate-400 flex flex-col items-center justify-center gap-2 active:scale-95 transition"><i class="fa-solid fa-truck text-4xl text-slate-400"></i><span class="font-bold">運費</span></div>`; }
         async function addToCart(id) { const i = DB.inv.find(x => x.id == id); if(!i) return; let p = i.price, q = 1; let defPrice = i.defaultPrice > 0 ? i.defaultPrice : (i.price > 0 ? i.price : ''); if (i.type === 'accessory' || i.price === 0) { const { value } = await Swal.fire({ title: i.name, html: `<input id="sw-p" type="number" class="swal2-input" placeholder="單價" value="${defPrice}"><input id="sw-q" type="number" class="swal2-input" placeholder="數量" value="1">`, background: '#1e293b', color: 'white', preConfirm: () => [document.getElementById('sw-p').value, document.getElementById('sw-q').value] }); if(!value) return; p = parseInt(value[0]); q = parseInt(value[1]); } Cart.push({ ...i, price: p, quantity: q, itemId: i.id, originalPrice: p, isGift: false }); renderCart(); }
         function renderCart() { 
             const c = document.getElementById('cart-items'); 
@@ -1277,6 +1312,10 @@
         function clearRestockCart() { RestockCart=[]; renderRestockCartList(); toggleMobileCart('restock', false); }
         async function submitRestock() { 
             if(RestockCart.length===0) return; 
+            const confirm = await Swal.fire({ title: '確定要送出進貨清單？', text: '送出後無法撤回', showCancelButton: true, confirmButtonText: '確定送出', cancelButtonText: '取消', background: '#1e293b', color: 'white' });
+            if (!confirm.isConfirmed) return;
+            const btn = document.getElementById('btn-submit-restock');
+            if(btn){ btn.disabled=true; btn.textContent='送出中...'; }
             const oid = 'EXP'+Date.now().toString().slice(-6); 
             try {
                 const r = await API.handleRestock({items:RestockCart, person:User.name, orderId:oid});
@@ -1291,6 +1330,8 @@
                 Swal.fire({icon:'success', title:'已送出', background:'#1e293b'});
             } catch(err) {
                 Swal.fire({icon:'error', title:'進貨失敗', text: (err&&err.message)||'請重試', background:'#1e293b'});
+            } finally {
+                if(btn){ btn.disabled=false; btn.textContent='確認送出'; }
             }
         }
         async function modalNewPhone() { const {value:v}=await Swal.fire({title:'新機',html:'<input id="n1" class="swal2-input" placeholder="同行名稱"><input id="n2" class="swal2-input" type="number" placeholder="成本"><input id="n3" class="swal2-input" placeholder="IMEI"><input id="n4" class="swal2-input" type="number" placeholder="銷售金額"><input id="n5" class="swal2-input" placeholder="客戶名稱"><input id="n6" class="swal2-input" placeholder="型號（流水用）"><input id="n7" class="swal2-input" placeholder="容量（流水用）"><input id="n8" class="swal2-input" placeholder="顏色（流水用）">',background:'#1e293b', color:'white', preConfirm:()=>[document.getElementById('n1').value,document.getElementById('n2').value,document.getElementById('n3').value,document.getElementById('n4').value,document.getElementById('n5').value,document.getElementById('n6').value,document.getElementById('n7').value,document.getElementById('n8').value]}); if(v&&v[1]&&v[4]){const spec=[v[5],v[6],v[7]].filter(Boolean).join(' '); Cart.push({type:'new_phone',name:'新機 '+v[0]+(spec?' '+spec:''),dealerName:v[0],cost:Number(v[1]),price:Number(v[3]),imei:v[2],customer:v[4],quantity:1,itemId:'NP-'+Date.now()});renderCart();}}
@@ -1377,6 +1418,7 @@
         }
 
         async function modalWrap(){const {value:v}=await Swal.fire({html:'<input id="w1" class="swal2-input" placeholder="項目"><input id="w2" class="swal2-input" placeholder="售價">',background:'#1e293b',preConfirm:()=>[document.getElementById('w1').value,document.getElementById('w2').value]}); if(v){Cart.push({type:'wrap',name:'包膜:'+v[0],cost:0,price:v[1],quantity:1,itemId:'W-'+Date.now()});renderCart();}}
+        async function modalESIM(){const {value:v}=await Swal.fire({title:'eSIM',html:'<input id="es1" class="swal2-input" type="number" placeholder="成本"><input id="es2" class="swal2-input" type="number" placeholder="結帳金額">',background:'#1e293b',color:'white',preConfirm:()=>[document.getElementById('es1').value,document.getElementById('es2').value]}); if(v&&v[1]){Cart.push({type:'esim',name:'eSIM',cost:Number(v[0])||0,price:Number(v[1])||0,quantity:1,itemId:'ESIM-'+Date.now()});renderCart();}}
         async function modalShipping(){const {value:v}=await Swal.fire({title:'運費',input:'number',inputPlaceholder:'金額',background:'#1e293b',color:'white'}); if(v!=null&&v!==''){const amt=Number(v)||0; Cart.push({type:'shipping',name:'運費',cost:amt,price:amt,quantity:1,itemId:'SF-'+Date.now(),originalPrice:amt,isGift:false}); renderCart();}}
         function renderDirectTransferGrid() {
             const grid = document.getElementById('item-grid');
