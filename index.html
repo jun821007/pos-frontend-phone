@@ -730,7 +730,7 @@
                 } else if(it.stock_id && !dName.includes('#')) { 
                     dName += ` #${it.stock_id}`; 
                 }
-                if(it.salePrice === 0 && it.cost > 0 && !dName.includes('(贈)') && !it.isMultiPhoneExtra) { dName += ' <span class="text-red-400 text-[10px] border border-red-400 px-1 rounded">贈</span>'; }
+                if(it.salePrice === 0 && it.cost > 0 && !dName.includes('(贈)') && !(it.type === 'phone' && dName.includes(' + ')) && !it.isMultiPhoneExtra) { dName += ' <span class="text-red-400 text-[10px] border border-red-400 px-1 rounded">贈</span>'; }
                 let itemKey = `RET_${it.orderId}_${it.itemId}`;
                 ItemRegistry[itemKey] = { ...it, customer: g.customer };
                 let safeCost = Number(it.cost) || 0;
@@ -740,7 +740,858 @@
                         <div class="text-slate-200 font-bold">${dName}</div>
                         <div class="text-[10px] text-slate-500 mt-0.5">${formatDate(it.time)}</div>
                     </div>
-                    <div class="col-span-3 text-right text-yellow-500 font-mono">$${(Number(it.salePrice) || 0).toLocaleString()}</div>
+                    <div class="col-span-3 text-right font-mono ${(it.type==='phone' && Number(it.salePrice)===0 && dName.includes(' + ')) ? 'text-slate-500 text-[10px]' : 'text-yellow-500'}">${(it.type==='phone' && Number(it.salePrice)===0 && dName.includes(' + ')) ? '含於上筆' : '
+                    <div class="col-span-2 cp-box">
+                        <span class="cp-cost">本 ${safeCost.toLocaleString()}</span>
+                        <span class="${pc} font-bold">利 ${p.toLocaleString()}</span>
+                    </div>
+                    <div class="col-span-2 text-right">
+                         ${it.type === 'direct_transfer' ? `<button onclick="confirmDeleteOrderItem('${it.orderId}', '${it.itemId}')" class="text-red-400 border border-red-900 bg-red-950/30 px-2 py-1 rounded hover:bg-red-900 transition">刪</button>` : `<button onclick="handleReturnFromRegistry('${itemKey}')" class="text-red-400 border border-red-900 bg-red-950/30 px-2 py-1 rounded hover:bg-red-900 transition">退</button>`}
+                    </div>
+                </div>`;
+            }).join('');
+            if (details.trim() === '') return '';
+            return `
+            <div id="group-${g.orderId}" class="border-b border-slate-700 bg-slate-900/20">
+                <div onclick="this.nextElementSibling.classList.toggle('open')" class="list-row flex justify-between items-center">
+                    <div class="flex-1">
+                        <div class="text-white text-sm font-bold">${g.customer || '過路客'}</div>
+                        <div class="text-xs text-slate-500">${formatDate(g.time)}</div>
+                    </div>
+                    <div class="w-24 text-right">
+                        <div id="total-${g.orderId}" class="text-yellow-500 font-mono text-sm">$${(Number(g.total) || 0).toLocaleString()}</div>
+                        <div class="text-xs font-mono ${netColor}">利 ${(Number(g.net) || 0).toLocaleString()}</div>
+                    </div>
+                    <div class="w-16 text-right text-xs flex flex-col items-end gap-1">
+                        <div class="flex items-center gap-1">
+                            <span class="${statusClass}">${statusText}</span>
+                            ${payBadge}
+                        </div>
+                        ${g.status === 'Pending' ? `<button onclick="event.stopPropagation(); settle('${g.orderId}', ${g.total})" class="text-[10px] bg-green-900 text-green-200 px-1.5 rounded border border-green-700 hover:bg-green-800">入帳</button>` : ''}
+                        <button onclick="event.stopPropagation(); confirmDeleteOrder('${g.orderId}')" class="text-[10px] bg-red-900 text-red-200 px-1.5 rounded border border-red-700 hover:bg-red-800">刪單</button>
+                    </div>
+                </div>
+                <div class="accordion-content shadow-inner">${details}</div>
+            </div>`;
+        }
+
+        function renderExpenseRow(i) {
+            let c = Number(i.cost) || 0;
+            return `<div class="list-row-exp flex justify-between items-center"><div class="flex-1"><div class="text-slate-300 text-sm">${i.itemName}</div><div class="text-xs text-slate-500">${formatDate(i.time)}</div></div><div class="text-red-400 font-mono text-sm">-$${c.toLocaleString()}</div><div class="w-12 text-right text-xs text-slate-500">支出</div></div>`;
+        }
+
+        function openReport() { 
+            // 限制 a002 帳號不能使用「今日」功能
+            if (User && User.username === 'a002') {
+                Swal.fire({ icon: 'warning', title: '權限不足', text: '此帳號無法使用「今日帳務」功能', background: '#1e293b', color: 'white' });
+                return;
+            }
+            switchView('report'); 
+            renderReport(); 
+        }
+        function renderReport() {
+            let stats = { cash:0, pending:0, profit:0, pot:0, exp:0, gift:0 };
+            const div = document.getElementById('today-list'); div.innerHTML='';
+            const groups = {};
+            DB.sales.slice().reverse().forEach(i => {
+                if(BlackList.orders.includes(i.orderId)) return;
+                if(BlackList.items.includes(i.orderId + '_' + i.itemId)) return;
+                if(i.status === 'Returned' || i.status === 'Deleted') return; 
+                if(i.category === '調整入庫') return; 
+                if(i.type === 'expense' || i.type === 'restock' || i.type === 'salary') {
+                    let cost = Number(i.cost) || 0;
+                    stats.exp += Math.abs(cost); 
+                    stats.cash -= Math.abs(cost);
+                    div.innerHTML += renderExpenseRow(i);
+                } else {
+                    if(!groups[i.orderId]) groups[i.orderId] = { ...i, items:[], total:0, net:0 };
+                    groups[i.orderId].items.push(i);
+                    let sale = Number(i.salePrice) || 0;
+                    let cost = Number(i.cost) || 0;
+                    groups[i.orderId].total += sale;
+                    groups[i.orderId].net += (sale - cost); 
+                    if (i.status === 'Completed') { 
+                        stats.cash += sale; 
+                        if(i.type!=='wrap') stats.profit += (sale - cost); 
+                    }
+                    else if (i.status === 'Pending') { 
+                        stats.pending += sale; 
+                        if(i.type!=='wrap') stats.pot += (sale - cost); 
+                    }
+                    if (sale===0 && cost>0) stats.gift += cost;
+                }
+            });
+            Object.values(groups).forEach(g => { div.innerHTML += renderOrderRow(g); });
+            document.getElementById('today-cash').innerText = stats.cash.toLocaleString();
+            document.getElementById('today-pending').innerText = stats.pending.toLocaleString();
+            document.getElementById('today-profit').innerText = stats.profit.toLocaleString();
+            document.getElementById('today-pot').innerText = stats.pot.toLocaleString();
+            document.getElementById('today-exp').innerText = stats.exp.toLocaleString();
+            document.getElementById('today-gift').innerText = stats.gift.toLocaleString();
+        }
+
+        function openPending() { 
+            // 限制 a002 帳號不能使用「未結」功能
+            if (User && User.username === 'a002') {
+                Swal.fire({ icon: 'warning', title: '權限不足', text: '此帳號無法使用「未結帳款」功能', background: '#1e293b', color: 'white' });
+                return;
+            }
+            switchView('pending'); 
+            loadPending(); 
+        }
+        async function loadPending() { 
+            const d = document.getElementById('pending-list'); 
+            d.innerHTML = '<div class="text-center mt-10"><span class="loader"></span></div>'; 
+            try {
+                const res = await API.getPendingOrders(); 
+                DB.pending = res || [];
+                renderPendingList(); 
+            } catch(e) {
+                console.error('載入未結帳款失敗:', e);
+                d.innerHTML = '<div class="text-center text-red-500 mt-10">載入失敗，請重試</div>';
+            }
+        }
+
+        function renderPendingList() {
+            const d = document.getElementById('pending-list'); d.innerHTML = '';
+            if(DB.pending.length === 0) { d.innerHTML='<div class="text-center text-slate-500 mt-10">無未結帳款</div>'; return; } 
+            const groups = {}; 
+            DB.pending.forEach(i => { 
+                if(BlackList.orders.includes(i.orderId)) return;
+                if(BlackList.items.includes(i.orderId + '_' + i.itemId)) return;
+                if(i.status === 'Returned' || i.status === 'Deleted') return; 
+                if(!groups[i.customer]) groups[i.customer] = { ...i, items:[], total:0, net:0 }; 
+                let sale = Number(i.salePrice) || 0;
+                let cost = Number(i.cost) || 0;
+                groups[i.customer].items.push(i); 
+                groups[i.customer].total += sale; 
+                groups[i.customer].net += (sale - cost);
+            });
+            Object.values(groups).forEach(g => { d.innerHTML += renderOrderRow(g); }); 
+        }
+
+        function openHistory() { switchView('history'); setQuickDate('month'); }
+        function setQuickDate(m) { const n = new Date(); const t = d => d.toISOString().split('T')[0]; const s = new Date(); if(m==='month') s.setDate(1); document.getElementById('h-end').value = t(n); document.getElementById('h-start').value = t(s); doHistorySearch(); }
+        async function doHistorySearch() { 
+            const s = document.getElementById('h-start').value; 
+            const e = document.getElementById('h-end').value; 
+            if(!s || !e) return; 
+            Swal.showLoading(); 
+            try {
+                const res = await API.getHistory(s, e);
+                Swal.close(); 
+                DB.history = res || [];
+                renderHistoryList(); 
+            } catch(err) {
+                Swal.close();
+                console.error('載入歷史記錄失敗:', err);
+                Swal.fire({icon:'error', title:'載入失敗', text: err.message || '請重試', background:'#1e293b'});
+            }
+        }
+        function renderHistoryList() {
+            const div = document.getElementById('history-list'); div.innerHTML='';
+            let stats = { cash:0, pending:0, profit:0, pot:0, exp:0, gift:0 };
+            const groups = {};
+            DB.history.forEach(i => {
+                if(BlackList.orders.includes(i.orderId)) return;
+                if(BlackList.items.includes(i.orderId + '_' + i.itemId)) return;
+                if(i.status === 'Returned' || i.status === 'Deleted') return; 
+                if(i.category === '調整入庫') return; 
+                if(i.type === 'expense' || i.type === 'restock' || i.type === 'salary') {
+                    let cost = i.cost || 0;
+                    stats.exp += Math.abs(cost);
+                    div.innerHTML += renderExpenseRow(i);
+                } else {
+                    if(!groups[i.orderId]) groups[i.orderId] = { ...i, items:[], total:0, net:0 };
+                    groups[i.orderId].items.push(i);
+                    let sale = i.salePrice || 0;
+                    let cost = i.cost || 0;
+                    groups[i.orderId].total += sale;
+                    groups[i.orderId].net += (sale - cost);
+                    if (i.status === 'Completed') { stats.cash += sale; if(i.type!=='wrap') stats.profit += (sale - cost); }
+                    else if (i.status === 'Pending') { stats.pending += sale; if(i.type!=='wrap') stats.pot += (sale - cost); }
+                    if (i.salePrice===0 && i.cost>0) stats.gift += cost;
+                }
+            });
+            document.getElementById('h-cash').innerText = stats.cash.toLocaleString();
+            document.getElementById('h-pending').innerText = stats.pending.toLocaleString();
+            document.getElementById('h-profit').innerText = stats.profit.toLocaleString();
+            document.getElementById('h-pot').innerText = stats.pot.toLocaleString();
+            document.getElementById('h-exp').innerText = stats.exp.toLocaleString();
+            document.getElementById('h-gift').innerText = stats.gift.toLocaleString();
+            Object.values(groups).reverse().forEach(g => { div.innerHTML += renderOrderRow(g); });
+        }
+
+        function toggleAcc(id) { document.getElementById(id).classList.toggle('open'); }
+        
+        async function handleReturnFromRegistry(key) {
+            const item = ItemRegistry[key];
+            if (!item) { Swal.fire({icon:'error', title:'資料錯誤', text:'找不到商品資料'}); return; }
+            const { orderId, itemId, type, itemName, quantity, cost, salePrice, customer } = item;
+            const r = await Swal.fire({
+                title: '確認退貨？', text: `${itemName} 將回補庫存`, icon: 'warning', showCancelButton: true, background: '#1e293b', color: 'white'
+            });
+            if (r.isConfirmed) {
+                BlackList.items.push(orderId + '_' + itemId);
+                saveBlacklist();
+                let row = document.getElementById(`item-row-${itemId}`);
+                if(row) { row.style.opacity = "0"; setTimeout(() => row.remove(), 300); }
+                let totalEl = document.getElementById(`total-${orderId}`);
+                if (totalEl) {
+                    let currentTotal = parseInt(totalEl.innerText.replace(/[^0-9-]/g, '')) || 0;
+                    let newTotal = currentTotal - salePrice;
+                    totalEl.innerText = `$${newTotal.toLocaleString()}`;
+                    if (newTotal <= 0) {
+                        let groupEl = document.getElementById(`group-${orderId}`);
+                        if(groupEl) { groupEl.style.opacity = "0"; setTimeout(() => groupEl.remove(), 500); }
+                    }
+                }
+                try {
+                    // handleTransaction 已經處理配件和庫存電池的退貨回補（寫入進出庫流水帳和回補庫存）
+                    // 不需要再調用 handleRestock，避免重複寫入
+                    await API.handleTransaction({action:'return', orderId:orderId, itemId: itemId, quantity: quantity});
+                    if (type === 'phone' || type === 'new_phone' || type === 'peer_phone') {
+                        await API.changePhoneStatus(itemId, '庫存中');
+                    }
+                    // 配件和庫存電池的退貨回補已經在 handleTransaction 中處理，不需要再調用 handleRestock
+                    if(!document.getElementById('view-report').classList.contains('hidden')) renderReport();
+                    if(!document.getElementById('view-pending').classList.contains('hidden')) renderPendingList();
+                    if(!document.getElementById('view-history').classList.contains('hidden')) renderHistoryList();
+                    Swal.fire({icon:'success', title:'退貨完成', timer:1000, background:'#1e293b'});
+                } catch(e) {
+                    console.error('退貨失敗:', e);
+                    Swal.fire({icon:'error', title:'退貨失敗', text: e.message || '請重試', background:'#1e293b'});
+                }
+            }
+        }
+        
+        async function confirmDeleteOrder(oid) {
+            const { value: password } = await Swal.fire({
+                title: '刪除整筆訂單', text: '請輸入管理員密碼', input: 'password', showCancelButton: true, background: '#1e293b', color: 'white'
+            });
+            if (password === 'Apple168168') {
+                BlackList.orders.push(oid);
+                saveBlacklist();
+                if(!document.getElementById('view-report').classList.contains('hidden')) renderReport();
+                if(!document.getElementById('view-pending').classList.contains('hidden')) renderPendingList();
+                if(!document.getElementById('view-history').classList.contains('hidden')) renderHistoryList();
+                try {
+                    await API.handleTransaction({action: 'delete', orderId: oid, person: User.name});
+                    Swal.fire({icon:'success', title:'訂單已刪除', timer:1000, background:'#1e293b'});
+                } catch(e) {
+                    Swal.fire({icon:'error', title:'刪除失敗', text: e.message || '請重試', background:'#1e293b'});
+                }
+            } else if (password) {
+                Swal.fire({icon:'error', title:'密碼錯誤', background:'#1e293b'});
+            }
+        }
+        async function confirmDeleteOrderItem(orderId, itemId) {
+            const { value: password } = await Swal.fire({
+                title: '刪除此項目', text: '請輸入管理員密碼', input: 'password', showCancelButton: true, background: '#1e293b', color: 'white'
+            });
+            if (password === 'Apple168168') {
+                BlackList.items.push(orderId + '_' + itemId);
+                saveBlacklist();
+                let row = document.getElementById(`item-row-${itemId}`);
+                if(row) { row.style.opacity = "0"; setTimeout(() => row.remove(), 300); }
+                let totalEl = document.getElementById(`total-${orderId}`);
+                if (totalEl) {
+                    // 找到這個項目的金額
+                    const item = ItemRegistry[`RET_${orderId}_${itemId}`];
+                    if (item) {
+                        let currentTotal = parseInt(totalEl.innerText.replace(/[^0-9-]/g, '')) || 0;
+                        let newTotal = currentTotal - (Number(item.salePrice) || 0);
+                        totalEl.innerText = `$${newTotal.toLocaleString()}`;
+                        if (newTotal <= 0) {
+                            let groupEl = document.getElementById(`group-${orderId}`);
+                            if(groupEl) { groupEl.style.opacity = "0"; setTimeout(() => groupEl.remove(), 500); }
+                        }
+                    }
+                }
+                try {
+                    // 調貨項目直接刪除，不需要回補庫存
+                    await API.handleTransaction({action: 'delete_item', orderId: orderId, itemId: itemId, person: User.name});
+                    if(!document.getElementById('view-report').classList.contains('hidden')) renderReport();
+                    if(!document.getElementById('view-pending').classList.contains('hidden')) renderPendingList();
+                    if(!document.getElementById('view-history').classList.contains('hidden')) renderHistoryList();
+                    Swal.fire({icon:'success', title:'項目已刪除', timer:1000, background:'#1e293b'});
+                } catch(e) {
+                    console.error('刪除項目失敗:', e);
+                    Swal.fire({icon:'error', title:'刪除失敗', text: e.message || '請重試', background:'#1e293b'});
+                }
+            } else if (password) {
+                Swal.fire({icon:'error', title:'密碼錯誤', background:'#1e293b'});
+            }
+        }
+
+        async function settle(oid, amt) { 
+            const r = await Swal.fire({title:'入帳', input:'number', inputValue:amt, background:'#1e293b', color:'white'});
+            if(r.value) {
+                try {
+                    await API.handleTransaction({action:'settle', orderId:oid, realAmount:r.value});
+                    loadPending(); 
+                    fetchData(); 
+                    Swal.fire({icon:'success', title:'已入帳', timer:1000, background:'#1e293b'});
+                } catch(e) {
+                    console.error('入帳失敗:', e);
+                    Swal.fire({icon:'error', title:'入帳失敗', text: e.message || '請重試', background:'#1e293b'});
+                }
+            }
+        }
+        
+        function renderCompanyAccessoryGrid() { const grid = document.getElementById('item-grid'); grid.innerHTML = ''; if(DB.companyTemplates.length === 0) { grid.innerHTML = '<div class="col-span-full text-center text-slate-500 mt-10">尚無公司配件模板，請至設定新增</div>'; return; } DB.companyTemplates.forEach(t => { grid.innerHTML += `<div onclick="addCompanyTemplateToCart('${t.name}', ${t.cost}, ${t.price})" class="glass p-3 rounded-xl border-l-4 border-blue-400 cursor-pointer active:scale-95 transition group"><div class="flex justify-between mb-1"><span class="text-xs font-bold text-blue-400">公司貨</span></div><div class="font-bold text-sm text-slate-200 line-clamp-2 leading-tight h-9">${t.name}</div><div class="mt-2 text-right font-bold text-yellow-500">$${t.price.toLocaleString()}</div></div>`; }); }
+        function updateCategoryNumbers(list) {
+            Array.from(list.children).forEach((child, i) => {
+                const numSpan = child.querySelector('span:last-child');
+                if (numSpan) numSpan.textContent = i + 1;
+            });
+        }
+        function renderCategorySortList() {
+            const list = document.getElementById('category-sort-list');
+            if (!list) return;
+            const cats = getOrderedCategories();
+            list.innerHTML = '';
+            if (cats.length === 0) {
+                list.innerHTML = '<div class="text-center text-slate-500 py-4">尚無配件分類</div>';
+                return;
+            }
+            let draggedElement = null;
+            const isTouch = 'ontouchstart' in window;
+            
+            cats.forEach((cat, idx) => {
+                const item = document.createElement('div');
+                item.className = 'flex items-center gap-2 p-3 bg-slate-800 rounded-lg border border-slate-700 transition select-none';
+                item.draggable = false;
+                item.dataset.category = cat;
+                item.innerHTML = `
+                    <div class="category-sort-handle flex items-center justify-center w-10 h-10 shrink-0 rounded cursor-grab active:cursor-grabbing touch-none">
+                        <i class="fa-solid fa-grip-vertical text-slate-500 text-lg"></i>
+                    </div>
+                    <span class="flex-1 text-white font-medium min-w-0">${cat}</span>
+                    <span class="text-xs text-slate-500 w-6 text-center shrink-0">${idx + 1}</span>
+                `;
+                const handle = item.querySelector('.category-sort-handle');
+                
+                // 桌面版：僅握把可拖曳
+                handle.draggable = true;
+                handle.addEventListener('dragstart', (e) => {
+                    draggedElement = item;
+                    item.classList.add('opacity-50', 'scale-105', 'border-yellow-500');
+                    e.dataTransfer.effectAllowed = 'move';
+                    e.dataTransfer.setData('text/plain', cat);
+                    e.dataTransfer.setDragImage(item, 0, 0);
+                });
+                handle.addEventListener('dragend', () => {
+                    item.classList.remove('opacity-50', 'scale-105', 'border-yellow-500');
+                    draggedElement = null;
+                    updateCategoryNumbers(list);
+                });
+                item.addEventListener('dragover', (e) => {
+                    e.preventDefault();
+                    e.dataTransfer.dropEffect = 'move';
+                    if (draggedElement && draggedElement !== item) {
+                        const rect = item.getBoundingClientRect();
+                        const next = (e.clientY - rect.top) / (rect.bottom - rect.top) > 0.5;
+                        if (next) list.insertBefore(draggedElement, item.nextSibling);
+                        else list.insertBefore(draggedElement, item);
+                    }
+                });
+                item.addEventListener('drop', (e) => e.preventDefault());
+                
+                // 手機版：僅握把可長按拖曳，其他區域自然捲動
+                if (isTouch) {
+                    let dragMode = false;
+                    let longPressTimer = null;
+                    let startX = 0, startY = 0;
+                    const MOVE_THRESHOLD = 12;
+                    
+                    handle.addEventListener('touchstart', (e) => {
+                        dragMode = false;
+                        if (longPressTimer) clearTimeout(longPressTimer);
+                        startX = e.touches[0].clientX;
+                        startY = e.touches[0].clientY;
+                        longPressTimer = setTimeout(() => {
+                            longPressTimer = null;
+                            dragMode = true;
+                            draggedElement = item;
+                            item.classList.add('opacity-90', 'border-yellow-500');
+                            item.style.position = 'relative';
+                            item.style.zIndex = '50';
+                            item.style.boxShadow = '0 4px 20px rgba(234,179,8,0.2)';
+                        }, 350);
+                    }, { passive: true });
+                    
+                    const handleTouchMove = (e) => {
+                        if (!dragMode && longPressTimer) {
+                            const dx = Math.abs(e.touches[0].clientX - startX);
+                            const dy = Math.abs(e.touches[0].clientY - startY);
+                            if (dx > MOVE_THRESHOLD || dy > MOVE_THRESHOLD) {
+                                clearTimeout(longPressTimer);
+                                longPressTimer = null;
+                                return;
+                            }
+                        }
+                        if (!dragMode || draggedElement !== item) return;
+                        e.preventDefault();
+                        const touchY = e.touches[0].clientY;
+                        const allItems = Array.from(list.children);
+                        const currentIndex = allItems.indexOf(item);
+                        let targetIndex = currentIndex;
+                        for (let i = 0; i < allItems.length; i++) {
+                            if (i === currentIndex) continue;
+                            const other = allItems[i];
+                            const rect = other.getBoundingClientRect();
+                            const centerY = rect.top + rect.height / 2;
+                            if (touchY < centerY && currentIndex > i) { targetIndex = i; break; }
+                            else if (touchY > centerY && currentIndex < i) targetIndex = i + 1;
+                        }
+                        if (targetIndex !== currentIndex && targetIndex >= 0 && targetIndex <= allItems.length) {
+                            if (targetIndex > currentIndex) list.insertBefore(item, allItems[targetIndex] || null);
+                            else list.insertBefore(item, allItems[targetIndex]);
+                            updateCategoryNumbers(list);
+                        }
+                    };
+                    handle.addEventListener('touchmove', handleTouchMove, { passive: false });
+                    
+                    const clearDrag = () => {
+                        if (longPressTimer) { clearTimeout(longPressTimer); longPressTimer = null; }
+                        dragMode = false;
+                        if (draggedElement === item) {
+                            item.classList.remove('opacity-90', 'border-yellow-500');
+                            item.style.position = '';
+                            item.style.zIndex = '';
+                            item.style.boxShadow = '';
+                            draggedElement = null;
+                            updateCategoryNumbers(list);
+                        }
+                    };
+                    handle.addEventListener('touchend', clearDrag, { passive: true });
+                    handle.addEventListener('touchcancel', clearDrag, { passive: true });
+                }
+                
+                list.appendChild(item);
+            });
+        }
+        function saveCategoryOrder() {
+            const list = document.getElementById('category-sort-list');
+            if (!list) return;
+            const order = Array.from(list.children).map(item => item.dataset.category).filter(Boolean);
+            saveCategoryOrderToStorage(order);
+            Swal.fire({icon:'success', title:'已儲存', text:'分類順序已更新', timer:1500, background:'#1e293b'});
+            // 如果當前在配件頁面，重新渲染分類
+            if (UI.tab === 'accessory') {
+                switchMainTab('accessory');
+            }
+        }
+        async function addCompanyTemplateToCart(name, cost, price) { const { value: v } = await Swal.fire({ title: name, html: `<input id="p" type="number" class="swal2-input" value="${price}" placeholder="售價"><div style="display:flex;align-items:center;justify-content:center;gap:12px;margin-top:8px"><button type="button" onclick="var el=document.getElementById('q');el.value=Math.max(1,parseInt(el.value||1)-1)" style="width:52px;height:52px;font-size:26px;border-radius:12px;background:#334155;color:white;border:none;cursor:pointer">-</button><input id="q" type="number" value="1" min="1" style="width:72px;height:52px;font-size:22px;text-align:center;background:#1e293b;color:white;border:2px solid #475569;border-radius:12px;outline:none"><button type="button" onclick="var el=document.getElementById('q');el.value=parseInt(el.value||1)+1" style="width:52px;height:52px;font-size:26px;border-radius:12px;background:#334155;color:white;border:none;cursor:pointer">+</button></div>`, background: '#1e293b', color: 'white', preConfirm: () => [document.getElementById('p').value, document.getElementById('q').value] }); if(v) { Cart.push({ type: 'accessory', category: '公司配件', name: name, price: parseInt(v[0]), cost: cost, quantity: parseInt(v[1]), itemId: 'CP-'+Date.now() }); renderCart(); } }
+        async function addNewCompanyTemplate() { const n = document.getElementById('new-cp-name').value.trim(); const c = document.getElementById('new-cp-cost').value; const p = document.getElementById('new-cp-price').value; if(!n || !c || !p) { Swal.fire({icon:'warning', title:'請填寫完整', toast:true, position:'top', background:'#1e293b'}); return; } try { const res = await API.addCompanyTemplate(n, c, p); if(res.status === 'success') { Swal.fire({icon:'success', title:'已新增', toast:true, position:'top', background:'#1e293b'}); document.getElementById('new-cp-name').value=''; document.getElementById('new-cp-cost').value=''; document.getElementById('new-cp-price').value=''; fetchData(); renderCompanyTemplateList(); } else { Swal.fire({icon:'error', title:'新增失敗', text: res.msg || '', background:'#1e293b'}); } } catch(e) { Swal.fire({icon:'error', title:'新增失敗', text: e.message || '請重試', background:'#1e293b'}); } }
+        async function addNewAccessory(){const cat=document.getElementById('new-acc-category').value.trim();const nm=document.getElementById('new-acc-name').value.trim();if(!cat||!nm){Swal.fire({icon:'warning',title:'請填寫分類與品項名稱',toast:true,position:'top',background:'#1e293b'});return;}try{const res=await API.addAccessory(cat,nm);if(res.status==='success'){Swal.fire({icon:'success',title:'已新增 '+res.id,toast:true,background:'#1e293b'});document.getElementById('new-acc-category').value='';document.getElementById('new-acc-name').value='';fetchData();}else{Swal.fire({icon:'error',title:'新增失敗',text:res.msg||'',background:'#1e293b'});}}catch(e){Swal.fire({icon:'error',title:'新增失敗',text:e.message||'',background:'#1e293b'});}}
+        function renderCompanyTemplateList(){const el=document.getElementById('company-template-list');if(!el)return;el.innerHTML='';(DB.companyTemplates||[]).forEach(t=>{el.innerHTML+='<div class="flex justify-between p-2 bg-slate-800 rounded"><span>'+t.name+'</span><button onclick="deleteCompanyTemplate(&quot;'+t.name.replace(/"/g,'&quot;')+'&quot;)" class="text-red-400"><i class="fa-solid fa-trash"></i></button></div>';});}
+        async function deleteCompanyTemplate(name){const r=await Swal.fire({title:'確定刪除？',text:name,showCancelButton:true,background:'#1e293b',color:'white'});if(!r.isConfirmed)return;try{const res=await API.deleteCompanyTemplate(name);if(res.status==='success'){Swal.fire({icon:'success',title:'已刪除',toast:true,background:'#1e293b'});fetchData();renderCompanyTemplateList();}else{Swal.fire({icon:'error',title:'刪除失敗',text:res.msg||'',background:'#1e293b'});}}catch(e){Swal.fire({icon:'error',title:'刪除失敗',text:e.message||'',background:'#1e293b'});}}
+        async function changeStatus(id, s) { 
+            let ns = s === '庫存中' ? '客訂中' : '庫存中'; 
+            const r = await Swal.fire({ title: '切換狀態', text: `改為「${ns}」？`, icon: 'question', showCancelButton: true, background: '#1e293b', color: 'white' });
+            if(r.isConfirmed) { 
+                try {
+                    const res = await API.changePhoneStatus(id, s);
+                    if(res.status === 'success'){ 
+                        Swal.fire({title:'已更新', icon:'success', timer:800, background:'#1e293b'}); 
+                        let item = DB.inv.find(x => x.id == id); 
+                        if(item) { item.status_label = ns; filterItems(null, document.querySelector('.pill-btn.active').innerText); } 
+                    }
+                } catch(e) {
+                    console.error('更改狀態失敗:', e);
+                    Swal.fire({icon:'error', title:'更新失敗', text: e.message || '請重試', background:'#1e293b'});
+                }
+            }
+        }
+        function renderServiceGrid() { document.getElementById('item-grid').innerHTML = `<div onclick="modalRepair()" class="glass p-6 rounded-xl border-l-4 border-yellow-500 flex flex-col items-center justify-center gap-2 active:scale-95 transition"><i class="fa-solid fa-screwdriver-wrench text-4xl text-yellow-500"></i><span class="font-bold">維修登記</span></div><div onclick="modalWrap()" class="glass p-6 rounded-xl border-l-4 border-purple-500 flex flex-col items-center justify-center gap-2 active:scale-95 transition"><i class="fa-solid fa-wand-magic-sparkles text-4xl text-purple-500"></i><span class="font-bold">包膜服務</span></div><div onclick="modalNewPhone()" class="glass p-6 rounded-xl border-l-4 border-green-500 flex flex-col items-center justify-center gap-2 active:scale-95 transition"><i class="fa-solid fa-mobile-screen text-4xl text-green-500"></i><span class="font-bold">新機</span></div><div onclick="modalPeerTransfer()" class="glass p-6 rounded-xl border-l-4 border-blue-500 flex flex-col items-center justify-center gap-2 active:scale-95 transition"><i class="fa-solid fa-truck-fast text-4xl text-blue-500"></i><span class="font-bold">同行調貨</span></div><div onclick="modalESIM()" class="glass p-6 rounded-xl border-l-4 border-cyan-500 flex flex-col items-center justify-center gap-2 active:scale-95 transition"><i class="fa-solid fa-sim-card text-4xl text-cyan-500"></i><span class="font-bold">eSIM</span></div><div onclick="modalShipping()" class="glass p-6 rounded-xl border-l-4 border-slate-400 flex flex-col items-center justify-center gap-2 active:scale-95 transition"><i class="fa-solid fa-truck text-4xl text-slate-400"></i><span class="font-bold">運費</span></div>`; }
+        async function addToCart(id) { const i = DB.inv.find(x => x.id == id); if(!i) return; let p = i.price, q = 1; let defPrice = i.defaultPrice > 0 ? i.defaultPrice : (i.price > 0 ? i.price : ''); if (i.type === 'accessory' || i.price === 0) { const { value } = await Swal.fire({ title: i.name, html: `<input id="sw-p" type="number" class="swal2-input" placeholder="單價" value="${defPrice}"><div style="display:flex;align-items:center;justify-content:center;gap:12px;margin-top:8px"><button type="button" onclick="var el=document.getElementById('sw-q');el.value=Math.max(1,parseInt(el.value||1)-1)" style="width:52px;height:52px;font-size:26px;border-radius:12px;background:#334155;color:white;border:none;cursor:pointer">-</button><input id="sw-q" type="number" value="1" min="1" style="width:72px;height:52px;font-size:22px;text-align:center;background:#1e293b;color:white;border:2px solid #475569;border-radius:12px;outline:none"><button type="button" onclick="var el=document.getElementById('sw-q');el.value=parseInt(el.value||1)+1" style="width:52px;height:52px;font-size:26px;border-radius:12px;background:#334155;color:white;border:none;cursor:pointer">+</button></div>`, background: '#1e293b', color: 'white', preConfirm: () => [document.getElementById('sw-p').value, document.getElementById('sw-q').value] }); if(!value) return; p = parseInt(value[0]); q = parseInt(value[1]); } Cart.push({ ...i, price: p, quantity: q, itemId: i.id, originalPrice: p, isGift: false }); renderCart(); }
+        function renderCart() { 
+            const c = document.getElementById('cart-items'); 
+            c.innerHTML = ''; 
+            let t = 0, cn = 0; 
+            Cart.forEach((item, idx) => { 
+                let s = item.price * item.quantity; 
+                t += s; 
+                cn += item.quantity; 
+                let g = item.isGift ? 'text-red-400 border-red-400' : 'text-slate-500 border-slate-600'; 
+                let nameLine = item.name; 
+                if (item.type === 'phone' || item.type === 'new_phone' || item.type === 'peer_phone') { 
+                    if (item.stock_id) nameLine += ' <span class="text-slate-400 text-xs">#' + item.stock_id + '</span>'; 
+                } 
+                nameLine += ' <span class="text-yellow-500 text-xs">x' + item.quantity + '</span>'; 
+                // 配件和所有維修都可以標記為「贈」
+                const showGiftBtn = (item.type === 'accessory' || item.type === 'repair' || item.type === 'shipping');
+                c.innerHTML += `<div class="bg-slate-800 p-2 rounded-lg flex justify-between items-center text-sm"><div class="flex-1"><div class="text-white font-bold">${nameLine}</div><div class="text-xs text-slate-500">$${item.price}</div></div><div class="flex items-center gap-2">${showGiftBtn ? `<button onclick="toggleGift(${idx})" class="text-xs border px-1 rounded ${g}">贈</button>` : ''}<button onclick="Cart.splice(${idx},1);renderCart()" class="text-slate-500 px-2"><i class="fa-solid fa-trash"></i></button></div></div>`; 
+            }); 
+            document.getElementById('cart-total').innerText = t.toLocaleString(); 
+            document.getElementById('mob-total').innerText = '$' + t.toLocaleString(); 
+            document.getElementById('mob-count').innerText = cn; 
+            const f = document.getElementById('mobile-float-bar-pos'); 
+            if(cn > 0) f.classList.remove('translate-y-24'); 
+            else f.classList.add('translate-y-24'); 
+        }
+        function toggleGift(idx) { let item = Cart[idx]; if(item.isGift) { item.isGift = false; item.price = item.originalPrice; item.name = item.name.replace(' (贈)',''); } else { item.isGift = true; item.price = 0; item.name += ' (贈)'; } renderCart(); }
+        function clearRestockCart() { RestockCart=[]; renderRestockCartList(); toggleMobileCart('restock', false); }
+        
+        async function confirmCheckout() { 
+            try {
+                if(Cart.length === 0) return; 
+                const confirm = await Swal.fire({ title: '確定要結帳嗎？', showCancelButton: true, confirmButtonText: '確定結帳', cancelButtonText: '取消', background: '#1e293b', color: 'white' });
+                if (!confirm.isConfirmed) return;
+                const cust = document.getElementById('cust-name').value || '過路客'; 
+                const pay = document.querySelector('input[name="pay"]:checked').value; 
+                const oid = 'ORD' + Date.now().toString().slice(-6); 
+                const items = Cart.flatMap(item => {
+                    if (item.isMultiPhone && item.allIds) {
+                        return item.allIds.map((pid, idx) => {
+                            const ph = DB.inv.find(x => String(x.id) === String(pid));
+                            const phName = ph ? ph.name : item.name;
+                            if(ph) ph.status_label = '已售出';
+                            return {
+                                itemName: '(二) ' + item.name + (item.allStockIds ? ' #' + item.allStockIds.join('+') : ''),
+                                name: item.name,
+                                type: 'phone',
+                                itemId: pid,
+                                salePrice: idx === 0 ? item.price : 0,
+                                cost: ph ? (Number(ph.cost) || 0) : 0,
+                                profit: idx === 0 ? (item.price - item.cost) : 0,
+                                isMultiPhoneExtra: idx > 0,
+                                quantity: 1,
+                                imei: ph ? (ph.imei || '') : '',
+                                modelName: phName,
+                                reason: '', description: '', isStockBattery: false,
+                                isDirectTransfer: false, batteryCat: '', category: '',
+                                dealerName: '', customer: '',
+                                _prebuilt: true
+                            };
+                        });
+                    }
+                    return [item];
+                }).map(item => {
+                    if (item._prebuilt) return item;
+                    let finalName = item.name; 
+                    let prefix = '';
+                    if(item.type === 'new_phone') prefix = '(新) ';
+                    else if(item.type === 'phone' || item.type === 'peer_phone') prefix = '(二) ';
+                    else if(item.type === 'repair') prefix = '(維) ';
+                    else if(item.type === 'wrap') prefix = '(包) ';
+                    else if(item.type === 'direct_transfer') prefix = '(調) ';
+                    else if(item.type === 'shipping') prefix = '(運) ';
+                    let suffix = ''; if(item.type === 'phone' && item.stock_id) { suffix = ` #${item.stock_id}`; }
+                    if(item.type !== 'accessory' && item.type !== 'direct_transfer') finalName = prefix + item.name.replace('(贈)', '').trim() + suffix; 
+                    else finalName = item.name.replace('(贈)', '').trim();
+                    let safePrice = Number(item.price) || 0, safeCost = Number(item.cost) || 0, safeQty = Number(item.quantity) || 1;
+                    if(item.type === 'phone') { let i = DB.inv.find(x => x.id === item.itemId); if(i) i.status_label = '已售出'; }
+                    return { 
+                        itemName: finalName, 
+                        name: item.name || finalName,  // 直接調貨使用 name
+                        type: item.type, 
+                        itemId: item.itemId, 
+                        salePrice: safePrice * safeQty, 
+                        cost: safeCost * safeQty, 
+                        profit: (safePrice - safeCost) * safeQty, 
+                        quantity: safeQty, 
+                        imei: item.imei||'', 
+                        modelName: item.modelName||'', 
+                        reason: item.reason||'',           // 故障原因（更換物品）
+                        description: item.description||'', // 故障描述
+                        isStockBattery: item.isStockBattery, 
+                        isDirectTransfer: item.isDirectTransfer || false,  // 標記為直接調貨
+                        batteryCat: item.batteryCat||'', 
+                        category: item.category||'', 
+                        dealerName: item.dealerName||'', 
+                        customer: item.customer||'' 
+                    };
+                });
+                Swal.fire({ title: '結帳處理中...', html: '正在寫入資料，請勿關閉視窗', allowOutsideClick: false, didOpen: () => { Swal.showLoading(); } }); 
+                try {
+                    const result = await API.checkoutOrder({ orderId: oid, customer: cust, payMethod: pay, person: User.name, items: items });
+                    if (result.status === 'error') { 
+                        Swal.fire({icon:'error', title:'結帳失敗', text: result.msg || '請截圖通知管理員', background: '#1e293b'}); 
+                        return; 
+                    }
+                    Cart = []; 
+                    renderCart(); 
+                    toggleMobileCart('pos', false);
+                    try { const activeBtn = document.querySelector('.pill-btn.active'); if(activeBtn) filterItems(null, activeBtn.innerText); } catch(e) {}
+                    Swal.update({ html: '寫入成功，正在載入今日帳務...' });
+                    try {
+                        const fd = await API.getTodaySalesOnly();
+                        if (fd.status === 'error') { 
+                            Swal.fire({icon:'warning', title:'結帳已寫入', text: '今日帳務同步失敗，請手動重新整理', background: '#1e293b'}); 
+                            return; 
+                        }
+                        DB.sales = fd.todaySales || [];
+                        if (UI.tab === 'phone') switchMainTab('phone');
+                        renderReport();
+                        document.getElementById('sync-status').innerHTML = '<span class="text-green-500">● 已同步</span>';
+                        Swal.fire({icon:'success', title:'結帳完成', timer: 1500, background: '#1e293b'});
+                        fetchData();
+                    } catch(e) { 
+                        console.error('載入今日帳務失敗:', e);
+                        Swal.fire({icon:'success', title:'結帳完成', text: '若今日帳務未更新請手動重新整理', timer: 2000, background: '#1e293b'}); 
+                        fetchData(); 
+                    }
+                } catch(e) {
+                    console.error('結帳失敗:', e);
+                    Swal.fire({icon:'error', title:'結帳失敗', text: '請截圖通知管理員: ' + (e && e.message ? e.message : String(e)), background:'#1e293b'});
+                }
+            } catch(e) {
+                console.error(e);
+                Swal.fire({icon:'error', title:'結帳失敗', text: '請截圖通知管理員: ' + e.message, background:'#1e293b'});
+            }
+        }
+
+        function toggleMobileCart(t, s) { const p = (t==='pos') ? document.getElementById('cart-panel') : document.getElementById('rs-cart-panel'); if(s) { p.classList.remove('hidden'); p.classList.add('flex', 'fixed', 'inset-0', 'z-50'); if (t === 'pos') { p.classList.add('mobile-cart-open'); resetCartFooterDrag(); } } else { if (t === 'pos') { p.classList.remove('mobile-cart-open'); resetCartFooterDrag(); } p.classList.add('hidden'); p.classList.remove('flex', 'fixed', 'inset-0', 'z-50'); } }
+        function setRestockMode(m) { UI.rsMode = m; document.getElementById('rm-inv').className = m==='inventory' ? 'pill-btn active' : 'pill-btn'; document.getElementById('rm-exp').className = m==='expense' ? 'pill-btn active' : 'pill-btn'; if(m === 'inventory') { document.getElementById('rs-toolbar-inv').classList.remove('hidden'); document.getElementById('rs-toolbar-exp').classList.add('hidden'); document.getElementById('mobile-float-bar-restock').classList.remove('hidden'); const sub = document.getElementById('rs-cat-scroll'); sub.innerHTML = ''; sub.appendChild(createRsPill('全部', 'all')); const hiddenBtn = document.createElement('div'); hiddenBtn.className='pill-btn border-pink-500 text-pink-400'; hiddenBtn.innerText='🔧 維修料件'; hiddenBtn.onclick=()=>{ UI.rsCat='hidden_parts'; document.querySelectorAll('.rs-pill').forEach(b=>b.classList.remove('active')); hiddenBtn.classList.add('active'); renderRestockGrid(); }; sub.appendChild(hiddenBtn); const cats = new Set(DB.inv.filter(i=>i.type==='accessory' && i.category && !i.isHidden).map(i=>i.category)); Array.from(cats).sort().forEach(c => sub.appendChild(createRsPill(c, c))); renderRestockGrid(); } else { document.getElementById('rs-toolbar-inv').classList.add('hidden'); document.getElementById('rs-toolbar-exp').classList.remove('hidden'); document.getElementById('mobile-float-bar-restock').classList.add('hidden'); document.getElementById('rs-grid').innerHTML = ''; renderRestockCartList(); } }
+        function createRsPill(t, v) { const d = document.createElement('div'); d.className = 'pill-btn rs-pill'; d.innerText = t; if(UI.rsCat === v) d.classList.add('active'); d.onclick = () => { UI.rsCat = v; document.querySelectorAll('.rs-pill').forEach(b=>b.classList.remove('active')); d.classList.add('active'); renderRestockGrid(); }; return d; }
+        function renderRestockGrid() { if(UI.rsMode === 'expense') return; const term = document.getElementById('rs-search').value.toLowerCase(); const grid = document.getElementById('rs-grid'); grid.innerHTML = ''; let list = DB.inv.filter(i => { if (i.type !== 'accessory') return false; if (term) return i.name.toLowerCase().includes(term); if (UI.rsCat === 'hidden_parts') return i.isHidden; if (UI.rsCat === 'all') return !i.isHidden; return i.category === UI.rsCat; }); if(list.length === 0) { grid.innerHTML = '<div class="col-span-full text-center text-slate-500 mt-4">無符合商品</div>'; return; } list.forEach(i => { let border = i.isHidden ? 'border-pink-500' : 'border-blue-500'; grid.innerHTML += `<div class="glass p-3 rounded-xl border-l-4 ${border} relative group active:scale-95 transition"><button onclick="event.stopPropagation(); editAccessory('${i.id}', '${i.name}', ${i.cost}, ${i.defaultPrice})" class="absolute top-2 right-2 text-slate-500 hover:text-white p-1"><i class="fa-solid fa-pen-to-square"></i></button><div onclick="addRsItem('${i.id}')" class="cursor-pointer"><div class="flex justify-between text-xs text-slate-500"><span>${i.category}</span><span>庫: ${i.stock}</span></div><div class="font-bold text-sm text-slate-200 line-clamp-2 my-1">${i.name}</div><div class="text-right text-xs text-slate-400">成本 $${i.cost}</div></div></div>`; }); }
+        async function editAccessory(id, n, c, p) { const { value: v } = await Swal.fire({ title: '編輯商品', html: `<div class="text-xs text-slate-400 mb-2">${n}</div><label class="text-xs text-slate-500 block text-left">成本</label><input id="sw-edit-c" class="swal2-input" type="number" value="${c}"><label class="text-xs text-slate-500 block text-left mt-2">建議售價</label><input id="sw-edit-p" class="swal2-input" type="number" value="${p}">`, background: '#1e293b', color: 'white', showCancelButton: true, preConfirm: () => [document.getElementById('sw-edit-c').value, document.getElementById('sw-edit-p').value] }); if (v) { google.script.run.withSuccessHandler(res => { if (res === 'SUCCESS') { Swal.fire({title:'已更新', toast:true, position:'top', timer:1000, background:'#1e293b'}); let item = DB.inv.find(x => x.id == id); if(item) { item.cost = parseInt(v[0]); item.defaultPrice = parseInt(v[1]); } renderRestockGrid(); } }).apiUpdateAccessory(id, v[0], v[1]); } }
+        async function addRsItem(id) { const i = DB.inv.find(x=>x.id==id); const {isConfirmed} = await Swal.fire({title:i.name, html:`<div style="display:flex;align-items:center;justify-content:center;gap:12px;margin-top:8px"><button type="button" onclick="var el=document.getElementById('sw-q');el.value=Math.max(1,parseInt(el.value||1)-1)" style="width:52px;height:52px;font-size:26px;border-radius:12px;background:#334155;color:white;border:none;cursor:pointer">-</button><input id="sw-q" type="number" value="1" min="1" style="width:72px;height:52px;font-size:22px;text-align:center;background:#1e293b;color:white;border:2px solid #475569;border-radius:12px;outline:none"><button type="button" onclick="var el=document.getElementById('sw-q');el.value=parseInt(el.value||1)+1" style="width:52px;height:52px;font-size:26px;border-radius:12px;background:#334155;color:white;border:none;cursor:pointer">+</button></div>`, background:'#1e293b', color:'white', showCancelButton:true, confirmButtonText:'加入'}); if(isConfirmed){const q=parseInt(document.getElementById('sw-q').value)||1; RestockCart.push({type:'restock', name:i.name, category:i.category, cost:i.cost, quantity:q}); renderRestockCartList();} }
+        async function addExpItem(type) { const { value } = await Swal.fire({ title: type, html: `<input id="ex-n" class="swal2-input" placeholder="備註 (如: 便當/抽成)"><input id="ex-a" type="number" class="swal2-input" placeholder="金額">`, background:'#1e293b', color:'white', preConfirm:()=>[document.getElementById('ex-n').value, document.getElementById('ex-a').value] }); if(value && value[1]) { RestockCart.push({type: type==='薪資/抽成'?'salary':'expense', name:`[${type}] ${value[0]}`, cost:parseInt(value[1]), quantity:1}); renderRestockCartList(); } }
+        function renderRestockCartList() { const d = document.getElementById('rs-cart-items'); d.innerHTML=''; let t = 0, c = 0; RestockCart.forEach((i, idx) => { t += (i.cost*i.quantity); c += 1; d.innerHTML += `<div class="flex justify-between text-sm bg-slate-900 p-2 rounded mb-1"><span>${i.name} <span class="text-yellow-500">x${i.quantity}</span></span><div class="flex gap-2 items-center"><span class="text-red-400">$${i.cost*i.quantity}</span><i onclick="RestockCart.splice(${idx},1);renderRestockCartList()" class="fa-solid fa-trash text-slate-500 cursor-pointer"></i></div></div>`; }); document.getElementById('rs-cart-total').innerText = t.toLocaleString(); document.getElementById('rs-mob-total').innerText = '$' + t.toLocaleString(); document.getElementById('rs-mob-count').innerText = c; const f = document.getElementById('mobile-float-bar-restock'); if(c > 0 && UI.rsMode === 'inventory') f.classList.remove('translate-y-24'); else f.classList.add('translate-y-24'); }
+        function clearRestockCart() { RestockCart=[]; renderRestockCartList(); toggleMobileCart('restock', false); }
+        async function submitRestock() { 
+            if(RestockCart.length===0) return; 
+            const confirm = await Swal.fire({ title: '確定要送出進貨清單？', text: '送出後無法撤回', showCancelButton: true, confirmButtonText: '確定送出', cancelButtonText: '取消', background: '#1e293b', color: 'white' });
+            if (!confirm.isConfirmed) return;
+            const btn = document.getElementById('btn-submit-restock');
+            if(btn){ btn.disabled=true; btn.textContent='送出中...'; }
+            const oid = 'EXP'+Date.now().toString().slice(-6); 
+            try {
+                const r = await API.handleRestock({items:RestockCart, person:User.name, orderId:oid});
+                if(r.status==='error'){ 
+                    Swal.fire({icon:'error', title:'進貨失敗', text: r.msg||'請重試', background:'#1e293b'}); 
+                    return; 
+                }
+                RestockCart=[]; 
+                renderRestockCartList(); 
+                toggleMobileCart('restock', false); 
+                fetchData(); 
+                Swal.fire({icon:'success', title:'已送出', background:'#1e293b'});
+            } catch(err) {
+                Swal.fire({icon:'error', title:'進貨失敗', text: (err&&err.message)||'請重試', background:'#1e293b'});
+            } finally {
+                if(btn){ btn.disabled=false; btn.textContent='確認送出'; }
+            }
+        }
+        async function modalNewPhone() { const {value:v}=await Swal.fire({title:'新機',html:'<input id="n1" class="swal2-input" placeholder="同行名稱"><input id="n2" class="swal2-input" type="number" placeholder="成本"><input id="n3" class="swal2-input" placeholder="IMEI"><input id="n4" class="swal2-input" type="number" placeholder="銷售金額"><input id="n5" class="swal2-input" placeholder="客戶名稱"><input id="n6" class="swal2-input" placeholder="型號（流水用）"><input id="n7" class="swal2-input" placeholder="容量（流水用）"><input id="n8" class="swal2-input" placeholder="顏色（流水用）">',background:'#1e293b', color:'white', preConfirm:()=>[document.getElementById('n1').value,document.getElementById('n2').value,document.getElementById('n3').value,document.getElementById('n4').value,document.getElementById('n5').value,document.getElementById('n6').value,document.getElementById('n7').value,document.getElementById('n8').value]}); if(v&&v[1]&&v[4]){const spec=[v[5],v[6],v[7]].filter(Boolean).join(' '); Cart.push({type:'new_phone',name:'新機 '+v[0]+(spec?' '+spec:''),dealerName:v[0],cost:Number(v[1]),price:Number(v[3]),imei:v[2],customer:v[4],quantity:1,itemId:'NP-'+Date.now()});renderCart();}}
+        async function modalPeerTransfer() { const {value:v}=await Swal.fire({title:'同行調貨',html:'<input id="p1" class="swal2-input" placeholder="同行名稱"><input id="p2" class="swal2-input" type="number" placeholder="成本"><input id="p3" class="swal2-input" placeholder="IMEI"><input id="p4" class="swal2-input" type="number" placeholder="銷售金額"><input id="p5" class="swal2-input" placeholder="客戶名稱"><input id="p6" class="swal2-input" placeholder="型號（流水用）"><input id="p7" class="swal2-input" placeholder="容量（流水用）"><input id="p8" class="swal2-input" placeholder="顏色（流水用）">',background:'#1e293b', color:'white', preConfirm:()=>[document.getElementById('p1').value,document.getElementById('p2').value,document.getElementById('p3').value,document.getElementById('p4').value,document.getElementById('p5').value,document.getElementById('p6').value,document.getElementById('p7').value,document.getElementById('p8').value]}); if(v&&v[1]&&v[4]){const spec=[v[5],v[6],v[7]].filter(Boolean).join(' '); Cart.push({type:'peer_phone',name:'同行 '+v[0]+(spec?' '+spec:''),dealerName:v[0],cost:Number(v[1]),price:Number(v[3]),imei:v[2],customer:v[4],quantity:1,itemId:'PP-'+Date.now()});renderCart();}}
+
+        async function modalRepair() {
+            const { value: t } = await Swal.fire({ input: 'select', inputOptions: { 'gen': '一般', 'stock': '庫存電池' }, background: '#1e293b', color: 'white' });
+            if (!t) return;
+            if (t === 'stock') {
+                // 電池維修：選擇庫存電池，然後顯示維修登記表單
+                const BATTERY_CATS = ['已加工成品電池', '成品大容量電池'];
+                const batteries = DB.inv.filter(i => i.type === 'accessory' && i.category && BATTERY_CATS.includes(i.category) && Number(i.stock) > 0);
+                if (batteries.length === 0) { Swal.fire({ icon: 'warning', title: '無庫存電池', text: '請先至進貨補貨（僅顯示已加工成品電池、成品大容量電池）', background: '#1e293b', color: 'white' }); return; }
+                const options = {}; batteries.forEach(b => { options['b' + b.id] = (b.category || '電池') + ' - ' + b.name + ' (庫存 ' + b.stock + ')'; });
+                const { value: bid } = await Swal.fire({ title: '選擇庫存電池', input: 'select', inputOptions: options, background: '#1e293b', color: 'white' });
+                if (!bid) return;
+                const item = batteries.find(b => 'b' + b.id === bid);
+                // 庫存電池維修：顯示維修登記表單（型號、序號、更換物品、客戶、價格），然後寫入維修紀錄
+                const { value: v } = await Swal.fire({ 
+                    title: '維修登記 - 庫存電池',
+                    html: '<input id="r1" class="swal2-input" placeholder="型號"><input id="r2" class="swal2-input" placeholder="序號（IMEI）"><input id="r3" class="swal2-input" placeholder="更換物品"><input id="r4" class="swal2-input" placeholder="客戶名稱"><input id="r5" class="swal2-input" type="number" placeholder="價格（成本已帶入庫存）">', 
+                    background: '#1e293b', 
+                    color: 'white', 
+                    preConfirm: () => [
+                        document.getElementById('r1').value,  // 型號
+                        document.getElementById('r2').value,  // 序號（IMEI）
+                        document.getElementById('r3').value,  // 更換物品（故障原因/描述）
+                        document.getElementById('r4').value,  // 客戶名稱
+                        document.getElementById('r5').value   // 價格
+                    ] 
+                });
+                if (v && v[0] && v[4]) { 
+                    Cart.push({ 
+                        type: 'repair', 
+                        name: '維修:庫存電池 ' + item.name, 
+                        modelName: v[0] || '',           // 型號
+                        imei: v[1] || '',                // 序號（IMEI）
+                        reason: v[2] || '',              // 更換物品（故障原因）
+                        description: v[2] || '',         // 故障描述（與更換物品相同）
+                        customer: v[3] || '',            // 客戶名稱
+                        cost: item.cost || 0,            // 庫存已有成本，自動帶入
+                        price: Number(v[4]) || 0,        // 價格
+                        quantity: 1, 
+                        itemId: item.id,                 // 使用電池的 ID，用於扣庫存
+                        isStockBattery: true,            // 標記為庫存電池維修
+                        batteryCat: item.category || '電池',
+                        batteryName: item.name           // 電池名稱
+                    }); 
+                    renderCart(); 
+                }
+            } else {
+                // 一般維修：輸入型號、序號（IMEI）、更換物品、客戶、成本、價格
+                const { value: v } = await Swal.fire({ 
+                    html: '<input id="r1" class="swal2-input" placeholder="型號"><input id="r2" class="swal2-input" placeholder="序號（IMEI）"><input id="r3" class="swal2-input" placeholder="更換物品"><input id="r4" class="swal2-input" placeholder="客戶名稱"><input id="r5" class="swal2-input" type="number" placeholder="成本"><input id="r6" class="swal2-input" type="number" placeholder="價格">', 
+                    background: '#1e293b', 
+                    color: 'white', 
+                    preConfirm: () => [
+                        document.getElementById('r1').value,  // 型號
+                        document.getElementById('r2').value,  // 序號（IMEI）
+                        document.getElementById('r3').value,  // 更換物品（故障原因/描述）
+                        document.getElementById('r4').value,  // 客戶名稱
+                        document.getElementById('r5').value,  // 成本
+                        document.getElementById('r6').value   // 價格
+                    ] 
+                });
+                if (v && v[0] && v[5]) { 
+                    Cart.push({ 
+                        type: 'repair', 
+                        name: '維修:' + v[0], 
+                        modelName: v[0], 
+                        imei: v[1] || '',           // 序號（IMEI）
+                        reason: v[2] || '',         // 更換物品（故障原因）
+                        description: v[2] || '',    // 故障描述（與更換物品相同）
+                        customer: v[3] || '',       // 客戶名稱
+                        cost: Number(v[4]) || 0,   // 成本（當日叫貨用，僅流水與利潤顯示）
+                        price: Number(v[5]) || 0,   // 價格
+                        quantity: 1, 
+                        itemId: 'REP-' + Date.now(),
+                        isStockBattery: false       // 一般維修，不是庫存電池
+                    }); 
+                    renderCart(); 
+                }
+            }
+        }
+
+        async function modalWrap(){const {value:v}=await Swal.fire({html:'<input id="w1" class="swal2-input" placeholder="項目"><input id="w2" class="swal2-input" placeholder="售價">',background:'#1e293b',preConfirm:()=>[document.getElementById('w1').value,document.getElementById('w2').value]}); if(v){Cart.push({type:'wrap',name:'包膜:'+v[0],cost:0,price:v[1],quantity:1,itemId:'W-'+Date.now()});renderCart();}}
+        async function modalESIM(){const {value:v}=await Swal.fire({title:'eSIM',html:'<input id="es1" class="swal2-input" type="number" placeholder="成本"><input id="es2" class="swal2-input" type="number" placeholder="結帳金額">',background:'#1e293b',color:'white',preConfirm:()=>[document.getElementById('es1').value,document.getElementById('es2').value]}); if(v&&v[1]){Cart.push({type:'esim',name:'eSIM',cost:Number(v[0])||0,price:Number(v[1])||0,quantity:1,itemId:'ESIM-'+Date.now()});renderCart();}}
+        async function modalShipping(){const {value:v}=await Swal.fire({title:'運費',input:'number',inputPlaceholder:'金額',background:'#1e293b',color:'white'}); if(v!=null&&v!==''){const amt=Number(v)||0; Cart.push({type:'shipping',name:'運費',cost:amt,price:amt,quantity:1,itemId:'SF-'+Date.now(),originalPrice:amt,isGift:false}); renderCart();}}
+        function renderDirectTransferGrid() {
+            const grid = document.getElementById('item-grid');
+            grid.innerHTML = '';
+            // 顯示一個「新增調貨」的按鈕
+            grid.innerHTML = `<div onclick="modalDirectTransfer()" class="glass p-6 rounded-xl border-l-4 border-purple-500 flex flex-col items-center justify-center gap-2 active:scale-95 transition cursor-pointer"><i class="fa-solid fa-truck-fast text-4xl text-purple-500"></i><span class="font-bold text-white">新增調貨</span><span class="text-xs text-slate-400">點擊新增調貨項目</span></div>`;
+        }
+        async function modalDirectTransfer() {
+            const { value: v } = await Swal.fire({
+                title: '調貨',
+                html: '<input id="dt1" class="swal2-input" placeholder="調貨廠商"><input id="dt2" class="swal2-input" placeholder="品項"><input id="dt3" class="swal2-input" type="number" placeholder="成本"><input id="dt4" class="swal2-input" type="number" placeholder="售價">',
+                background: '#1e293b',
+                color: 'white',
+                preConfirm: () => [
+                    document.getElementById('dt1').value,  // 調貨廠商
+                    document.getElementById('dt2').value,  // 品項
+                    document.getElementById('dt3').value,  // 成本
+                    document.getElementById('dt4').value   // 售價
+                ]
+            });
+            if (v && v[0] && v[1] && v[2] && v[3]) {
+                Cart.push({
+                    type: 'direct_transfer',
+                    name: '調貨: ' + v[1],
+                    dealerName: v[0],  // 調貨廠商
+                    cost: Number(v[2]) || 0,
+                    price: Number(v[3]) || 0,
+                    quantity: 1,
+                    itemId: 'DT-' + Date.now(),
+                    isDirectTransfer: true  // 標記為直接調貨，不扣庫存
+                });
+                renderCart();
+            }
+        }
+        
+        function renderMultiSelectBar() {
+            const bar = document.getElementById('multi-select-bar');
+            const confirm = document.getElementById('multi-select-confirm');
+            const btn = document.getElementById('btn-multiselect');
+            if (!bar) return;
+            if (UI.tab !== 'phone') { bar.classList.add('hidden'); return; }
+            bar.classList.remove('hidden');
+            if (UI.multiSelect) {
+                if (btn) { btn.classList.add('active'); }
+                if (confirm) confirm.classList.remove('hidden');
+                const cnt = document.getElementById('multi-count');
+                if (cnt) cnt.textContent = UI.selectedPhones.size + ' 台';
+            } else {
+                if (btn) btn.classList.remove('active');
+                if (confirm) confirm.classList.add('hidden');
+            }
+        }
+        function toggleMultiSelectMode() {
+            UI.multiSelect = !UI.multiSelect;
+            if (!UI.multiSelect) { UI.selectedPhones = new Set(); refreshPhoneSelection(); }
+            renderMultiSelectBar();
+        }
+        function cancelMultiSelect() {
+            UI.multiSelect = false; UI.selectedPhones = new Set(); refreshPhoneSelection(); renderMultiSelectBar();
+        }
+        function togglePhoneSelect(id) {
+            if (UI.selectedPhones.has(id)) UI.selectedPhones.delete(id);
+            else UI.selectedPhones.add(id);
+            refreshPhoneSelection();
+            renderMultiSelectBar();
+        }
+        function refreshPhoneSelection() {
+            document.querySelectorAll('[id^="sel-"]').forEach(el => {
+                const id = el.id.replace('sel-', '');
+                if (UI.selectedPhones.has(id)) el.classList.remove('hidden');
+                else el.classList.add('hidden');
+            });
+        }
+        async function confirmMultiPhone() {
+            if (UI.selectedPhones.size === 0) return;
+            const phones = Array.from(UI.selectedPhones).map(id => DB.inv.find(x => String(x.id) === String(id))).filter(Boolean);
+            if (phones.length === 0) return;
+            const listHTML = phones.map(p => `<div class="text-sm text-slate-300 py-1 border-b border-slate-700">${p.name} <span class="text-slate-500 text-xs">#${p.stock_id}</span></div>`).join('');
+            const totalCost = phones.reduce((s, p) => s + (Number(p.cost) || 0), 0);
+            const { value } = await Swal.fire({
+                title: `共 ${phones.length} 台手機`,
+                html: `<div class="mb-3 max-h-40 overflow-y-auto">${listHTML}</div><input id="multi-price" type="number" class="swal2-input" placeholder="總價格">`,
+                background: '#1e293b', color: 'white',
+                showCancelButton: true, confirmButtonText: '加入購物車', cancelButtonText: '取消',
+                preConfirm: () => document.getElementById('multi-price').value
+            });
+            if (!value) return;
+            const totalPrice = parseInt(value) || 0;
+            const names = phones.map(p => p.name).join(' + ');
+            const combinedItem = {
+                id: phones[0].id,
+                stock_id: phones.map(p => p.stock_id).join('+'),
+                type: 'phone',
+                name: names,
+                price: totalPrice,
+                cost: totalCost,
+                quantity: 1,
+                itemId: phones[0].id,
+                originalPrice: totalPrice,
+                isGift: false,
+                isMultiPhone: true,
+                allIds: phones.map(p => p.id),
+                allStockIds: phones.map(p => p.stock_id)
+            };
+            Cart.push(combinedItem);
+            renderCart();
+            cancelMultiSelect();
+        }
+        
+        async function doLogout(){ 
+            const result = await Swal.fire({
+                title: '確定要登出嗎？',
+                text: '登出後需要重新輸入帳號密碼',
+                icon: 'question',
+                showCancelButton: true,
+                confirmButtonText: '確定登出',
+                cancelButtonText: '取消',
+                confirmButtonColor: '#ef4444',
+                cancelButtonColor: '#64748b',
+                background: '#1e293b',
+                color: 'white'
+            });
+            if (result.isConfirmed) {
+                localStorage.removeItem('pos_user_v30');
+                location.reload();
+            }
+        }
+    </script>
+</body>
+</html>+(Number(it.salePrice)||0).toLocaleString()}</div>
                     <div class="col-span-2 cp-box">
                         <span class="cp-cost">本 ${safeCost.toLocaleString()}</span>
                         <span class="${pc} font-bold">利 ${p.toLocaleString()}</span>
