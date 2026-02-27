@@ -101,10 +101,19 @@
                         <div onclick="switchMainTab('accessory')" id="tab-accessory" class="main-tab">🔌 配件</div>
                         <div onclick="switchMainTab('service')" id="tab-service" class="main-tab">🛠️ 服務</div>
                     </div>
-                    <div id="sub-cat-scroll" class="flex gap-2 overflow-x-auto no-scrollbar py-1"></div>
+                    <div class="flex items-center gap-2">
+                        <div id="sub-cat-scroll" class="flex gap-2 overflow-x-auto no-scrollbar py-1 flex-1"></div>
+                        <div id="multi-select-bar" class="hidden items-center gap-2 shrink-0 flex">
+                            <button onclick="toggleMultiSelectMode()" id="btn-multiselect" class="pill-btn border-yellow-500 text-yellow-400 shrink-0">☑ 多選</button>
+                            <div id="multi-select-confirm" class="hidden items-center gap-2 flex">
+                                <span id="multi-count" class="text-xs text-slate-400 shrink-0">0 台</span>
+                                <button onclick="confirmMultiPhone()" class="bg-yellow-500 text-black font-bold px-3 py-1.5 rounded-xl text-xs shrink-0">加入</button>
+                                <button onclick="cancelMultiSelect()" class="text-slate-400 text-xs shrink-0">取消</button>
+                            </div>
+                        </div>
+                    </div>
                 </div>
                 <div id="item-grid" class="flex-1 overflow-y-auto p-3 grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-3 content-start pb-24 md:pb-4"></div>
-                <div id="multi-select-bar" class="hidden shrink-0 p-3 bg-slate-800 border-t border-slate-700 flex items-center gap-2"><button onclick="toggleMultiSelectMode()" id="btn-multiselect" class="pill-btn border-yellow-500 text-yellow-400">☑ 多選</button><div id="multi-select-confirm" class="hidden flex-1 flex items-center gap-2"><span id="multi-count" class="text-xs text-slate-400">0 台</span><button onclick="confirmMultiPhone()" class="flex-1 bg-yellow-500 text-black font-bold py-2 rounded-xl text-sm">確認加入</button><button onclick="cancelMultiSelect()" class="text-slate-400 px-3 py-2 text-sm">取消</button></div></div>
             </div>
             <div id="cart-panel" class="hidden md:flex w-80 bg-slate-900 border-l border-slate-800 flex-col h-full max-h-[100dvh] md:max-h-none min-h-0 z-30 absolute md:static inset-0 md:inset-auto">
                 <div class="p-3 border-b border-slate-800 flex justify-between items-center bg-slate-800/50 shrink-0"><h2 class="font-bold text-white">結帳清單</h2><button onclick="toggleMobileCart('pos',false)" class="md:hidden text-slate-400 p-2"><i class="fa-solid fa-chevron-down"></i></button><button onclick="clearCart()" class="text-xs text-red-400 hidden md:block">清空</button></div>
@@ -638,7 +647,7 @@
         }
         function switchMainTab(t) { 
             UI.tab = t; document.querySelectorAll('.main-tab').forEach(e => e.classList.remove('active')); document.getElementById('tab-'+t).classList.add('active'); const sub = document.getElementById('sub-cat-scroll'); sub.innerHTML = ''; 
-            if (t === 'phone') { ['庫存中','客訂中','寄賣中'].forEach(s => sub.appendChild(createPill(s, () => filterItems('status', s)))); if(sub.firstChild) sub.firstChild.click(); } else if (t === 'accessory') { const btn = document.createElement('div'); btn.className = 'pill-btn border-blue-500 text-blue-400'; btn.innerHTML = '🏢 公司貨'; btn.onclick = () => { document.querySelectorAll('.pill-btn').forEach(b=>b.classList.remove('active')); btn.classList.add('active'); renderCompanyAccessoryGrid(); }; sub.appendChild(btn); const transferBtn = document.createElement('div'); transferBtn.className = 'pill-btn border-purple-500 text-purple-400'; transferBtn.innerHTML = '🚚 調貨'; transferBtn.onclick = () => { document.querySelectorAll('.pill-btn').forEach(b=>b.classList.remove('active')); transferBtn.classList.add('active'); renderDirectTransferGrid(); }; sub.appendChild(transferBtn); const cats = getOrderedCategories(); cats.forEach(c => sub.appendChild(createPill(c, () => filterItems('cat', c)))); if(sub.childNodes[1]) sub.childNodes[1].click(); } else { renderServiceGrid(); } 
+            if (t === 'phone') { ['庫存中','客訂中','寄賣中'].forEach(s => sub.appendChild(createPill(s, () => filterItems('status', s)))); if(sub.firstChild) sub.firstChild.click(); renderMultiSelectBar(); } else if (t === 'accessory') { const btn = document.createElement('div'); btn.className = 'pill-btn border-blue-500 text-blue-400'; btn.innerHTML = '🏢 公司貨'; btn.onclick = () => { document.querySelectorAll('.pill-btn').forEach(b=>b.classList.remove('active')); btn.classList.add('active'); renderCompanyAccessoryGrid(); }; sub.appendChild(btn); const transferBtn = document.createElement('div'); transferBtn.className = 'pill-btn border-purple-500 text-purple-400'; transferBtn.innerHTML = '🚚 調貨'; transferBtn.onclick = () => { document.querySelectorAll('.pill-btn').forEach(b=>b.classList.remove('active')); transferBtn.classList.add('active'); renderDirectTransferGrid(); }; sub.appendChild(transferBtn); const cats = getOrderedCategories(); cats.forEach(c => sub.appendChild(createPill(c, () => filterItems('cat', c)))); if(sub.childNodes[1]) sub.childNodes[1].click(); } else { renderServiceGrid(); } 
         }
         function createPill(t, f) { const d = document.createElement('div'); d.className = 'pill-btn'; d.innerText = t; d.onclick = () => { document.querySelectorAll('.pill-btn').forEach(b=>b.classList.remove('active')); d.classList.add('active'); f(); }; return d; }
         
