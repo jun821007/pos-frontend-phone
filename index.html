@@ -818,7 +818,7 @@
                         stats.pending += sale; 
                         if(i.type!=='wrap') stats.pot += (sale - cost); 
                     }
-                    if (sale===0 && cost>0) stats.gift += cost;
+                    if (sale===0 && cost>0 && !(i.type==='phone' && (i.itemName||'').includes(' + '))) stats.gift += cost;
                 }
             });
             Object.values(groups).forEach(g => { div.innerHTML += renderOrderRow(g); });
