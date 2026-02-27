@@ -740,7 +740,7 @@
                         <div class="text-slate-200 font-bold">${dName}</div>
                         <div class="text-[10px] text-slate-500 mt-0.5">${formatDate(it.time)}</div>
                     </div>
-                    <div class="col-span-3 text-right font-mono ${(it.type==='phone' && Number(it.salePrice)===0 && dName.includes(' + ')) ? 'text-slate-500 text-[10px]' : 'text-yellow-500'}">${(it.type==='phone' && Number(it.salePrice)===0 && dName.includes(' + ')) ? '含於上筆' : '
+                    <div class="col-span-3 text-right font-mono ${(it.type==='phone'&&Number(it.salePrice)===0&&dName.includes(' + '))?'text-slate-500 text-[10px]':'text-yellow-500'}">${(it.type==='phone'&&Number(it.salePrice)===0&&dName.includes(' + '))?'含於上筆':'$'+(Number(it.salePrice)||0).toLocaleString()}</div>
                     <div class="col-span-2 cp-box">
                         <span class="cp-cost">本 ${safeCost.toLocaleString()}</span>
                         <span class="${pc} font-bold">利 ${p.toLocaleString()}</span>
