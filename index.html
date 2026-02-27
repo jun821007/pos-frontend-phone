@@ -730,7 +730,7 @@
                 } else if(it.stock_id && !dName.includes('#')) { 
                     dName += ` #${it.stock_id}`; 
                 }
-                if(it.salePrice === 0 && it.cost > 0 && !dName.includes('(贈)')) { dName += ' <span class="text-red-400 text-[10px] border border-red-400 px-1 rounded">贈</span>'; }
+                if(it.salePrice === 0 && it.cost > 0 && !dName.includes('(贈)') && !it.isMultiPhoneExtra) { dName += ' <span class="text-red-400 text-[10px] border border-red-400 px-1 rounded">贈</span>'; }
                 let itemKey = `RET_${it.orderId}_${it.itemId}`;
                 ItemRegistry[itemKey] = { ...it, customer: g.customer };
                 let safeCost = Number(it.cost) || 0;
@@ -1257,17 +1257,20 @@
                                 salePrice: idx === 0 ? item.price : 0,
                                 cost: ph ? (Number(ph.cost) || 0) : 0,
                                 profit: idx === 0 ? (item.price - item.cost) : 0,
+                                isMultiPhoneExtra: idx > 0,
                                 quantity: 1,
                                 imei: ph ? (ph.imei || '') : '',
                                 modelName: phName,
                                 reason: '', description: '', isStockBattery: false,
                                 isDirectTransfer: false, batteryCat: '', category: '',
-                                dealerName: '', customer: ''
+                                dealerName: '', customer: '',
+                                _prebuilt: true
                             };
                         });
                     }
                     return [item];
                 }).map(item => {
+                    if (item._prebuilt) return item;
                     let finalName = item.name; 
                     let prefix = '';
                     if(item.type === 'new_phone') prefix = '(新) ';
