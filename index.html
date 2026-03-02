@@ -8,7 +8,7 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="mobile-web-app-capable" content="yes">
     <link rel="manifest" href="manifest.json">
-    <title>內部POS系統 v37.4</title>
+    <title>內部POS系統 v37.5</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/js/all.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
@@ -290,7 +290,7 @@
 
     <script>
         // 版本號：每次改程式請往上加 (v35 → v35.1 → v35.2 …)
-        const POS_VERSION = 'v37.4';
+        const POS_VERSION = 'v37.5';
 
         let DB = { inv: [], sales: [], pending: [], history: [], companyTemplates: [] }; 
         let Cart = [], RestockCart = [];
@@ -1254,6 +1254,7 @@
                             const ph = DB.inv.find(x => String(x.id) === String(pid));
                             return sum + (ph ? (Number(ph.cost) || 0) : 0);
                         }, 0);
+                        console.log('[MultiPhone] allIds:', item.allIds, 'totalCost:', totalCost, 'price:', item.price, 'profit0:', item.price - totalCost);
                         return item.allIds.map((pid, idx) => {
                             const ph = DB.inv.find(x => String(x.id) === String(pid));
                             const phName = ph ? ph.name : item.name;
