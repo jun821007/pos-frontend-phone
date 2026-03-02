@@ -8,7 +8,7 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="mobile-web-app-capable" content="yes">
     <link rel="manifest" href="manifest.json">
-    <title>內部POS系統 v37.3</title>
+    <title>內部POS系統 v37.4</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/js/all.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
@@ -290,7 +290,7 @@
 
     <script>
         // 版本號：每次改程式請往上加 (v35 → v35.1 → v35.2 …)
-        const POS_VERSION = 'v37.3';
+        const POS_VERSION = 'v37.4';
 
         let DB = { inv: [], sales: [], pending: [], history: [], companyTemplates: [] }; 
         let Cart = [], RestockCart = [];
@@ -1247,6 +1247,7 @@
                 const cust = document.getElementById('cust-name').value || '過路客'; 
                 const pay = document.querySelector('input[name="pay"]:checked').value; 
                 const oid = 'ORD' + Date.now().toString().slice(-6); 
+                console.log('Cart before flatMap:', JSON.stringify(Cart.map(i => ({name:i.name, isMultiPhone:i.isMultiPhone, allIds:i.allIds, price:i.price}))));
                 const items = Cart.flatMap(item => {
                     if (item.isMultiPhone && item.allIds) {
                         const totalCost = item.allIds.reduce((sum, pid) => {
