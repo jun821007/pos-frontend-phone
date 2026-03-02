@@ -854,20 +854,20 @@
 
         function renderPendingList() {
             const d = document.getElementById('pending-list'); d.innerHTML = '';
-            if(DB.pending.length === 0) { d.innerHTML='<div class="text-center text-slate-500 mt-10">無未結帳款</div>'; return; } 
-            const groups = {}; 
-            DB.pending.forEach(i => { 
+            if(DB.pending.length === 0) { d.innerHTML='<div class="text-center text-slate-500 mt-10">無未結帳款</div>'; return; }
+            const groups = {};
+            DB.pending.forEach(i => {
                 if(BlackList.orders.includes(i.orderId)) return;
                 if(BlackList.items.includes(i.orderId + '_' + i.itemId)) return;
-                if(i.status === 'Returned' || i.status === 'Deleted') return; 
-                if(!groups[i.customer]) groups[i.customer] = { ...i, items:[], total:0, net:0 }; 
+                if(i.status === 'Returned' || i.status === 'Deleted') return;
+                if(!groups[i.orderId]) groups[i.orderId] = { ...i, items:[], total:0, net:0 };
                 let sale = Number(i.salePrice) || 0;
                 let cost = Number(i.cost) || 0;
-                groups[i.customer].items.push(i); 
-                groups[i.customer].total += sale; 
-                groups[i.customer].net += (sale - cost);
+                groups[i.orderId].items.push(i);
+                groups[i.orderId].total += sale;
+                groups[i.orderId].net += (sale - cost);
             });
-            Object.values(groups).forEach(g => { d.innerHTML += renderOrderRow(g); }); 
+            Object.values(groups).forEach(g => { d.innerHTML += renderOrderRow(g); });
         }
 
         function openHistory() { switchView('history'); setQuickDate('month'); }
