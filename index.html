@@ -808,17 +808,20 @@
                     groups[i.orderId].items.push(i);
                     let sale = Number(i.salePrice) || 0;
                     let cost = Number(i.cost) || 0;
-                    groups[i.orderId].total += sale;
-                    groups[i.orderId].net += (sale - cost); 
-                    if (i.status === 'Completed') { 
+                    const isMultiExtra = i.type==='phone' && sale===0 && (i.itemName||'').includes(' + ');
+                    if (!isMultiExtra) {
+                        groups[i.orderId].total += sale;
+                        groups[i.orderId].net += (sale - cost);
+                    }
+                    if (i.status === 'Completed' && !isMultiExtra) { 
                         stats.cash += sale; 
                         if(i.type!=='wrap') stats.profit += (sale - cost); 
                     }
-                    else if (i.status === 'Pending') { 
+                    else if (i.status === 'Pending' && !isMultiExtra) { 
                         stats.pending += sale; 
                         if(i.type!=='wrap') stats.pot += (sale - cost); 
                     }
-                    if (sale===0 && cost>0 && !(i.type==='phone' && (i.itemName||'').includes(' + '))) stats.gift += cost;
+                    if (sale===0 && cost>0 && !isMultiExtra) stats.gift += cost;
                 }
             });
             Object.values(groups).forEach(g => { div.innerHTML += renderOrderRow(g); });
@@ -906,11 +909,11 @@
                     groups[i.orderId].items.push(i);
                     let sale = i.salePrice || 0;
                     let cost = i.cost || 0;
-                    groups[i.orderId].total += sale;
-                    groups[i.orderId].net += (sale - cost);
-                    if (i.status === 'Completed') { stats.cash += sale; if(i.type!=='wrap') stats.profit += (sale - cost); }
-                    else if (i.status === 'Pending') { stats.pending += sale; if(i.type!=='wrap') stats.pot += (sale - cost); }
-                    if (i.salePrice===0 && i.cost>0) stats.gift += cost;
+                    const isMultiExtra = i.type==='phone' && sale===0 && (i.itemName||'').includes(' + ');
+                    if (!isMultiExtra) { groups[i.orderId].total += sale; groups[i.orderId].net += (sale - cost); }
+                    if (i.status === 'Completed' && !isMultiExtra) { stats.cash += sale; if(i.type!=='wrap') stats.profit += (sale - cost); }
+                    else if (i.status === 'Pending' && !isMultiExtra) { stats.pending += sale; if(i.type!=='wrap') stats.pot += (sale - cost); }
+                    if (sale===0 && cost>0 && !isMultiExtra) stats.gift += cost;
                 }
             });
             document.getElementById('h-cash').innerText = stats.cash.toLocaleString();
@@ -1254,9 +1257,9 @@
                                 name: item.name,
                                 type: 'phone',
                                 itemId: pid,
-                                salePrice: item.price,
+                                salePrice: idx === 0 ? item.price : 0,
                                 cost: ph ? (Number(ph.cost) || 0) : 0,
-                                profit: item.price - (ph ? (Number(ph.cost) || 0) : 0),
+                                profit: idx === 0 ? (item.price - (ph ? (Number(ph.cost)||0) : 0)) : 0,
                                 isMultiPhoneExtra: idx > 0,
                                 quantity: 1,
                                 imei: ph ? (ph.imei || '') : '',
