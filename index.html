@@ -8,7 +8,7 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="mobile-web-app-capable" content="yes">
     <link rel="manifest" href="manifest.json">
-    <title>內部POS系統 v37.8</title>
+    <title>內部POS系統 v37.9</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/js/all.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
@@ -290,7 +290,7 @@
 
     <script>
         // 版本號：每次改程式請往上加 (v35 → v35.1 → v35.2 …)
-        const POS_VERSION = 'v37.8';
+        const POS_VERSION = 'v37.9';
 
         let DB = { inv: [], sales: [], pending: [], history: [], companyTemplates: [] }; 
         let Cart = [], RestockCart = [];
@@ -904,8 +904,9 @@
                 if(i.status === 'Returned' || i.status === 'Deleted') return; 
                 if(i.category === '調整入庫') return; 
                 if(i.type === 'expense' || i.type === 'restock' || i.type === 'salary') {
-                    let cost = i.cost || 0;
+                    let cost = Number(i.cost) || 0;
                     stats.exp += Math.abs(cost);
+                    stats.cash -= Math.abs(cost);
                     div.innerHTML += renderExpenseRow(i);
                 } else {
                     if(!groups[i.orderId]) groups[i.orderId] = { ...i, items:[], total:0, net:0 };
@@ -1474,7 +1475,7 @@
             }
         }
 
-        async function modalWrap(){const {value:v}=await Swal.fire({html:'<input id="w1" class="swal2-input" placeholder="項目"><input id="w2" class="swal2-input" placeholder="售價">',background:'#1e293b',preConfirm:()=>[document.getElementById('w1').value,document.getElementById('w2').value]}); if(v){Cart.push({type:'wrap',name:'包膜:'+v[0],cost:0,price:v[1],quantity:1,itemId:'W-'+Date.now()});renderCart();}}
+        async function modalWrap(){const {value:v}=await Swal.fire({html:'<input id="w1" class="swal2-input" placeholder="項目"><input id="w2" class="swal2-input" placeholder="售價">',background:'#1e293b',preConfirm:()=>[document.getElementById('w1').value,document.getElementById('w2').value]}); if(v){Cart.push({type:'wrap',name:'包膜:'+v[0],cost:0,price:Number(v[1])||0,quantity:1,itemId:'W-'+Date.now()});renderCart();}}
         async function modalESIM(){const {value:v}=await Swal.fire({title:'eSIM',html:'<input id="es1" class="swal2-input" type="number" placeholder="成本"><input id="es2" class="swal2-input" type="number" placeholder="結帳金額">',background:'#1e293b',color:'white',preConfirm:()=>[document.getElementById('es1').value,document.getElementById('es2').value]}); if(v&&v[1]){Cart.push({type:'esim',name:'eSIM',cost:Number(v[0])||0,price:Number(v[1])||0,quantity:1,itemId:'ESIM-'+Date.now()});renderCart();}}
         async function modalSoftware(){const {value:v}=await Swal.fire({title:'軟體',html:'<input id="sf1" class="swal2-input" type="number" placeholder="成本"><input id="sf2" class="swal2-input" type="number" placeholder="售價">',background:'#1e293b',color:'white',showCancelButton:true,preConfirm:()=>[document.getElementById('sf1').value,document.getElementById('sf2').value]}); if(v&&v[1]){Cart.push({type:'software',name:'軟體',cost:Number(v[0])||0,price:Number(v[1])||0,quantity:1,itemId:'SW-'+Date.now(),originalPrice:Number(v[1])||0,isGift:false});renderCart();}}
         async function modalShipping(){const {value:v}=await Swal.fire({title:'運費',input:'number',inputPlaceholder:'金額',background:'#1e293b',color:'white'}); if(v!=null&&v!==''){const amt=Number(v)||0; Cart.push({type:'shipping',name:'運費',cost:amt,price:amt,quantity:1,itemId:'SF-'+Date.now(),originalPrice:amt,isGift:false}); renderCart();}}
