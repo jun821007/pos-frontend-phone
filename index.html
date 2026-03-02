@@ -8,7 +8,7 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="mobile-web-app-capable" content="yes">
     <link rel="manifest" href="manifest.json">
-    <title>內部POS系統 v37.7</title>
+    <title>內部POS系統 v37.8</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/js/all.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
@@ -290,7 +290,7 @@
 
     <script>
         // 版本號：每次改程式請往上加 (v35 → v35.1 → v35.2 …)
-        const POS_VERSION = 'v37.7';
+        const POS_VERSION = 'v37.8';
 
         let DB = { inv: [], sales: [], pending: [], history: [], companyTemplates: [] }; 
         let Cart = [], RestockCart = [];
@@ -1270,6 +1270,7 @@
                                 salePrice: idx === 0 ? item.price : 0,
                                 cost: ph ? (Number(ph.cost) || 0) : 0,
                                 profit: idx === 0 ? (item.price - totalCost) : 0,
+                                bundlePrice: item.price,
                                 isMultiPhoneExtra: idx > 0,
                                 quantity: 1,
                                 imei: ph ? (ph.imei || '') : '',
