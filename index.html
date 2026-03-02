@@ -8,7 +8,7 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="mobile-web-app-capable" content="yes">
     <link rel="manifest" href="manifest.json">
-    <title>內部POS系統 v37.6</title>
+    <title>內部POS系統 v37.7</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/js/all.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
@@ -290,7 +290,7 @@
 
     <script>
         // 版本號：每次改程式請往上加 (v35 → v35.1 → v35.2 …)
-        const POS_VERSION = 'v37.6';
+        const POS_VERSION = 'v37.7';
 
         let DB = { inv: [], sales: [], pending: [], history: [], companyTemplates: [] }; 
         let Cart = [], RestockCart = [];
@@ -1241,6 +1241,7 @@
             else f.classList.add('translate-y-24'); 
         }
         function toggleGift(idx) { let item = Cart[idx]; if(item.isGift) { item.isGift = false; item.price = item.originalPrice; item.name = item.name.replace(' (贈)',''); } else { item.isGift = true; item.price = 0; item.name += ' (贈)'; } renderCart(); }
+        function clearCart() { Cart=[]; renderCart(); }
         function clearRestockCart() { RestockCart=[]; renderRestockCartList(); toggleMobileCart('restock', false); }
         
         async function confirmCheckout() { 
@@ -1251,14 +1252,12 @@
                 const cust = document.getElementById('cust-name').value || '過路客'; 
                 const pay = document.querySelector('input[name="pay"]:checked').value; 
                 const oid = 'ORD' + Date.now().toString().slice(-6); 
-                console.log('Cart before flatMap:', JSON.stringify(Cart.map(i => ({name:i.name, isMultiPhone:i.isMultiPhone, allIds:i.allIds, price:i.price}))));
                 const items = Cart.flatMap(item => {
                     if (item.isMultiPhone && item.allIds) {
                         const totalCost = item.allIds.reduce((sum, pid) => {
                             const ph = DB.inv.find(x => String(x.id) === String(pid));
                             return sum + (ph ? (Number(ph.cost) || 0) : 0);
                         }, 0);
-                        console.log('[MultiPhone] allIds:', item.allIds, 'totalCost:', totalCost, 'price:', item.price, 'profit0:', item.price - totalCost);
                         return item.allIds.map((pid, idx) => {
                             const ph = DB.inv.find(x => String(x.id) === String(pid));
                             const phName = ph ? ph.name : item.name;
@@ -1362,11 +1361,11 @@
         function setRestockMode(m) { UI.rsMode = m; document.getElementById('rm-inv').className = m==='inventory' ? 'pill-btn active' : 'pill-btn'; document.getElementById('rm-exp').className = m==='expense' ? 'pill-btn active' : 'pill-btn'; if(m === 'inventory') { document.getElementById('rs-toolbar-inv').classList.remove('hidden'); document.getElementById('rs-toolbar-exp').classList.add('hidden'); document.getElementById('mobile-float-bar-restock').classList.remove('hidden'); const sub = document.getElementById('rs-cat-scroll'); sub.innerHTML = ''; sub.appendChild(createRsPill('全部', 'all')); const hiddenBtn = document.createElement('div'); hiddenBtn.className='pill-btn border-pink-500 text-pink-400'; hiddenBtn.innerText='🔧 維修料件'; hiddenBtn.onclick=()=>{ UI.rsCat='hidden_parts'; document.querySelectorAll('.rs-pill').forEach(b=>b.classList.remove('active')); hiddenBtn.classList.add('active'); renderRestockGrid(); }; sub.appendChild(hiddenBtn); const cats = new Set(DB.inv.filter(i=>i.type==='accessory' && i.category && !i.isHidden).map(i=>i.category)); Array.from(cats).sort().forEach(c => sub.appendChild(createRsPill(c, c))); renderRestockGrid(); } else { document.getElementById('rs-toolbar-inv').classList.add('hidden'); document.getElementById('rs-toolbar-exp').classList.remove('hidden'); document.getElementById('mobile-float-bar-restock').classList.add('hidden'); document.getElementById('rs-grid').innerHTML = ''; renderRestockCartList(); } }
         function createRsPill(t, v) { const d = document.createElement('div'); d.className = 'pill-btn rs-pill'; d.innerText = t; if(UI.rsCat === v) d.classList.add('active'); d.onclick = () => { UI.rsCat = v; document.querySelectorAll('.rs-pill').forEach(b=>b.classList.remove('active')); d.classList.add('active'); renderRestockGrid(); }; return d; }
         function renderRestockGrid() { if(UI.rsMode === 'expense') return; const term = document.getElementById('rs-search').value.toLowerCase(); const grid = document.getElementById('rs-grid'); grid.innerHTML = ''; let list = DB.inv.filter(i => { if (i.type !== 'accessory') return false; if (term) return i.name.toLowerCase().includes(term); if (UI.rsCat === 'hidden_parts') return i.isHidden; if (UI.rsCat === 'all') return !i.isHidden; return i.category === UI.rsCat; }); if(list.length === 0) { grid.innerHTML = '<div class="col-span-full text-center text-slate-500 mt-4">無符合商品</div>'; return; } list.forEach(i => { let border = i.isHidden ? 'border-pink-500' : 'border-blue-500'; grid.innerHTML += `<div class="glass p-3 rounded-xl border-l-4 ${border} relative group active:scale-95 transition"><button onclick="event.stopPropagation(); editAccessory('${i.id}', '${i.name}', ${i.cost}, ${i.defaultPrice})" class="absolute top-2 right-2 text-slate-500 hover:text-white p-1"><i class="fa-solid fa-pen-to-square"></i></button><div onclick="addRsItem('${i.id}')" class="cursor-pointer"><div class="flex justify-between text-xs text-slate-500"><span>${i.category}</span><span>庫: ${i.stock}</span></div><div class="font-bold text-sm text-slate-200 line-clamp-2 my-1">${i.name}</div><div class="text-right text-xs text-slate-400">成本 $${i.cost}</div></div></div>`; }); }
-        async function editAccessory(id, n, c, p) { const { value: v } = await Swal.fire({ title: '編輯商品', html: `<div class="text-xs text-slate-400 mb-2">${n}</div><label class="text-xs text-slate-500 block text-left">成本</label><input id="sw-edit-c" class="swal2-input" type="number" value="${c}"><label class="text-xs text-slate-500 block text-left mt-2">建議售價</label><input id="sw-edit-p" class="swal2-input" type="number" value="${p}">`, background: '#1e293b', color: 'white', showCancelButton: true, preConfirm: () => [document.getElementById('sw-edit-c').value, document.getElementById('sw-edit-p').value] }); if (v) { google.script.run.withSuccessHandler(res => { if (res === 'SUCCESS') { Swal.fire({title:'已更新', toast:true, position:'top', timer:1000, background:'#1e293b'}); let item = DB.inv.find(x => x.id == id); if(item) { item.cost = parseInt(v[0]); item.defaultPrice = parseInt(v[1]); } renderRestockGrid(); } }).apiUpdateAccessory(id, v[0], v[1]); } }
+        async function editAccessory(id, n, c, p) { const { value: v } = await Swal.fire({ title: '編輯商品', html: `<div class="text-xs text-slate-400 mb-2">${n}</div><label class="text-xs text-slate-500 block text-left">成本</label><input id="sw-edit-c" class="swal2-input" type="number" value="${c}"><label class="text-xs text-slate-500 block text-left mt-2">建議售價</label><input id="sw-edit-p" class="swal2-input" type="number" value="${p}">`, background: '#1e293b', color: 'white', showCancelButton: true, preConfirm: () => [document.getElementById('sw-edit-c').value, document.getElementById('sw-edit-p').value] }); if (v) { let item = DB.inv.find(x => x.id == id); if(item) { item.cost = parseInt(v[0]); item.defaultPrice = parseInt(v[1]); } renderRestockGrid(); Swal.fire({title:'已更新（本機）', text:'重新整理後會恢復，完整儲存功能開發中', toast:true, position:'top', timer:2000, background:'#1e293b'}); } }
         async function addRsItem(id) { const i = DB.inv.find(x=>x.id==id); const {isConfirmed} = await Swal.fire({title:i.name, html:`<div style="display:flex;align-items:center;justify-content:center;gap:12px;margin-top:8px"><button type="button" onclick="var el=document.getElementById('sw-q');el.value=Math.max(1,parseInt(el.value||1)-1)" style="width:52px;height:52px;font-size:26px;border-radius:12px;background:#334155;color:white;border:none;cursor:pointer">-</button><input id="sw-q" type="number" value="1" min="1" style="width:72px;height:52px;font-size:22px;text-align:center;background:#1e293b;color:white;border:2px solid #475569;border-radius:12px;outline:none"><button type="button" onclick="var el=document.getElementById('sw-q');el.value=parseInt(el.value||1)+1" style="width:52px;height:52px;font-size:26px;border-radius:12px;background:#334155;color:white;border:none;cursor:pointer">+</button></div>`, background:'#1e293b', color:'white', showCancelButton:true, confirmButtonText:'加入'}); if(isConfirmed){const q=parseInt(document.getElementById('sw-q').value)||1; RestockCart.push({type:'restock', name:i.name, category:i.category, cost:i.cost, quantity:q}); renderRestockCartList();} }
         async function addExpItem(type) { const { value } = await Swal.fire({ title: type, html: `<input id="ex-n" class="swal2-input" placeholder="備註 (如: 便當/抽成)"><input id="ex-a" type="number" class="swal2-input" placeholder="金額">`, background:'#1e293b', color:'white', preConfirm:()=>[document.getElementById('ex-n').value, document.getElementById('ex-a').value] }); if(value && value[1]) { RestockCart.push({type: type==='薪資/抽成'?'salary':'expense', name:`[${type}] ${value[0]}`, cost:parseInt(value[1]), quantity:1}); renderRestockCartList(); } }
         function renderRestockCartList() { const d = document.getElementById('rs-cart-items'); d.innerHTML=''; let t = 0, c = 0; RestockCart.forEach((i, idx) => { t += (i.cost*i.quantity); c += 1; d.innerHTML += `<div class="flex justify-between text-sm bg-slate-900 p-2 rounded mb-1"><span>${i.name} <span class="text-yellow-500">x${i.quantity}</span></span><div class="flex gap-2 items-center"><span class="text-red-400">$${i.cost*i.quantity}</span><i onclick="RestockCart.splice(${idx},1);renderRestockCartList()" class="fa-solid fa-trash text-slate-500 cursor-pointer"></i></div></div>`; }); document.getElementById('rs-cart-total').innerText = t.toLocaleString(); document.getElementById('rs-mob-total').innerText = '$' + t.toLocaleString(); document.getElementById('rs-mob-count').innerText = c; const f = document.getElementById('mobile-float-bar-restock'); if(c > 0 && UI.rsMode === 'inventory') f.classList.remove('translate-y-24'); else f.classList.add('translate-y-24'); }
-        function clearRestockCart() { RestockCart=[]; renderRestockCartList(); toggleMobileCart('restock', false); }
+
         async function submitRestock() { 
             if(RestockCart.length===0) return; 
             const confirm = await Swal.fire({ title: '確定要送出進貨清單？', text: '送出後無法撤回', showCancelButton: true, confirmButtonText: '確定送出', cancelButtonText: '取消', background: '#1e293b', color: 'white' });
