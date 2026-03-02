@@ -8,7 +8,7 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="mobile-web-app-capable" content="yes">
     <link rel="manifest" href="manifest.json">
-    <title>內部POS系統 v37.5</title>
+    <title>內部POS系統 v37.6</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/js/all.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
@@ -290,7 +290,7 @@
 
     <script>
         // 版本號：每次改程式請往上加 (v35 → v35.1 → v35.2 …)
-        const POS_VERSION = 'v37.5';
+        const POS_VERSION = 'v37.6';
 
         let DB = { inv: [], sales: [], pending: [], history: [], companyTemplates: [] }; 
         let Cart = [], RestockCart = [];
@@ -711,7 +711,8 @@
             let netColor = g.net >= 0 ? 'text-green-400' : 'text-red-400';
             let details = g.items.map(it => {
                 if (BlackList.items.includes(it.orderId + '_' + it.itemId)) return ''; 
-                let p = Number(it.salePrice) - Number(it.cost);
+                const isMultiExtra = it.type === 'phone' && Number(it.salePrice) === 0 && (it.itemName||'').includes(' + ');
+                let p = isMultiExtra ? 0 : (it.profit !== undefined && it.profit !== null && it.profit !== '' ? Number(it.profit) : Number(it.salePrice) - Number(it.cost));
                 let pc = p >= 0 ? 'text-green-400' : 'text-red-400';
                 let dName = it.itemName;
                 let prefix = '';
@@ -809,17 +810,18 @@
                     let sale = Number(i.salePrice) || 0;
                     let cost = Number(i.cost) || 0;
                     const isMultiExtra = i.type==='phone' && sale===0 && (i.itemName||'').includes(' + ');
+                    const iProfit = (i.profit !== undefined && i.profit !== null && i.profit !== '') ? Number(i.profit) : (sale - cost);
                     if (!isMultiExtra) {
                         groups[i.orderId].total += sale;
-                        groups[i.orderId].net += (sale - cost);
+                        groups[i.orderId].net += iProfit;
                     }
                     if (i.status === 'Completed' && !isMultiExtra) { 
                         stats.cash += sale; 
-                        if(i.type!=='wrap') stats.profit += (sale - cost); 
+                        if(i.type!=='wrap') stats.profit += iProfit; 
                     }
                     else if (i.status === 'Pending' && !isMultiExtra) { 
                         stats.pending += sale; 
-                        if(i.type!=='wrap') stats.pot += (sale - cost); 
+                        if(i.type!=='wrap') stats.pot += iProfit; 
                     }
                     if (sale===0 && cost>0 && !isMultiExtra) stats.gift += cost;
                 }
@@ -866,9 +868,10 @@
                 if(!groups[i.orderId]) groups[i.orderId] = { ...i, items:[], total:0, net:0 };
                 let sale = Number(i.salePrice) || 0;
                 let cost = Number(i.cost) || 0;
+                const iPendingProfit = (i.profit !== undefined && i.profit !== null && i.profit !== '') ? Number(i.profit) : (sale - cost);
                 groups[i.orderId].items.push(i);
                 groups[i.orderId].total += sale;
-                groups[i.orderId].net += (sale - cost);
+                groups[i.orderId].net += iPendingProfit;
             });
             Object.values(groups).forEach(g => { d.innerHTML += renderOrderRow(g); });
         }
@@ -910,9 +913,10 @@
                     let sale = i.salePrice || 0;
                     let cost = i.cost || 0;
                     const isMultiExtra = i.type==='phone' && sale===0 && (i.itemName||'').includes(' + ');
-                    if (!isMultiExtra) { groups[i.orderId].total += sale; groups[i.orderId].net += (sale - cost); }
-                    if (i.status === 'Completed' && !isMultiExtra) { stats.cash += sale; if(i.type!=='wrap') stats.profit += (sale - cost); }
-                    else if (i.status === 'Pending' && !isMultiExtra) { stats.pending += sale; if(i.type!=='wrap') stats.pot += (sale - cost); }
+                    const iHistProfit = (i.profit !== undefined && i.profit !== null && i.profit !== '') ? Number(i.profit) : (sale - cost);
+                    if (!isMultiExtra) { groups[i.orderId].total += sale; groups[i.orderId].net += iHistProfit; }
+                    if (i.status === 'Completed' && !isMultiExtra) { stats.cash += sale; if(i.type!=='wrap') stats.profit += iHistProfit; }
+                    else if (i.status === 'Pending' && !isMultiExtra) { stats.pending += sale; if(i.type!=='wrap') stats.pot += iHistProfit; }
                     if (sale===0 && cost>0 && !isMultiExtra) stats.gift += cost;
                 }
             });
