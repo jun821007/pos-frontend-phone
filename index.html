@@ -8,7 +8,7 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="mobile-web-app-capable" content="yes">
     <link rel="manifest" href="manifest.json">
-    <title>內部POS系統 v37.2</title>
+    <title>內部POS系統 v37.3</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/js/all.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
@@ -290,7 +290,7 @@
 
     <script>
         // 版本號：每次改程式請往上加 (v35 → v35.1 → v35.2 …)
-        const POS_VERSION = 'v37.2';
+        const POS_VERSION = 'v37.3';
 
         let DB = { inv: [], sales: [], pending: [], history: [], companyTemplates: [] }; 
         let Cart = [], RestockCart = [];
@@ -961,6 +961,7 @@
                     if(!document.getElementById('view-pending').classList.contains('hidden')) renderPendingList();
                     if(!document.getElementById('view-history').classList.contains('hidden')) renderHistoryList();
                     Swal.fire({icon:'success', title:'退貨完成', timer:1000, background:'#1e293b'});
+                    fetchData();
                 } catch(e) {
                     console.error('退貨失敗:', e);
                     Swal.fire({icon:'error', title:'退貨失敗', text: e.message || '請重試', background:'#1e293b'});
