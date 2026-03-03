@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="zh-TW">
 <head>
     <meta charset="UTF-8">
@@ -1395,7 +1395,7 @@
         async function modalNewPhone() { const {value:v}=await Swal.fire({title:'新機',html:'<input id="n1" class="swal2-input" placeholder="同行名稱"><input id="n2" class="swal2-input" type="number" placeholder="成本"><input id="n3" class="swal2-input" placeholder="IMEI"><input id="n4" class="swal2-input" type="number" placeholder="銷售金額"><input id="n5" class="swal2-input" placeholder="客戶名稱"><input id="n6" class="swal2-input" placeholder="型號（流水用）"><input id="n7" class="swal2-input" placeholder="容量（流水用）"><input id="n8" class="swal2-input" placeholder="顏色（流水用）">',background:'#1e293b', color:'white', preConfirm:()=>[document.getElementById('n1').value,document.getElementById('n2').value,document.getElementById('n3').value,document.getElementById('n4').value,document.getElementById('n5').value,document.getElementById('n6').value,document.getElementById('n7').value,document.getElementById('n8').value]}); if(v&&v[1]&&v[4]){const spec=[v[5],v[6],v[7]].filter(Boolean).join(' '); Cart.push({type:'new_phone',name:'新機 '+v[0]+(spec?' '+spec:''),dealerName:v[0],cost:Number(v[1]),price:Number(v[3]),imei:v[2],customer:v[4],quantity:1,itemId:'NP-'+Date.now()});renderCart();}}
         async function modalPeerTransfer(keepDealer, keepCustomer) {
             const gp = id => document.getElementById(id);
-            const html = `<input id="p1" class="swal2-input" placeholder="同行名稱" value="${(keepDealer||'').replace(/"/g,'&quot;')}"><input id="p2" class="swal2-input" type="number" placeholder="成本"><input id="p3" class="swal2-input" placeholder="IMEI"><input id="p4" class="swal2-input" type="number" placeholder="銷售金額"><input id="p5" class="swal2-input" placeholder="客戶名稱" value="${(keepCustomer||'').replace(/"/g,'&quot;')}"><input id="p6" class="swal2-input" placeholder="型號（流水用）"><input id="p7" class="swal2-input" placeholder="容量（流水用）"><input id="p8" class="swal2-input" placeholder="顏色（流水用）"><button type="button" id="p-add-btn" class="mt-2 w-full py-2 rounded bg-slate-600 text-white text-sm">＋ 新增（加入此筆並繼續填）</button>`;
+            const html = `<input id="p1" class="swal2-input" placeholder="同行名稱" value="${(keepDealer||'').replace(/"/g,'&quot;')}"><input id="p2" class="swal2-input" type="number" placeholder="成本"><input id="p3" class="swal2-input" placeholder="IMEI"><input id="p4" class="swal2-input" type="number" placeholder="銷售金額"><input id="p5" class="swal2-input" placeholder="客戶名稱" value="${(keepCustomer||'').replace(/"/g,'&quot;')}"><input id="p6" class="swal2-input" placeholder="型號（流水用）"><input id="p7" class="swal2-input" placeholder="容量（流水用）"><input id="p8" class="swal2-input" placeholder="顏色（流水用）"><div id="p-err" class="text-red-400 text-xs mt-1 min-h-[1rem]"></div><button type="button" id="p-add-btn" class="mt-2 w-full py-2 rounded bg-slate-600 text-white text-sm">＋ 新增（加入此筆並繼續填）</button>`;
             const addOne = (v) => {
                 const spec = [v[5],v[6],v[7]].filter(Boolean).join(' ');
                 Cart.push({type:'peer_phone',name:'同行 '+v[0]+(spec?' '+spec:''),dealerName:v[0],cost:Number(v[1]),price:Number(v[3]),imei:v[2],customer:v[4],quantity:1,itemId:'PP-'+Date.now()+'-'+Math.random().toString(36).slice(2,9)});
@@ -1415,9 +1415,9 @@
                         const vals = getV();
                         if (vals[0] && vals[1] && vals[4]) {
                             addOne(vals);
-                            Swal.fire({ title: '已加入，請繼續填下一筆', toast: true, position: 'top', timer: 1000, background: '#1e293b' });
+                            if (gp('p-err')) gp('p-err').textContent = '已加入';
                             gp('p2').value = ''; gp('p3').value = ''; gp('p4').value = ''; gp('p6').value = ''; gp('p7').value = ''; gp('p8').value = '';
-                        } else { Swal.fire({ icon: 'warning', title: '請填寫同行名稱、成本、客戶名稱', background: '#1e293b', color: 'white' }); }
+                        } else { if (gp('p-err')) gp('p-err').textContent = '請填寫同行名稱、成本、客戶名稱'; }
                     };
                 },
                 preConfirm: () => getV()
