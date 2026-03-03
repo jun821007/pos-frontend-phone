@@ -1214,7 +1214,7 @@
                 }
             }
         }
-        function renderServiceGrid() { document.getElementById('item-grid').innerHTML = `<div onclick="modalRepair()" class="glass p-6 rounded-xl border-l-4 border-yellow-500 flex flex-col items-center justify-center gap-2 active:scale-95 transition"><i class="fa-solid fa-screwdriver-wrench text-4xl text-yellow-500"></i><span class="font-bold">維修登記</span></div><div onclick="modalWrap()" class="glass p-6 rounded-xl border-l-4 border-purple-500 flex flex-col items-center justify-center gap-2 active:scale-95 transition"><i class="fa-solid fa-wand-magic-sparkles text-4xl text-purple-500"></i><span class="font-bold">包膜服務</span></div><div onclick="modalNewPhone()" class="glass p-6 rounded-xl border-l-4 border-green-500 flex flex-col items-center justify-center gap-2 active:scale-95 transition"><i class="fa-solid fa-mobile-screen text-4xl text-green-500"></i><span class="font-bold">新機</span></div><div onclick="modalPeerTransfer()" class="glass p-6 rounded-xl border-l-4 border-blue-500 flex flex-col items-center justify-center gap-2 active:scale-95 transition"><i class="fa-solid fa-truck-fast text-4xl text-blue-500"></i><span class="font-bold">同行調貨</span></div><div onclick="modalESIM()" class="glass p-6 rounded-xl border-l-4 border-cyan-500 flex flex-col items-center justify-center gap-2 active:scale-95 transition"><i class="fa-solid fa-sim-card text-4xl text-cyan-500"></i><span class="font-bold">eSIM</span></div><div onclick="modalShipping()" class="glass p-6 rounded-xl border-l-4 border-slate-400 flex flex-col items-center justify-center gap-2 active:scale-95 transition"><i class="fa-solid fa-truck text-4xl text-slate-400"></i><span class="font-bold">運費</span></div><div onclick="modalSoftware()" class="glass p-6 rounded-xl border-l-4 border-indigo-500 flex flex-col items-center justify-center gap-2 active:scale-95 transition"><i class="fa-solid fa-mobile-screen-button text-4xl text-indigo-400"></i><span class="font-bold">軟體</span></div>`; }
+        function renderServiceGrid() { document.getElementById('item-grid').innerHTML = `<div onclick="modalRepair()" class="glass p-6 rounded-xl border-l-4 border-yellow-500 flex flex-col items-center justify-center gap-2 active:scale-95 transition"><i class="fa-solid fa-screwdriver-wrench text-4xl text-yellow-500"></i><span class="font-bold">維修登記</span></div><div onclick="modalWrap()" class="glass p-6 rounded-xl border-l-4 border-purple-500 flex flex-col items-center justify-center gap-2 active:scale-95 transition"><i class="fa-solid fa-wand-magic-sparkles text-4xl text-purple-500"></i><span class="font-bold">包膜服務</span></div><div onclick="modalNewPhone()" class="glass p-6 rounded-xl border-l-4 border-green-500 flex flex-col items-center justify-center gap-2 active:scale-95 transition"><i class="fa-solid fa-mobile-screen text-4xl text-green-500"></i><span class="font-bold">新機</span></div><div onclick="modalPeerTransfer()" class="glass p-6 rounded-xl border-l-4 border-blue-500 flex flex-col items-center justify-center gap-2 active:scale-95 transition"><i class="fa-solid fa-truck-fast text-4xl text-blue-500"></i><span class="font-bold">同行調貨</span></div><div onclick="modalPeerBulkTransfer()" class="glass p-6 rounded-xl border-l-4 border-blue-400 flex flex-col items-center justify-center gap-2 active:scale-95 transition"><i class="fa-solid fa-trucks text-4xl text-blue-400"></i><span class="font-bold">同行批量調貨</span></div><div onclick="modalESIM()" class="glass p-6 rounded-xl border-l-4 border-cyan-500 flex flex-col items-center justify-center gap-2 active:scale-95 transition"><i class="fa-solid fa-sim-card text-4xl text-cyan-500"></i><span class="font-bold">eSIM</span></div><div onclick="modalShipping()" class="glass p-6 rounded-xl border-l-4 border-slate-400 flex flex-col items-center justify-center gap-2 active:scale-95 transition"><i class="fa-solid fa-truck text-4xl text-slate-400"></i><span class="font-bold">運費</span></div><div onclick="modalSoftware()" class="glass p-6 rounded-xl border-l-4 border-indigo-500 flex flex-col items-center justify-center gap-2 active:scale-95 transition"><i class="fa-solid fa-mobile-screen-button text-4xl text-indigo-400"></i><span class="font-bold">軟體</span></div>`; }
         async function addToCart(id) { const i = DB.inv.find(x => x.id == id); if(!i) return; let p = i.price, q = 1; let defPrice = i.defaultPrice > 0 ? i.defaultPrice : (i.price > 0 ? i.price : ''); if (i.type === 'accessory' || i.price === 0) { const { value } = await Swal.fire({ title: i.name, html: `<input id="sw-p" type="number" class="swal2-input" placeholder="單價" value="${defPrice}"><div style="display:flex;align-items:center;justify-content:center;gap:12px;margin-top:8px"><button type="button" onclick="var el=document.getElementById('sw-q');el.value=Math.max(1,parseInt(el.value||1)-1)" style="width:52px;height:52px;font-size:26px;border-radius:12px;background:#334155;color:white;border:none;cursor:pointer">-</button><input id="sw-q" type="number" value="1" min="1" style="width:72px;height:52px;font-size:22px;text-align:center;background:#1e293b;color:white;border:2px solid #475569;border-radius:12px;outline:none"><button type="button" onclick="var el=document.getElementById('sw-q');el.value=parseInt(el.value||1)+1" style="width:52px;height:52px;font-size:26px;border-radius:12px;background:#334155;color:white;border:none;cursor:pointer">+</button></div>`, background: '#1e293b', color: 'white', preConfirm: () => [document.getElementById('sw-p').value, document.getElementById('sw-q').value] }); if(!value) return; p = parseInt(value[0]); q = parseInt(value[1]); } Cart.push({ ...i, price: p, quantity: q, itemId: i.id, originalPrice: p, isGift: false }); renderCart(); }
         function renderCart() { 
             const c = document.getElementById('cart-items'); 
@@ -1393,7 +1393,49 @@
             }
         }
         async function modalNewPhone() { const {value:v}=await Swal.fire({title:'新機',html:'<input id="n1" class="swal2-input" placeholder="同行名稱"><input id="n2" class="swal2-input" type="number" placeholder="成本"><input id="n3" class="swal2-input" placeholder="IMEI"><input id="n4" class="swal2-input" type="number" placeholder="銷售金額"><input id="n5" class="swal2-input" placeholder="客戶名稱"><input id="n6" class="swal2-input" placeholder="型號（流水用）"><input id="n7" class="swal2-input" placeholder="容量（流水用）"><input id="n8" class="swal2-input" placeholder="顏色（流水用）">',background:'#1e293b', color:'white', preConfirm:()=>[document.getElementById('n1').value,document.getElementById('n2').value,document.getElementById('n3').value,document.getElementById('n4').value,document.getElementById('n5').value,document.getElementById('n6').value,document.getElementById('n7').value,document.getElementById('n8').value]}); if(v&&v[1]&&v[4]){const spec=[v[5],v[6],v[7]].filter(Boolean).join(' '); Cart.push({type:'new_phone',name:'新機 '+v[0]+(spec?' '+spec:''),dealerName:v[0],cost:Number(v[1]),price:Number(v[3]),imei:v[2],customer:v[4],quantity:1,itemId:'NP-'+Date.now()});renderCart();}}
-        async function modalPeerTransfer() { const {value:v}=await Swal.fire({title:'同行調貨',html:'<input id="p1" class="swal2-input" placeholder="同行名稱"><input id="p2" class="swal2-input" type="number" placeholder="成本"><input id="p3" class="swal2-input" placeholder="IMEI"><input id="p4" class="swal2-input" type="number" placeholder="銷售金額"><input id="p5" class="swal2-input" placeholder="客戶名稱"><input id="p6" class="swal2-input" placeholder="型號（流水用）"><input id="p7" class="swal2-input" placeholder="容量（流水用）"><input id="p8" class="swal2-input" placeholder="顏色（流水用）">',background:'#1e293b', color:'white', preConfirm:()=>[document.getElementById('p1').value,document.getElementById('p2').value,document.getElementById('p3').value,document.getElementById('p4').value,document.getElementById('p5').value,document.getElementById('p6').value,document.getElementById('p7').value,document.getElementById('p8').value]}); if(v&&v[1]&&v[4]){const spec=[v[5],v[6],v[7]].filter(Boolean).join(' '); Cart.push({type:'peer_phone',name:'同行 '+v[0]+(spec?' '+spec:''),dealerName:v[0],cost:Number(v[1]),price:Number(v[3]),imei:v[2],customer:v[4],quantity:1,itemId:'PP-'+Date.now()});renderCart();}}
+        async function modalPeerTransfer() { const {value:v}=await Swal.fire({title:'同行調貨',html:'<input id="p1" class="swal2-input" placeholder="同行名稱"><input id="p2" class="swal2-input" type="number" placeholder="成本"><input id="p3" class="swal2-input" placeholder="IMEI"><input id="p4" class="swal2-input" type="number" placeholder="銷售金額"><input id="p5" class="swal2-input" placeholder="客戶名稱"><input id="p6" class="swal2-input" placeholder="型號（流水用）"><input id="p7" class="swal2-input" placeholder="容量（流水用）"><input id="p8" class="swal2-input" placeholder="顏色（流水用）">',background:'#1e293b', color:'white', preConfirm:()=>[document.getElementById('p1').value,document.getElementById('p2').value,document.getElementById('p3').value,document.getElementById('p4').value,document.getElementById('p5').value,document.getElementById('p6').value,document.getElementById('p7').value,document.getElementById('p8').value]}); if(v&&v[1]&&v[4]){const spec=[v[5],v[6],v[7]].filter(Boolean).join(' '); Cart.push({type:'peer_phone',name:'同行 '+v[0]+(spec?' '+spec:''),dealerName:v[0],cost:Number(v[1]),price:Number(v[3]),imei:v[2],customer:v[4],quantity:1,itemId:'PP-'+Date.now()+'-'+Math.random().toString(36).slice(2,9)});renderCart();}}
+        async function modalPeerBulkTransfer() {
+            let rowCount = 1;
+            const addRow = () => {
+                const c = document.getElementById('peer-bulk-rows');
+                const r = document.createElement('div');
+                r.className = 'peer-bulk-row border-b border-slate-600 pb-2 mb-2';
+                r.innerHTML = `<div class="grid grid-cols-4 gap-2 text-xs"><input class="swal2-input py-1" placeholder="同行名稱" data-p="0"><input class="swal2-input py-1" type="number" placeholder="成本" data-p="1"><input class="swal2-input py-1" placeholder="IMEI" data-p="2"><input class="swal2-input py-1" type="number" placeholder="售價" data-p="3"><input class="swal2-input py-1 col-span-2" placeholder="客戶" data-p="4"><input class="swal2-input py-1" placeholder="型號" data-p="5"><input class="swal2-input py-1" placeholder="容量" data-p="6"><input class="swal2-input py-1" placeholder="顏色" data-p="7"><button type="button" class="col-span-4 text-red-400 text-xs" onclick="this.closest('.peer-bulk-row').remove()">刪除此筆</button></div>`;
+                c.appendChild(r);
+                rowCount++;
+            };
+            const { value: confirmed } = await Swal.fire({
+                title: '同行批量調貨',
+                html: `<div id="peer-bulk-rows"></div><button type="button" id="peer-bulk-add" class="mt-2 w-full py-2 rounded bg-slate-600 text-white text-sm">＋ 新增一筆</button>`,
+                background: '#1e293b',
+                color: 'white',
+                showCancelButton: true,
+                confirmButtonText: '全部加入購物車',
+                cancelButtonText: '取消',
+                didOpen: () => {
+                    addRow();
+                    document.getElementById('peer-bulk-add').onclick = addRow;
+                },
+                preConfirm: () => {
+                    const rows = document.querySelectorAll('.peer-bulk-row');
+                    const items = [];
+                    rows.forEach(r => {
+                        const inp = sel => r.querySelector(`[data-p="${sel}"]`);
+                        const v = i => (inp(i) && inp(i).value) ? inp(i).value.trim() : '';
+                        if (v(0) && v(1) && v(4)) {
+                            const spec = [v(5), v(6), v(7)].filter(Boolean).join(' ');
+                            items.push({ type: 'peer_phone', name: '同行 ' + v(0) + (spec ? ' ' + spec : ''), dealerName: v(0), cost: Number(v(1)) || 0, price: Number(v(3)) || 0, imei: v(2), customer: v(4), quantity: 1, itemId: 'PP-' + Date.now() + '-' + Math.random().toString(36).slice(2, 9) });
+                        }
+                    });
+                    return items;
+                }
+            });
+            if (confirmed && confirmed.length > 0) {
+                confirmed.forEach(it => Cart.push(it));
+                renderCart();
+                Swal.fire({ title: '已加入 ' + confirmed.length + ' 筆', toast: true, position: 'top', timer: 1200, background: '#1e293b' });
+            }
+        }
 
         async function modalRepair() {
             const { value: t } = await Swal.fire({ input: 'select', inputOptions: { 'gen': '一般', 'stock': '庫存電池' }, background: '#1e293b', color: 'white' });
@@ -1506,7 +1548,7 @@
                     cost: Number(v[2]) || 0,
                     price: Number(v[3]) || 0,
                     quantity: 1,
-                    itemId: 'DT-' + Date.now(),
+                    itemId: 'DT-' + Date.now() + '-' + Math.random().toString(36).slice(2, 9),
                     isDirectTransfer: true  // 標記為直接調貨，不扣庫存
                 });
                 renderCart();
