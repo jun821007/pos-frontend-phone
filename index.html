@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="zh-TW">
 <head>
     <meta charset="UTF-8">
@@ -8,7 +8,7 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="mobile-web-app-capable" content="yes">
     <link rel="manifest" href="manifest.json">
-    <title>內部POS系統 v37.9</title>
+    <title>內部POS系統</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/js/all.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
@@ -1429,49 +1429,6 @@
             });
             if (v && v[0] && v[1] && v[4]) { addOne(v); }
         }
-        async function modalPeerBulkTransfer() {
-            let rowCount = 1;
-            const addRow = () => {
-                const c = document.getElementById('peer-bulk-rows');
-                const r = document.createElement('div');
-                r.className = 'peer-bulk-row border-b border-slate-600 pb-2 mb-2';
-                r.innerHTML = `<div class="grid grid-cols-4 gap-2 text-xs"><input class="swal2-input py-1" placeholder="同行名稱" data-p="0"><input class="swal2-input py-1" type="number" placeholder="成本" data-p="1"><input class="swal2-input py-1" placeholder="IMEI" data-p="2"><input class="swal2-input py-1" type="number" placeholder="售價" data-p="3"><input class="swal2-input py-1 col-span-2" placeholder="客戶" data-p="4"><input class="swal2-input py-1" placeholder="型號" data-p="5"><input class="swal2-input py-1" placeholder="容量" data-p="6"><input class="swal2-input py-1" placeholder="顏色" data-p="7"><button type="button" class="col-span-4 text-red-400 text-xs" onclick="this.closest('.peer-bulk-row').remove()">刪除此筆</button></div>`;
-                c.appendChild(r);
-                rowCount++;
-            };
-            const { value: confirmed } = await Swal.fire({
-                title: '同行批量調貨',
-                html: `<div id="peer-bulk-rows"></div><button type="button" id="peer-bulk-add" class="mt-2 w-full py-2 rounded bg-slate-600 text-white text-sm">＋ 新增一筆</button>`,
-                background: '#1e293b',
-                color: 'white',
-                showCancelButton: true,
-                confirmButtonText: '全部加入購物車',
-                cancelButtonText: '取消',
-                didOpen: () => {
-                    addRow();
-                    document.getElementById('peer-bulk-add').onclick = addRow;
-                },
-                preConfirm: () => {
-                    const rows = document.querySelectorAll('.peer-bulk-row');
-                    const items = [];
-                    rows.forEach(r => {
-                        const inp = sel => r.querySelector(`[data-p="${sel}"]`);
-                        const v = i => (inp(i) && inp(i).value) ? inp(i).value.trim() : '';
-                        if (v(0) && v(1) && v(4)) {
-                            const spec = [v(5), v(6), v(7)].filter(Boolean).join(' ');
-                            items.push({ type: 'peer_phone', name: '同行 ' + v(0) + (spec ? ' ' + spec : ''), dealerName: v(0), cost: Number(v(1)) || 0, price: Number(v(3)) || 0, imei: v(2), customer: v(4), quantity: 1, itemId: 'PP-' + Date.now() + '-' + Math.random().toString(36).slice(2, 9) });
-                        }
-                    });
-                    return items;
-                }
-            });
-            if (confirmed && confirmed.length > 0) {
-                confirmed.forEach(it => Cart.push(it));
-                renderCart();
-                Swal.fire({ title: '已加入 ' + confirmed.length + ' 筆', toast: true, position: 'top', timer: 1200, background: '#1e293b' });
-            }
-        }
-
         async function modalRepair() {
             const { value: t } = await Swal.fire({ input: 'select', inputOptions: { 'gen': '一般', 'stock': '庫存電池' }, background: '#1e293b', color: 'white' });
             if (!t) return;

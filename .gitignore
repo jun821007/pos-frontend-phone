@@ -6,3 +6,7 @@ appsscript.json
 *.sh
 *.txt
 .DS_Store
+patch-*.cjs
+apply-patch.cjs
+fav-patch.cjs
+fix.js
