@@ -100,25 +100,66 @@ function apiGetInventory() {
       }
     } catch (err) { }
 
-    // B. 配件
+    // B. 配件（庫存計算改成跟 AppSheet 一樣：基礎欄位 + 進出庫流水帳入/出庫差額）
     try {
       const aSS = SpreadsheetApp.openById(ACC_SS_ID);
       const aSheet = aSS.getSheetByName("庫存清單");
       const aData = aSheet.getDataRange().getValues();
+
+      // 讀取「進出庫流水帳」，先彙總每個品項名稱的庫存變化量
+      const logSheet = aSS.getSheetByName("進出庫流水帳");
+      const logData = logSheet ? logSheet.getDataRange().getValues() : [];
+      const stockDeltaMap = {};
+
+      if (logData && logData.length > 1) {
+        for (let j = 1; j < logData.length; j++) {
+          const logRow = logData[j];
+          const logName = String(logRow[2] || "").trim();  // [品項編號] / 品名
+          if (!logName) continue;
+          const type = String(logRow[4] || "").trim();     // 交易類型：入庫 / 出庫 / 調整入庫 / 調整出庫...
+          const qty = Number(logRow[5] || 0);
+          if (!qty) continue;
+
+          let sign = 0;
+          if (type === "入庫" || type === "調整入庫") sign = 1;
+          else if (type === "出庫" || type === "調整出庫") sign = -1;
+          if (!sign) continue;
+
+          stockDeltaMap[logName] = (stockDeltaMap[logName] || 0) + sign * qty;
+        }
+      }
+
       const HIDDEN_KEYWORDS = ["已加工", "成品", "電池", "電芯", "排線", "中框", "螢幕", "後玻璃", "外配", "維修", "零件", "加工"];
       for (let i = 1; i < aData.length; i++) {
         let row = aData[i];
         let fullCheck = (String(row[1]) + String(row[2]) + String(row[3])).toLowerCase();
         let category = String(row[2]);
         let isHidden = HIDDEN_KEYWORDS.some(k => fullCheck.includes(k));
-        if (row[3]) {
-          let realStock = Number(row[7]);
+        const name = String(row[3] || "").trim();   // 對應 [_THISROW].[品項名稱]
+
+        if (name) {
+          // 基礎庫存 = 試算表上的 [庫存數量] 欄位（原本 POS 讀的那個數字）
+          let baseStock = Number(row[7]);
+          if (isNaN(baseStock)) baseStock = 0;
+
+          // 變化量 = 進出庫流水帳中，該品項的「入庫/調整入庫 - 出庫/調整出庫」總和
+          const delta = stockDeltaMap[name] || 0;
+          const realStock = baseStock + delta;
+
           let defPrice = Number(row[8]);
-          if (isNaN(realStock)) realStock = 0;
+          if (isNaN(defPrice)) defPrice = 0;
+
           output.inventory.push({
-            id: row[0], type: 'accessory', category: category, name: row[3],
-            cost: Number(row[4]), price: 0, defaultPrice: defPrice || 0,
-            stock: realStock, owner: 'company', isHidden: isHidden
+            id: row[0],
+            type: 'accessory',
+            category: category,
+            name: name,
+            cost: Number(row[4]),
+            price: 0,
+            defaultPrice: defPrice || 0,
+            stock: realStock,
+            owner: 'company',
+            isHidden: isHidden
           });
         }
       }
