@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="zh-TW">
 <head>
     <meta charset="UTF-8">
@@ -61,16 +61,17 @@
             #cart-panel .cart-footer-wrap .cart-total-row-mobile { gap: 10px; }
             #cart-panel .cart-footer-wrap .cart-confirm-btn-mobile { flex: 1; min-width: 0; }
         }
+        body.login-page aside, body.login-page nav { display: none !important; }
     </style>
 </head>
-<body class="h-screen flex flex-col md:flex-row overflow-hidden select-none">
+<body class="h-screen flex flex-col md:flex-row overflow-hidden select-none login-page">
     <div id="bg-fill" aria-hidden="true"></div>
     <div id="login-overlay" class="fixed inset-0 z-50 bg-slate-950 flex items-center justify-center p-4 pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]">
         <div class="glass p-8 rounded-2xl w-full max-w-sm flex flex-col gap-4 text-center shadow-2xl border-slate-800">
             <h1 id="login-version" class="text-3xl font-bold text-yellow-500 mb-2 tracking-wider">POS</h1>
             <input type="text" id="login-user" placeholder="帳號" class="p-3 rounded-xl input-dark text-center text-lg">
             <input type="password" id="login-pass" placeholder="密碼" class="p-3 rounded-xl input-dark text-center text-lg">
-            <div class="flex items-center justify-center gap-2 mt-2"><input type="checkbox" id="remember-me" class="w-4 h-4 rounded border-slate-600 bg-slate-800 text-yellow-500"><label for="remember-me" class="text-slate-400 text-sm">保持登入</label></div>
+            <div class="flex items-center justify-center gap-4 mt-2 flex-wrap"><label class="flex items-center gap-2 text-slate-400 text-sm cursor-pointer"><input type="checkbox" id="remember-me" class="w-4 h-4 rounded border-slate-600 bg-slate-800 text-yellow-500">保持登入</label><label class="flex items-center gap-2 text-slate-400 text-sm cursor-pointer"><input type="checkbox" id="remember-creds" class="w-4 h-4 rounded border-slate-600 bg-slate-800 text-yellow-500">記住帳密</label></div>
             <button onclick="doLogin()" class="bg-gradient-to-r from-yellow-600 to-yellow-500 text-black font-bold py-3 rounded-xl mt-4 shadow-lg active:scale-95 transition">登入系統</button>
         </div>
     </div>
@@ -80,6 +81,7 @@
         <button id="d-nav-pos" onclick="switchView('pos')" class="nav-btn w-12 h-12 rounded-xl text-yellow-400 bg-slate-800 flex items-center justify-center transition"><i class="fa-solid fa-cash-register text-xl"></i></button>
         <button id="d-nav-report" onclick="openReport()" class="nav-btn w-12 h-12 rounded-xl text-slate-500 hover:text-yellow-400 flex items-center justify-center transition"><i class="fa-solid fa-file-invoice-dollar text-xl"></i></button>
         <button id="d-nav-history" onclick="openHistory()" class="nav-btn w-12 h-12 rounded-xl text-slate-500 hover:text-yellow-400 flex items-center justify-center transition"><i class="fa-solid fa-chart-pie text-xl"></i></button>
+        <button id="d-nav-peer" onclick="openPeer()" class="nav-btn w-12 h-12 rounded-xl text-slate-500 hover:text-yellow-400 flex items-center justify-center transition" title="同行對帳"><i class="fa-solid fa-handshake text-xl"></i></button>
         <button id="d-nav-pending" onclick="openPending()" class="nav-btn w-12 h-12 rounded-xl text-slate-500 hover:text-yellow-400 flex items-center justify-center transition"><i class="fa-solid fa-wallet text-xl"></i></button>
         <button id="d-nav-restock" onclick="switchView('restock')" class="nav-btn w-12 h-12 rounded-xl text-slate-500 hover:text-yellow-400 flex items-center justify-center transition"><i class="fa-solid fa-dolly text-xl"></i></button>
         <button id="d-nav-setting" onclick="switchView('setting')" class="nav-btn w-12 h-12 rounded-xl text-slate-500 hover:text-yellow-400 flex items-center justify-center transition"><i class="fa-solid fa-gear text-xl"></i></button>
@@ -123,7 +125,14 @@
                         <span class="w-8 h-0.5 rounded bg-slate-600"></span><span>可上下拖曳</span><span class="w-8 h-0.5 rounded bg-slate-600"></span>
                     </div>
                     <div class="cart-footer-wrap p-2 md:p-4 bg-slate-800 border-t border-slate-700 space-y-2 md:space-y-3 pb-safe">
-                    <div class="grid grid-cols-2 gap-1.5 md:gap-2"><input type="text" id="cust-name" class="w-full py-1.5 md:p-2 rounded-lg input-dark text-xs md:text-sm text-center" placeholder="客戶名稱"><div class="flex items-center justify-center py-1.5 md:p-2 bg-slate-700/50 rounded-lg"><span id="staff-name" class="text-[10px] md:text-xs font-bold">--</span></div></div>
+                    <div class="grid grid-cols-[auto_1fr_auto] gap-1.5 md:gap-2 items-center">
+                        <select id="cust-type" class="py-1.5 md:p-2 rounded-lg input-dark text-xs md:text-sm cursor-pointer shrink-0" onchange="var i=document.getElementById('cust-name');i.placeholder=this.value==='peer'?'同行名稱':'客戶名稱';">
+                            <option value="customer" selected>客人</option>
+                            <option value="peer">同行</option>
+                        </select>
+                        <input type="text" id="cust-name" class="w-full py-1.5 md:p-2 rounded-lg input-dark text-xs md:text-sm text-center min-w-0" placeholder="客戶名稱">
+                        <div class="flex items-center justify-center py-1.5 md:p-2 bg-slate-700/50 rounded-lg shrink-0"><span id="staff-name" class="text-[10px] md:text-xs font-bold">--</span></div>
+                    </div>
                     <div class="grid grid-cols-3 gap-1 md:gap-2 text-center text-[10px] md:text-xs">
                         <label><input type="radio" name="pay" value="cash" checked class="peer hidden"><div class="py-1.5 md:p-2 rounded border border-slate-600 peer-checked:bg-green-600 peer-checked:text-white cursor-pointer">現金</div></label>
                         <label><input type="radio" name="pay" value="linepay" class="peer hidden"><div class="py-1.5 md:p-2 rounded border border-slate-600 peer-checked:bg-green-500 peer-checked:text-black cursor-pointer">Line Pay</div></label>
@@ -142,7 +151,7 @@
         <div id="view-report" class="hidden view-section flex-1 flex flex-col overflow-hidden p-4">
             <h2 class="text-xl font-bold text-white mb-4">今日帳務</h2>
             <div class="grid grid-cols-2 md:grid-cols-3 gap-3 mb-4">
-                <div class="glass p-3 rounded-xl border-l-4 border-green-500"><div class="text-[10px] text-slate-400">現金實收 (扣支出)</div><div class="text-lg font-bold text-white" id="today-cash">0</div></div>
+                <div class="glass p-3 rounded-xl border-l-4 border-orange-500"><div class="text-[10px] text-slate-400">現金實收 (扣支出)</div><div class="text-lg font-bold text-white" id="today-cash">0</div></div>
                 <div class="glass p-3 rounded-xl border-l-4 border-red-500"><div class="text-[10px] text-slate-400">待收帳款</div><div class="text-lg font-bold text-red-400" id="today-pending">0</div></div>
                 <div class="glass p-3 rounded-xl border-l-4 border-yellow-500"><div class="text-[10px] text-slate-400">今日毛利 (售價-成本)</div><div class="text-lg font-bold text-yellow-400" id="today-profit">0</div></div>
                 <div class="glass p-3 rounded-xl border-l-4 border-purple-500"><div class="text-[10px] text-slate-400">潛在毛利 (未結)</div><div class="text-lg font-bold text-purple-400" id="today-pot">0</div></div>
@@ -157,6 +166,64 @@
             <div id="today-list" class="flex-1 overflow-y-auto pb-20"></div>
         </div>
 
+        <div id="view-peer" class="hidden view-section flex-1 flex flex-col overflow-hidden p-4">
+            <!-- 同行清單頁 -->
+            <div id="peer-list-panel" class="flex-1 flex flex-col overflow-hidden">
+                <div class="flex justify-between items-center mb-4">
+                    <div>
+                        <h2 class="text-xl font-bold text-white">同行對帳</h2>
+                        <p class="text-slate-400 text-sm mt-1">選擇同行查看對帳明細，或新增同行</p>
+                    </div>
+                    <button onclick="doAddNewPeer()" class="bg-yellow-600 hover:bg-yellow-500 px-4 py-2 rounded text-sm font-bold shrink-0">新增同行</button>
+                </div>
+                <div class="flex text-xs text-slate-400 px-3 pb-2 border-b border-slate-700">
+                    <div class="flex-1">同行名稱</div>
+                    <div class="w-20 text-right">應收</div>
+                    <div class="w-20 text-right">應付</div>
+                    <div class="w-24 text-right">淨餘額</div>
+                </div>
+                <div id="peer-list-body" class="flex-1 overflow-y-auto min-h-0"></div>
+            </div>
+            <!-- 對帳明細頁 -->
+            <div id="peer-detail-panel" class="hidden flex-1 flex flex-col overflow-hidden">
+                <div class="flex items-center gap-3 mb-4">
+                    <button onclick="goBackToPeerList()" class="w-10 h-10 flex items-center justify-center rounded-lg bg-slate-800 text-slate-400 hover:text-white transition shrink-0"><i class="fa-solid fa-arrow-left"></i></button>
+                    <div>
+                        <h2 class="text-xl font-bold text-white" id="peer-detail-title">同行對帳</h2>
+                        <p class="text-slate-400 text-sm">左為應收、右為應付；結帳選「掛帳」會自動記入欠帳</p>
+                    </div>
+                </div>
+                <input type="hidden" id="peer-selector" value="">
+                <div class="flex-1 flex flex-col md:flex-row gap-4 min-h-0 overflow-hidden">
+                <!-- 左：應收（他們欠我 / 他們還我） -->
+                <div class="flex-1 flex flex-col min-w-0 border border-red-900/50 rounded-xl overflow-hidden bg-slate-900/50">
+                    <div class="p-3 border-b border-slate-700 flex items-center justify-between">
+                        <div class="glass p-2 rounded-lg border-l-4 border-red-500"><div class="text-[10px] text-slate-400">應收（他們欠我）</div><div class="text-lg font-bold text-red-400" id="peer-sum-receivable">0</div></div>
+                        <div class="flex gap-2">
+                            <button onclick="doAddPeerDebt()" class="bg-red-600 hover:bg-red-500 px-3 py-1.5 rounded text-xs font-bold">應收入帳</button>
+                            <button onclick="doAddPeerRepayment()" class="bg-green-600 hover:bg-green-500 px-3 py-1.5 rounded text-xs font-bold">應收沖銷</button>
+                        </div>
+                    </div>
+                    <div class="flex text-xs text-slate-400 px-2 py-1 border-b border-slate-700"><div class="w-20">日期</div><div class="w-12">類型</div><div class="w-14">品項</div><div class="w-16">還款</div><div class="w-16 text-right">金額</div><div class="flex-1 truncate">備註</div></div>
+                    <div id="peer-ledger-receivable" class="flex-1 overflow-y-auto min-h-0"></div>
+                </div>
+                <!-- 右：應付（我欠他們 / 我還他們） -->
+                <div class="flex-1 flex flex-col min-w-0 border border-green-900/50 rounded-xl overflow-hidden bg-slate-900/50">
+                    <div class="p-3 border-b border-slate-700 flex items-center justify-between">
+                        <div class="glass p-2 rounded-lg border-l-4 border-green-500"><div class="text-[10px] text-slate-400">應付（我欠他們）</div><div class="text-lg font-bold text-green-400" id="peer-sum-payable">0</div></div>
+                        <div class="flex gap-2">
+                            <button onclick="doAddPeerMyDebt()" class="bg-orange-600 hover:bg-orange-500 px-3 py-1.5 rounded text-xs font-bold">應付入帳</button>
+                            <button onclick="doAddPeerMyRepay()" class="bg-teal-600 hover:bg-teal-500 px-3 py-1.5 rounded text-xs font-bold">應付沖銷</button>
+                        </div>
+                    </div>
+                    <div class="flex text-xs text-slate-400 px-2 py-1 border-b border-slate-700"><div class="w-20">日期</div><div class="w-12">類型</div><div class="w-14">品項</div><div class="w-16">還款</div><div class="w-16 text-right">金額</div><div class="flex-1 truncate">備註</div></div>
+                    <div id="peer-ledger-payable" class="flex-1 overflow-y-auto min-h-0"></div>
+                </div>
+            </div>
+            <div class="mt-3 flex items-center gap-3 shrink-0">
+                <div class="glass px-3 py-2 rounded-lg border-l-4 border-yellow-500"><span class="text-[10px] text-slate-400">淨餘額</span> <span class="text-lg font-bold text-yellow-400 ml-2" id="peer-balance">0</span></div>
+            </div>
+        </div>
         <div id="view-pending" class="hidden view-section flex-1 flex flex-col overflow-hidden p-4">
             <h2 class="text-xl font-bold text-white mb-4">未結帳款</h2>
             <div id="pending-list" class="flex-1 overflow-y-auto pb-20"></div>
@@ -286,7 +353,7 @@
         </div>
     </main>
 
-    <nav class="md:hidden fixed bottom-0 w-full h-16 bg-slate-950 border-t border-slate-800 flex z-50"><div onclick="switchView('pos')" id="m-nav-pos" class="mobile-nav-item active"><i class="fa-solid fa-cash-register"></i>收銀</div><div onclick="openReport()" id="m-nav-report" class="mobile-nav-item"><i class="fa-solid fa-file-invoice-dollar"></i>今日</div><div onclick="openPending()" id="m-nav-pending" class="mobile-nav-item"><i class="fa-solid fa-wallet"></i>未結</div><div onclick="openHistory()" id="m-nav-history" class="mobile-nav-item"><i class="fa-solid fa-chart-pie"></i>歷史</div><div onclick="switchView('restock')" id="m-nav-restock" class="mobile-nav-item"><i class="fa-solid fa-dolly"></i>進貨</div><div onclick="switchView('setting')" id="m-nav-setting" class="mobile-nav-item"><i class="fa-solid fa-gear"></i>設定</div></nav>
+    <nav class="md:hidden fixed bottom-0 w-full h-16 bg-slate-950 border-t border-slate-800 flex z-50"><div onclick="switchView('pos')" id="m-nav-pos" class="mobile-nav-item active"><i class="fa-solid fa-cash-register"></i>收銀</div><div onclick="openReport()" id="m-nav-report" class="mobile-nav-item"><i class="fa-solid fa-file-invoice-dollar"></i>今日</div><div onclick="openHistory()" id="m-nav-history" class="mobile-nav-item"><i class="fa-solid fa-chart-pie"></i>歷史</div><div onclick="openPeer()" id="m-nav-peer" class="mobile-nav-item"><i class="fa-solid fa-handshake"></i>同行</div><div onclick="openPending()" id="m-nav-pending" class="mobile-nav-item"><i class="fa-solid fa-wallet"></i>未結</div><div onclick="switchView('restock')" id="m-nav-restock" class="mobile-nav-item"><i class="fa-solid fa-dolly"></i>進貨</div><div onclick="switchView('setting')" id="m-nav-setting" class="mobile-nav-item"><i class="fa-solid fa-gear"></i>設定</div></nav>
 
     <script>
         // 版本號：自動以日期產生（每次載入即更新）
@@ -295,20 +362,22 @@
         let DB = { inv: [], sales: [], pending: [], history: [], companyTemplates: [] }; 
         let Cart = [], RestockCart = [];
         let BlackList = { orders: [], items: [] }; 
-        // API 基礎 URL（開發環境：localhost，生產環境：Railway）
-        // 本地開發時改回：'http://localhost:3001/api'
-        const API_BASE_URL = 'https://web-production-4ab5e4.up.railway.app/api';
-        
+        // API 基礎 URL：localhost 自動用本地，否則用 Railway。可覆寫 window.API_BASE_URL
+        const API_BASE_URL = (typeof window!=="undefined"&&window.API_BASE_URL)?window.API_BASE_URL:(typeof location!=="undefined"&&(location.hostname==="localhost"||location.hostname==="127.0.0.1")?"http://localhost:3001/api":"https://web-production-4ab5e4.up.railway.app/api");
+        function getAuthHeaders(json) { const t = localStorage.getItem('pos_token'); const h = t ? { 'Authorization': 'Bearer '+t } : {}; if(json) h['Content-Type'] = 'application/json'; return h; }
         // API 封裝函數（取代 google.script.run）
         const API = {
           verifyLogin: async (username, password) => {
             try {
-              console.log('發送登入請求到:', `${API_BASE_URL}/login`);
-              const res = await fetch(`${API_BASE_URL}/login`, {
+              const ctrl = new AbortController();
+              const tid = setTimeout(() => ctrl.abort(), 15000);
+              const res = await fetch(API_BASE_URL + '/login', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ username, password })
+                headers: getAuthHeaders(true),
+                body: JSON.stringify({ username, password }),
+                signal: ctrl.signal
               });
+              clearTimeout(tid);
               console.log('收到回應，狀態:', res.status);
               if (!res.ok) {
                 throw new Error(`HTTP ${res.status}: ${res.statusText}`);
@@ -322,13 +391,13 @@
             }
           },
           getInventory: async () => {
-            const res = await fetch(`${API_BASE_URL}/inventory`);
+            const res = await fetch(`${API_BASE_URL}/inventory`, { headers: getAuthHeaders() });
             return await res.json();
           },
           checkoutOrder: async (data) => {
             const res = await fetch(`${API_BASE_URL}/checkout`, {
               method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
+              headers: getAuthHeaders(true),
               body: JSON.stringify(data)
             });
             return await res.json();
@@ -336,7 +405,7 @@
           handleTransaction: async (data) => {
             const res = await fetch(`${API_BASE_URL}/transaction`, {
               method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
+              headers: getAuthHeaders(true),
               body: JSON.stringify(data)
             });
             return await res.json();
@@ -344,51 +413,74 @@
           handleRestock: async (data) => {
             const res = await fetch(`${API_BASE_URL}/restock`, {
               method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
+              headers: getAuthHeaders(true),
               body: JSON.stringify(data)
             });
             return await res.json();
           },
           getTodaySalesOnly: async () => {
-            const res = await fetch(`${API_BASE_URL}/today-sales`);
+            const res = await fetch(`${API_BASE_URL}/today-sales`, { headers: getAuthHeaders() });
             return await res.json();
           },
           getPendingOrders: async () => {
-            const res = await fetch(`${API_BASE_URL}/pending`);
+            const res = await fetch(`${API_BASE_URL}/pending`, { headers: getAuthHeaders() });
             return await res.json();
           },
           changePhoneStatus: async (id, status) => {
             const res = await fetch(`${API_BASE_URL}/phone/status`, {
               method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
+              headers: getAuthHeaders(true),
               body: JSON.stringify({ id, status })
             });
             return await res.json();
           },
           getHistory: async (startDate, endDate) => {
-            const res = await fetch(`${API_BASE_URL}/history?start=${startDate}&end=${endDate}`);
+            const res = await fetch(`${API_BASE_URL}/history?start=${startDate}&end=${endDate}`, { headers: getAuthHeaders() });
             return await res.json();
           },
           addCompanyTemplate: async (name, cost, price) => {
             const res = await fetch(`${API_BASE_URL}/company-template`, {
               method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
+              headers: getAuthHeaders(true),
               body: JSON.stringify({ name, cost: Number(cost), price: Number(price) })
             });
             return await res.json();
           },
           deleteCompanyTemplate: async (name) => {
-            const res = await fetch(`${API_BASE_URL}/company-template/${encodeURIComponent(name)}`, { method: 'DELETE' });
+            const res = await fetch(`${API_BASE_URL}/company-template/${encodeURIComponent(name)}`, { method: 'DELETE', headers: getAuthHeaders() });
             return await res.json();
           },
           addAccessory: async (category, name) => {
             const res = await fetch(`${API_BASE_URL}/accessory`, {
               method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
+              headers: getAuthHeaders(true),
               body: JSON.stringify({ category, name })
             });
             return await res.json();
-          }
+          },
+          getPeerLedger: async (peer) => {
+            const q = peer ? `?peer=${encodeURIComponent(peer)}` : '';
+            const res = await fetch(`${API_BASE_URL}/peer-ledger${q}`, { headers: getAuthHeaders() });
+            return await res.json();
+          },
+          addPeerDebt: async (data) => {
+            const res = await fetch(`${API_BASE_URL}/peer-debt`, {
+              method: 'POST',
+              headers: getAuthHeaders(true),
+              body: JSON.stringify(data)
+            });
+            return await res.json();
+          },
+          addPeerRepayment: async (data) => {
+            const res = await fetch(`${API_BASE_URL}/peer-repayment`, {
+              method: 'POST',
+              headers: getAuthHeaders(true),
+              body: JSON.stringify(data)
+            });
+            return await res.json();
+          },
+          addPeerMyDebt: async (data) => { const r = await fetch(API_BASE_URL + '/peer-my-debt', { method: 'POST', headers: getAuthHeaders(true), body: JSON.stringify(data) }); return await r.json(); },
+          addPeerMyRepay: async (data) => { const r = await fetch(API_BASE_URL + '/peer-my-repay', { method: 'POST', headers: getAuthHeaders(true), body: JSON.stringify(data) }); return await r.json(); }
         };
         
         let ItemRegistry = {}; 
@@ -429,7 +521,7 @@
         window.onload = () => { 
             document.title = '內部POS系統 ' + POS_VERSION + ' (Stable)';
             const loginVer = document.getElementById('login-version');
-            if (loginVer) loginVer.textContent = 'POS ' + POS_VERSION;
+            if (loginVer) loginVer.textContent = 'POS';
             const settingVer = document.getElementById('setting-version');
             if (settingVer) settingVer.textContent = POS_VERSION + ' Stable';
             initCartFooterDrag();
@@ -446,10 +538,7 @@
                     if (el) el.value = lastPass; 
                 }
                 // 如果有記住的帳號密碼，自動勾選記住選項
-                if (lastUser && lastPass) {
-                    const rem = document.getElementById('remember-me');
-                    if (rem) rem.checked = true;
-                }
+                if (lastUser || lastPass) { var c=document.getElementById('remember-creds'); if(c) c.checked=true; } if (localStorage.getItem('pos_user_v30')) { var r=document.getElementById('remember-me'); if(r) r.checked=true; }
             } catch(e) { console.error('載入記住的帳號密碼失敗', e); }
             const passInput = document.getElementById('login-pass');
             if (passInput) { passInput.addEventListener('keypress', function (e) { if (e.key === 'Enter') doLogin(); }); }
@@ -463,15 +552,35 @@
                     if (document.getElementById('view-pos') && !document.getElementById('view-pos').classList.contains('hidden') && Cart.length > 0) confirmCheckout();
                 }
             });
-            try { const s = localStorage.getItem('pos_user_v30'); if (s) { User = JSON.parse(s); initSystem(); } } catch(e) { console.error('Auto login fail', e); }
+            (async function autoLogin() {
+                try {
+                    const s = localStorage.getItem('pos_user_v30');
+                    if (!s) return;
+                    const lastUser = localStorage.getItem('pos_last_user');
+                    const lastPass = localStorage.getItem('pos_last_pass');
+                    // 若有記住的帳密，呼叫 API 重新取得 role，避免舊快取造成權限錯誤
+                    if (lastUser && lastPass && typeof API !== 'undefined' && API.verifyLogin) {
+                        try {
+                            const result = await API.verifyLogin(lastUser.trim(), lastPass);
+                            if (result && result.success && result.user) {
+                                const isAdmin = result.user.role === 'admin' || result.user.role === 'Y' || result.user.isAdmin === true;
+                                loginSuccess(result.user.name || result.user.username, isAdmin, result.user.username || lastUser, result.token);
+                                return;
+                            }
+                        } catch (e) { console.warn('Auto login re-verify fail, use cache', e); }
+                    }
+                    User = JSON.parse(s);
+                    initSystem();
+                } catch (e) { console.error('Auto login fail', e); }
+            })();
         };
 
         function loadBlacklist() { try { const s = localStorage.getItem('pos_blacklist_v32'); if (s) BlackList = JSON.parse(s); } catch(e) { console.error('Load blacklist fail', e); } }
         function saveBlacklist() { localStorage.setItem('pos_blacklist_v32', JSON.stringify(BlackList)); }
 
         async function doLogin() { 
-            const u = document.getElementById('login-user').value.trim(); 
-            const p = document.getElementById('login-pass').value.trim(); 
+            const u = (document.getElementById('login-user')?.value || '').trim(); 
+            const p = (document.getElementById('login-pass')?.value || '').trim(); 
             if (!u || !p) {
                 showError('請輸入帳號與密碼');
                 return;
@@ -494,9 +603,9 @@
                 console.log('登入結果:', result);
                 
                 if (result && result.success) {
-                    const isAdmin = result.user.role === 'admin';
+                    const isAdmin = result.user.role === 'admin' || result.user.role === 'Y' || result.user.isAdmin === true;
                     console.log('登入成功，使用者:', result.user.name, '管理員:', isAdmin);
-                    loginSuccess(result.user.name || result.user.username, isAdmin, result.user.username || u);
+                    loginSuccess(result.user.name||result.user.username,isAdmin,result.user.username||u, result.token);if(typeof Swal!=="undefined")Swal.fire({icon:"success",title:"登入成功",timer:1000,toast:true,position:"top-end",showConfirmButton:false,background:"#1e293b",color:"white"});
                 } else {
                     console.error('登入失敗:', result?.message);
                     showError(result?.message || '登入失敗');
@@ -504,7 +613,9 @@
             } catch (e) {
                 console.error('=== 登入錯誤 ===', e);
                 let errorMsg = '登入失敗：';
-                if (e.message && e.message.includes('Failed to fetch')) {
+                if (e.name === 'AbortError') {
+                    errorMsg += '連線逾時，請檢查網路或後端服務';
+                } else if (e.message && e.message.includes('Failed to fetch')) {
                     errorMsg += '無法連接到後端伺服器。請確認：\n1. 後端伺服器正在運行 (http://localhost:3001)\n2. 瀏覽器允許連接到 localhost';
                 } else if (e.message && e.message.includes('CORS')) {
                     errorMsg += 'CORS 錯誤，請使用本地伺服器打開 HTML 檔案';
@@ -520,32 +631,24 @@
             }
         }
         function showError(msg) { if (typeof Swal !== 'undefined') { Swal.fire({icon:'error', title:msg, background:'#1e293b', color:'white'}); } else { alert(msg); } }
-        function loginSuccess(n, a, u) { 
+        function loginSuccess(n, a, u, token) { 
+            if (token) localStorage.setItem('pos_token', token);
             User = { name: n, isAdmin: a, username: u }; 
             const rem = document.getElementById('remember-me'); 
             const uEl = document.getElementById('login-user');
             const pEl = document.getElementById('login-pass');
             
-            if(rem && rem.checked) { 
-                // 記住帳號和密碼
-                localStorage.setItem('pos_user_v30', JSON.stringify(User)); 
-                if(uEl) localStorage.setItem('pos_last_user', uEl.value.trim()); 
-                if(pEl) localStorage.setItem('pos_last_pass', pEl.value.trim());
-            } else {
-                // 不記住：清除已保存的密碼，但保留帳號（方便下次輸入）
-                localStorage.removeItem('pos_last_pass');
-                if(uEl) localStorage.setItem('pos_last_user', uEl.value.trim());
-            }
+            var creds=document.getElementById("remember-creds"); if(rem&&rem.checked)localStorage.setItem('pos_user_v30',JSON.stringify(User));else localStorage.removeItem('pos_user_v30'); if(creds&&creds.checked&&uEl&&pEl){localStorage.setItem('pos_last_user',uEl.value.trim());localStorage.setItem('pos_last_pass',pEl.value.trim());}else{if(!creds||!creds.checked)localStorage.removeItem('pos_last_pass');if(uEl)localStorage.setItem('pos_last_user',uEl.value.trim());}
             initSystem(); 
         }
         function initSystem() { 
-            document.getElementById('login-overlay').style.display = 'none'; 
+            document.getElementById('login-overlay').style.display = 'none'; document.body.classList.remove('login-page'); 
             document.getElementById('user-badge').innerText = User.name; 
             document.getElementById('staff-name').innerText = User.name; 
             console.log('使用者權限:', User);
             // 限制 a002 帳號不能使用「今日」和「未結」功能
-            if(User && User.username === 'a002') {
-                ['d-nav-report','d-nav-pending','m-nav-report','m-nav-pending'].forEach(id => { 
+            if(User && !User.isAdmin) {
+                ['d-nav-report','d-nav-history','d-nav-peer','d-nav-pending','m-nav-report','m-nav-history','m-nav-peer','m-nav-pending'].forEach(id => { 
                     const el = document.getElementById(id); 
                     if(el) {
                         el.classList.add('opacity-30', 'pointer-events-none');
@@ -575,9 +678,12 @@
                 if(UI.tab === 'phone') switchMainTab('phone'); 
                 else if(UI.tab === 'accessory') { const a = document.querySelector('.pill-btn.active'); if(a) { const t = a.innerText; if(t.includes('常用')) renderFavAccessoryGrid(); else if(t === '公司貨') renderCompanyAccessoryGrid(); else if(t === '調貨') renderDirectTransferGrid(); else filterItems(null, t); } }
                 renderReport(); 
+                var h=(location.hash||'').replace('#','').toLowerCase();
+                if(['report','pending','history','restock','setting'].includes(h)){ if(h==='report')openReport(); else if(h==='pending')openPending(); else if(h==='history')openHistory(); else if(h==='restock'){switchView('restock');if(typeof setRestockMode==='function')setRestockMode(UI.rsMode||'inventory');} else if(h==='setting')switchView('setting'); }
             } catch(e) { 
                 console.error('Data Parse Error', e); 
                 document.getElementById('sync-status').innerHTML = '<span class="text-red-500">● 連線失敗</span>'; 
+                if(typeof Swal!=="undefined")Swal.fire({icon:"error",title:"載入失敗",text:e.message||"請重新整理",background:"#1e293b",color:"white"}); 
             }
         }
         function softRefresh() {
@@ -587,23 +693,8 @@
         }
 
         function switchView(v) { 
-            const ev = document.getElementById('view-'+v); if (!ev) return;
-            document.querySelectorAll('.view-section').forEach(e => e.classList.add('hidden'));
-            ev.classList.remove('hidden');
-            ev.offsetHeight; // 強制 reflow，避免手機版 Flex 高度未重算導致空白頁
-            document.querySelectorAll('.nav-btn').forEach(b => b.classList.replace('text-yellow-400','text-slate-500'));
-            const d = document.getElementById('d-nav-'+v); if (d) d.classList.replace('text-slate-500','text-yellow-400');
-            document.querySelectorAll('.mobile-nav-item').forEach(b => b.classList.remove('active'));
-            const m = document.getElementById('m-nav-'+v); if (m) m.classList.add('active');
-            if (window.innerWidth < 768) {
-                const fp = document.getElementById('mobile-float-bar-pos');
-                const fr = document.getElementById('mobile-float-bar-restock');
-                if (fp) fp.classList.add('translate-y-24');
-                if (fr) fr.classList.add('translate-y-24');
-            }
-            if (v === 'setting') {
-                // 設定頁面打開時，不自動展開任何區塊
-            }
+            var ev=document.getElementById('view-'+v); if(!ev)return; document.querySelectorAll('.view-section').forEach(e=>e.classList.add('hidden')); ev.classList.remove('hidden'); document.querySelectorAll('.nav-btn').forEach(b => b.classList.replace('text-yellow-400','text-slate-500')); const d = document.getElementById('d-nav-'+v); if(d) d.classList.replace('text-slate-500','text-yellow-400'); document.querySelectorAll('.mobile-nav-item').forEach(b => b.classList.remove('active')); const m = document.getElementById('m-nav-'+v); if(m) m.classList.add('active'); if(window.innerWidth < 768) { const fp = document.getElementById('mobile-float-bar-pos'); const fr = document.getElementById('mobile-float-bar-restock'); if(fp) fp.classList.add('translate-y-24'); if(fr) fr.classList.add('translate-y-24'); } 
+            if (v === 'restock' && typeof setRestockMode === 'function') setRestockMode(UI.rsMode || 'inventory');
         }
         function toggleSettingSection(sectionId) {
             const content = document.getElementById(sectionId + '-content');
@@ -799,7 +890,7 @@
 
         function openReport() { 
             // 限制 a002 帳號不能使用「今日」功能
-            if (User && User.username === 'a002') {
+            if (User && !User.isAdmin) {
                 Swal.fire({ icon: 'warning', title: '權限不足', text: '此帳號無法使用「今日帳務」功能', background: '#1e293b', color: 'white' });
                 return;
             }
@@ -851,9 +942,180 @@
             document.getElementById('today-gift').innerText = stats.gift.toLocaleString();
         }
 
+        function openPeer() { if(User&&!User.isAdmin){if(typeof Swal!=="undefined")Swal.fire({icon:'warning',title:'權限不足',text:'此帳號無法使用同行對帳',background:'#1e293b',color:'white'});return;} switchView('peer'); showPeerListPanel(); loadPeerList(); }
+        function showPeerListPanel() {
+            const listPanel = document.getElementById('peer-list-panel');
+            const detailPanel = document.getElementById('peer-detail-panel');
+            if (listPanel) listPanel.classList.remove('hidden');
+            if (detailPanel) detailPanel.classList.add('hidden');
+        }
+        function showPeerDetailPanel() {
+            const listPanel = document.getElementById('peer-list-panel');
+            const detailPanel = document.getElementById('peer-detail-panel');
+            if (listPanel) listPanel.classList.add('hidden');
+            if (detailPanel) detailPanel.classList.remove('hidden');
+        }
+        function openPeerDetail(peerName) {
+            selectedPeer = String(peerName || '').trim();
+            const sel = document.getElementById('peer-selector');
+            if (sel) sel.value = selectedPeer;
+            const titleEl = document.getElementById('peer-detail-title');
+            if (titleEl) titleEl.textContent = selectedPeer ? (selectedPeer + ' 對帳明細') : '同行對帳';
+            showPeerDetailPanel();
+            loadPeerLedger();
+        }
+        function goBackToPeerList() {
+            selectedPeer = '';
+            showPeerListPanel();
+            loadPeerList();
+        }
+        async function doAddNewPeer() {
+            const r = await Swal.fire({ title: '新增同行', input: 'text', inputLabel: '同行名稱', inputPlaceholder: '請輸入同行名稱', showCancelButton: true, confirmButtonText: '確定', cancelButtonText: '取消', background: '#1e293b', color: 'white' });
+            if (!r.isConfirmed || !r.value || !String(r.value).trim()) return;
+            const n = String(r.value).trim(); addedPeerNames.add(n); openPeerDetail(n);
+        }
+        let addedPeerNames = new Set();
+        let peerListData = [];
+        async function loadPeerList() {
+            const bodyEl = document.getElementById('peer-list-body');
+            if (!bodyEl) return;
+            bodyEl.innerHTML = '<div class="text-center mt-10"><span class="loader"></span></div>';
+            try {
+                const res = await API.getPeerLedger();
+                const rows = res && res.rows ? res.rows : (res && res.ledger ? res.ledger : (res || []));
+                if (!Array.isArray(rows)) peerListData = [];
+                else {
+                    const byPeer = {};
+                    rows.forEach(function(r) {
+                        const pn = (r.peerName || '').trim();
+                        if (!pn) return;
+                        if (!byPeer[pn]) { byPeer[pn] = { peerName: pn, receivable: 0, payable: 0 }; }
+                        const amt = Number(r.amount) || 0;
+                        const t = r.type || '';
+                        if ((t.charAt(0)==='欠'||t.charAt(0)==='還')) byPeer[pn].receivable += amt;
+                        else if (t.charAt(0)==='我') byPeer[pn].payable += amt;
+                        else { if (amt > 0) byPeer[pn].receivable += amt; else byPeer[pn].payable += Math.abs(amt); }
+                    });
+                    (addedPeerNames||new Set()).forEach(function(n){var x=String(n||'').trim();if(x&&!byPeer[x])byPeer[x]={peerName:x,receivable:0,payable:0};});
+                    peerListData = Object.values(byPeer).sort((a,b) => (a.peerName || '').localeCompare(b.peerName || ''));
+                }
+                renderPeerList();
+            } catch (e) {
+                console.error('load peer list err:', e);
+                bodyEl.innerHTML = '<div class="text-center text-red-500 mt-10">載入失敗，請重試</div>';
+            }
+        }
+        function renderPeerList() {
+            const bodyEl = document.getElementById('peer-list-body');
+            if (!bodyEl) return;
+            if (peerListData.length === 0) {
+                bodyEl.innerHTML = '<div class="text-center text-slate-500 py-10">尚無同行，點「新增同行」開始</div>';
+                return;
+            }
+            bodyEl.innerHTML = peerListData.map(function(p, i) {
+                const bal = p.receivable - p.payable;
+                const balClass = bal > 0 ? 'text-yellow-400' : bal < 0 ? 'text-red-400' : 'text-slate-400';
+                const nameEsc = String(p.peerName || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/"/g,'&quot;');
+                return '<div data-peer-idx="'+i+'" class="list-row flex items-center py-3 px-3 cursor-pointer"><div class="flex-1 font-medium">' + nameEsc + '</div><div class="w-20 text-right text-red-400">' + p.receivable.toLocaleString() + '</div><div class="w-20 text-right text-green-400">' + p.payable.toLocaleString() + '</div><div class="w-24 text-right font-bold ' + balClass + '">' + bal.toLocaleString() + '</div></div>';
+            }).join('');
+            bodyEl.querySelectorAll('[data-peer-idx]').forEach(function(el){ el.onclick=function(){ const i=parseInt(el.getAttribute('data-peer-idx'),10); if(peerListData[i]) openPeerDetail(peerListData[i].peerName); }; });
+        }
+        let peerLedgerData = [];
+        let selectedPeer = '';
+        async function loadPeerLedger() {
+            selectedPeer = document.getElementById('peer-selector') ? document.getElementById('peer-selector').value.trim() : '';
+            const recvEl = document.getElementById('peer-ledger-receivable');
+            const payEl = document.getElementById('peer-ledger-payable');
+            if (!recvEl || !payEl) return;
+            recvEl.innerHTML = '<div class="text-center mt-10"><span class="loader"></span></div>';
+            payEl.innerHTML = '';
+            try {
+                const res = await API.getPeerLedger(selectedPeer || undefined);
+                peerLedgerData = res && res.rows ? res.rows : (res && res.ledger ? res.ledger : (res && res.items ? res.items : (res || [])));
+                if (!Array.isArray(peerLedgerData)) peerLedgerData = [];
+                renderPeerLedger();
+            } catch (e) {
+                console.error('load peer ledger err:', e);
+                recvEl.innerHTML = '<div class="text-center text-red-500 mt-10">載入失敗，請重試</div>';
+                payEl.innerHTML = '';
+            }
+        }
+        function renderPeerLedger() {
+            const recvEl = document.getElementById('peer-ledger-receivable');
+            const payEl = document.getElementById('peer-ledger-payable');
+            const sumRecvEl = document.getElementById('peer-sum-receivable');
+            const sumPayEl = document.getElementById('peer-sum-payable');
+            const balanceEl = document.getElementById('peer-balance');
+            if (!recvEl || !payEl) return;
+            let receivable = 0, payable = 0;
+            const recvRows = [], payRows = [];
+            peerLedgerData.forEach(function(r) {
+                const amt = Number(r.amount) || 0;
+                const t = r.type || '';
+                if ((t.charAt(0)==='欠'||t.charAt(0)==='還')) { receivable += amt; recvRows.push(r); }
+                else if (t.charAt(0)==='我') { payable += amt; payRows.push(r); }
+                else { if (amt > 0) { receivable += amt; recvRows.push(r); } else { payable += Math.abs(amt); payRows.push(r); } }
+            });
+            const balance = receivable - payable;
+            if (sumRecvEl) sumRecvEl.textContent = receivable.toLocaleString();
+            if (sumPayEl) sumPayEl.textContent = payable.toLocaleString();
+            if (balanceEl) balanceEl.textContent = balance.toLocaleString();
+            function rowHtml(r) {
+                const amt = Number(r.amount) || 0;
+                const type = r.type || '';
+                const date = r.date || r.createdAt || '';
+                const remark = r.remark || r.note || '';
+                const itemType = r.itemType || '';
+                const repayMethod = r.repayMethod || '';
+                const typeClass = (type.charAt(0)==='欠'?'text-red-400':type.charAt(0)==='還'?'text-green-400':type.charAt(0)==='我'?(type.charAt(1)==='欠'?'text-orange-400':'text-teal-400'):'text-slate-400');
+                return '<div class="flex items-center gap-2 px-2 py-1.5 border-b border-slate-700/50 text-sm"><span class="text-slate-400 w-20 shrink-0">' + (String(date).slice(0,10)) + '</span><span class="' + typeClass + ' w-12 shrink-0">' + type + '</span><span class="text-amber-400/90 w-14 shrink-0">' + itemType + '</span><span class="text-slate-400 w-16 shrink-0">' + repayMethod + '</span><span class="text-white w-16 text-right shrink-0">' + Math.abs(amt).toLocaleString() + '</span><span class="text-slate-400 flex-1 truncate">' + remark + '</span></div>';
+            }
+            recvEl.innerHTML = recvRows.length ? recvRows.map(rowHtml).join('') : '<div class="text-center text-slate-500 py-8 text-sm">無應收流水</div>';
+            payEl.innerHTML = payRows.length ? payRows.map(rowHtml).join('') : '<div class="text-center text-slate-500 py-8 text-sm">無應付流水</div>';
+        }
+        async function doAddPeerDebt() { const r = await Swal.fire({ title: '新增欠帳', html: '<select id="swal-itemtype" class="swal2-input"><option value="二手機">二手機</option><option value="網卡">網卡</option><option value="軟體">軟體</option><option value="其他">其他</option></select><input id="swal-amount" type="number" class="swal2-input" placeholder="金額"><input id="swal-remark" class="swal2-input" placeholder="備註（可手打）">', showCancelButton: true, confirmButtonText: '確定', cancelButtonText: '取消', background: '#1e293b', color: 'white' , preConfirm:function(){var el=document.getElementById("swal-amount");var a=el?Number(el.value)||0:0;if(a<=0)return false;var it=document.getElementById("swal-itemtype");var rm=document.getElementById("swal-remark");return{itemType:it?it.value||"":"" ,amount:a,remark:rm?rm.value.trim()||"":""};},});
+            if (!r.isConfirmed) return;
+            const peerName = (document.getElementById("peer-selector")&&document.getElementById("peer-selector").value.trim())||selectedPeer;
+            const amount = r.value ? r.value.amount : 0;
+            const remark = r.value ? r.value.remark : "";
+            const itemType = r.value ? (r.value.itemType||"") : "";
+            if (!peerName || amount <= 0) { Swal.fire({ icon: 'warning', title: '請填寫同行名稱與金額', background: '#1e293b', color: 'white' }); return; }
+            try { const res = await API.addPeerDebt({ peerName, amount, remark, itemType: itemType || '', person: User.name }); if (res && res.status === "error") { Swal.fire({ icon: "error", title: "新增失敗", text: res.msg || "未知錯誤", background: "#1e293b", color: "white" }); return; } loadPeerLedger(); } catch (e) { Swal.fire({ icon: "error", title: "新增失敗", text: e.message, background: "#1e293b", color: "white" }); }
+        }
+        async function doAddPeerRepayment() {
+            const r = await Swal.fire({ title: '新增還款', html: '<select id="swal-repaymethod2" class="swal2-input"><option value="現金">現金</option><option value="商品抵債">商品抵債</option></select><select id="swal-itemtype2" class="swal2-input"><option value="二手機">二手機</option><option value="網卡">網卡</option><option value="軟體">軟體</option><option value="其他">其他</option></select><input id="swal-amount2" type="number" class="swal2-input" placeholder="金額"><input id="swal-remark2" class="swal2-input" placeholder="備註（可手打）">', showCancelButton: true, confirmButtonText: '確定', cancelButtonText: '取消', background: '#1e293b', color: 'white' });
+            if (!r.isConfirmed) return;
+            const peerName = (document.getElementById('peer-selector')&&document.getElementById('peer-selector').value.trim())||selectedPeer;
+            const amount = Number(document.getElementById('swal-amount2') && document.getElementById('swal-amount2').value) || 0;
+            const remark = (document.getElementById('swal-remark2') && document.getElementById('swal-remark2').value.trim()) || '';
+            if (!peerName || amount <= 0) { Swal.fire({ icon: 'warning', title: '請填寫同行名稱與金額', background: '#1e293b', color: 'white' }); return; }
+            try { const res = await API.addPeerRepayment({ peerName, amount, remark, itemType: (document.getElementById('swal-itemtype2') && document.getElementById('swal-itemtype2').value) || '其他', repayMethod: (document.getElementById('swal-repaymethod2') && document.getElementById('swal-repaymethod2').value) || '現金', person: User.name }); if (res && res.status === "error") { Swal.fire({ icon: "error", title: "新增失敗", text: res.msg || "未知錯誤", background: "#1e293b", color: "white" }); return; } loadPeerLedger(); } catch (e) { Swal.fire({ icon: "error", title: "新增失敗", text: e.message, background: '#1e293b', color: 'white' }); }
+        }
+
+        async function doAddPeerMyDebt() {
+            const r = await Swal.fire({ title: '新增我欠', html: '<select id="swal-itemtype-my" class="swal2-input"><option value="二手機">二手機</option><option value="網卡">網卡</option><option value="軟體">軟體</option><option value="其他">其他</option></select><input id="swal-amount-my" type="number" class="swal2-input" placeholder="金額"><input id="swal-remark-my" class="swal2-input" placeholder="備註（可手打）">', showCancelButton: true, confirmButtonText: '確定', cancelButtonText: '取消', background: '#1e293b', color: 'white' });
+            if (!r.isConfirmed) return;
+            const peerName = (document.getElementById('peer-selector')&&document.getElementById('peer-selector').value.trim())||selectedPeer;
+            const amount = Number(document.getElementById('swal-amount-my') && document.getElementById('swal-amount-my').value) || 0;
+            const remark = (document.getElementById('swal-remark-my') && document.getElementById('swal-remark-my').value.trim()) || '';
+            if (!peerName || amount <= 0) { Swal.fire({ icon: 'warning', title: '請填寫同行與金額', background: '#1e293b', color: 'white' }); return; }
+            try { const res = await API.addPeerMyDebt({ peerName, amount, remark, itemType: (document.getElementById('swal-itemtype-my') && document.getElementById('swal-itemtype-my').value) || '其他', person: User.name }); if (res && res.status === "error") { Swal.fire({ icon: "error", title: "新增失敗", text: res.msg || "未知錯誤", background: "#1e293b", color: "white" }); return; } loadPeerLedger(); } catch (e) { Swal.fire({ icon: "error", title: "新增失敗", text: e.message, background: '#1e293b', color: 'white' }); }
+        }
+        async function doAddPeerMyRepay() {
+            const r = await Swal.fire({ title: '新增我還', html: '<select id="swal-repaymethod-myrepay" class="swal2-input"><option value="現金">現金</option><option value="商品抵債">商品抵債</option></select><select id="swal-itemtype-myrepay" class="swal2-input"><option value="二手機">二手機</option><option value="網卡">網卡</option><option value="軟體">軟體</option><option value="其他">其他</option></select><input id="swal-amount-myrepay" type="number" class="swal2-input" placeholder="金額"><input id="swal-remark-myrepay" class="swal2-input" placeholder="備註（可手打）">', showCancelButton: true, confirmButtonText: '確定', cancelButtonText: '取消', background: '#1e293b', color: 'white' });
+            if (!r.isConfirmed) return;
+            const peerName = (document.getElementById('peer-selector')&&document.getElementById('peer-selector').value.trim())||selectedPeer;
+            const amount = Number(document.getElementById('swal-amount-myrepay') && document.getElementById('swal-amount-myrepay').value) || 0;
+            const remark = (document.getElementById('swal-remark-myrepay') && document.getElementById('swal-remark-myrepay').value.trim()) || '';
+            const repayMethod = (document.getElementById('swal-repaymethod-myrepay') && document.getElementById('swal-repaymethod-myrepay').value) || '現金';
+            if (!peerName || amount <= 0) { Swal.fire({ icon: 'warning', title: '請填寫同行與金額', background: '#1e293b', color: 'white' }); return; }
+            try { const res = await API.addPeerMyRepay({ peerName, amount, remark, itemType: (document.getElementById('swal-itemtype-myrepay') && document.getElementById('swal-itemtype-myrepay').value) || '其他', repayMethod, person: User.name }); if (res && res.status === "error") { Swal.fire({ icon: "error", title: "新增失敗", text: res.msg || "未知錯誤", background: "#1e293b", color: "white" }); return; } loadPeerLedger(); } catch (e) { Swal.fire({ icon: "error", title: "新增失敗", text: e.message, background: '#1e293b', color: 'white' }); }
+        }
+
+
         function openPending() { 
             // 限制 a002 帳號不能使用「未結」功能
-            if (User && User.username === 'a002') {
+            if (User && !User.isAdmin) {
                 Swal.fire({ icon: 'warning', title: '權限不足', text: '此帳號無法使用「未結帳款」功能', background: '#1e293b', color: 'white' });
                 return;
             }
@@ -865,11 +1127,12 @@
             d.innerHTML = '<div class="text-center mt-10"><span class="loader"></span></div>'; 
             try {
                 const res = await API.getPendingOrders(); 
-                DB.pending = res || [];
+                DB.pending = Array.isArray(res)?res:(res&&res.data?res.data:res&&res.items?res.items:(res||[]));
                 renderPendingList(); 
             } catch(e) {
                 console.error('載入未結帳款失敗:', e);
                 d.innerHTML = '<div class="text-center text-red-500 mt-10">載入失敗，請重試</div>';
+                if(typeof Swal!=="undefined")Swal.fire({icon:"error",title:"載入失敗",text:e.message||"請重試",background:"#1e293b",color:"white"});
             }
         }
 
@@ -892,7 +1155,7 @@
             Object.values(groups).forEach(g => { d.innerHTML += renderOrderRow(g); });
         }
 
-        function openHistory() { switchView('history'); setQuickDate('month'); }
+        function openHistory() { if(User&&!User.isAdmin){if(typeof Swal!=="undefined")Swal.fire({icon:'warning',title:'權限不足',text:'此帳號無法使用歷史查詢',background:'#1e293b',color:'white'});return;} switchView('history'); setQuickDate('month'); }
         function setQuickDate(m) { const n = new Date(); const t = d => d.toISOString().split('T')[0]; const s = new Date(); if(m==='month') s.setDate(1); document.getElementById('h-end').value = t(n); document.getElementById('h-start').value = t(s); doHistorySearch(); }
         async function doHistorySearch() { 
             const s = document.getElementById('h-start').value; 
@@ -902,11 +1165,13 @@
             try {
                 const res = await API.getHistory(s, e);
                 Swal.close(); 
-                DB.history = res || [];
+                DB.history = Array.isArray(res)?res:(res&&res.data?res.data:res&&res.items?res.items:(res||[]));
                 renderHistoryList(); 
             } catch(err) {
                 Swal.close();
                 console.error('載入歷史記錄失敗:', err);
+                const hl = document.getElementById('history-list');
+                if (hl) hl.innerHTML = '<div class="text-center text-red-500 mt-10">載入失敗，請重試</div>';
                 Swal.fire({icon:'error', title:'載入失敗', text: err.message || '請重試', background:'#1e293b'});
             }
         }
@@ -1256,8 +1521,7 @@
             document.getElementById('mob-total').innerText = '$' + t.toLocaleString(); 
             document.getElementById('mob-count').innerText = cn; 
             const f = document.getElementById('mobile-float-bar-pos'); 
-            if(cn > 0) f.classList.remove('translate-y-24'); 
-            else f.classList.add('translate-y-24'); 
+            if(f) { if(cn > 0) f.classList.remove('translate-y-24'); else f.classList.add('translate-y-24'); } 
         }
         function toggleGift(idx) { let item = Cart[idx]; if(item.isGift) { item.isGift = false; item.price = item.originalPrice; item.name = item.name.replace(' (贈)',''); } else { item.isGift = true; item.price = 0; item.name += ' (贈)'; } renderCart(); }
         function clearCart() { Cart=[]; renderCart(); }
@@ -1340,7 +1604,7 @@
                 });
                 Swal.fire({ title: '結帳處理中...', html: '正在寫入資料，請勿關閉視窗', allowOutsideClick: false, didOpen: () => { Swal.showLoading(); } }); 
                 try {
-                    const result = await API.checkoutOrder({ orderId: oid, customer: cust, payMethod: pay, person: User.name, items: items });
+                    const custType = (document.getElementById('cust-type') && document.getElementById('cust-type').value) || 'customer'; const result = await API.checkoutOrder({ orderId: oid, customer: cust, payMethod: pay, person: User.name, items: items, customerType: custType });
                     if (result.status === 'error') { 
                         Swal.fire({icon:'error', title:'結帳失敗', text: result.msg || '請截圖通知管理員', background: '#1e293b'}); 
                         return; 
@@ -1384,7 +1648,7 @@
         async function editAccessory(id, n, c, p) { const { value: v } = await Swal.fire({ title: '編輯商品', html: `<div class="text-xs text-slate-400 mb-2">${n}</div><label class="text-xs text-slate-500 block text-left">成本</label><input id="sw-edit-c" class="swal2-input" type="number" value="${c}"><label class="text-xs text-slate-500 block text-left mt-2">建議售價</label><input id="sw-edit-p" class="swal2-input" type="number" value="${p}">`, background: '#1e293b', color: 'white', showCancelButton: true, preConfirm: () => [document.getElementById('sw-edit-c').value, document.getElementById('sw-edit-p').value] }); if (v) { let item = DB.inv.find(x => x.id == id); if(item) { item.cost = parseInt(v[0]); item.defaultPrice = parseInt(v[1]); } renderRestockGrid(); Swal.fire({title:'已更新（本機）', text:'重新整理後會恢復，完整儲存功能開發中', toast:true, position:'top', timer:2000, background:'#1e293b'}); } }
         async function addRsItem(id) { const i = DB.inv.find(x=>x.id==id); const {isConfirmed} = await Swal.fire({title:i.name, html:`<div style="display:flex;align-items:center;justify-content:center;gap:12px;margin-top:8px"><button type="button" onclick="var el=document.getElementById('sw-q');el.value=Math.max(1,parseInt(el.value||1)-1)" style="width:52px;height:52px;font-size:26px;border-radius:12px;background:#334155;color:white;border:none;cursor:pointer">-</button><input id="sw-q" type="number" value="1" min="1" style="width:72px;height:52px;font-size:22px;text-align:center;background:#1e293b;color:white;border:2px solid #475569;border-radius:12px;outline:none"><button type="button" onclick="var el=document.getElementById('sw-q');el.value=parseInt(el.value||1)+1" style="width:52px;height:52px;font-size:26px;border-radius:12px;background:#334155;color:white;border:none;cursor:pointer">+</button></div>`, background:'#1e293b', color:'white', showCancelButton:true, confirmButtonText:'加入'}); if(isConfirmed){const q=parseInt(document.getElementById('sw-q').value)||1; RestockCart.push({type:'restock', name:i.name, category:i.category, cost:i.cost, quantity:q}); renderRestockCartList();} }
         async function addExpItem(type) { const { value } = await Swal.fire({ title: type, html: `<input id="ex-n" class="swal2-input" placeholder="備註 (如: 便當/抽成)"><input id="ex-a" type="number" class="swal2-input" placeholder="金額">`, background:'#1e293b', color:'white', preConfirm:()=>[document.getElementById('ex-n').value, document.getElementById('ex-a').value] }); if(value && value[1]) { RestockCart.push({type: type==='薪資/抽成'?'salary':'expense', name:`[${type}] ${value[0]}`, cost:parseInt(value[1]), quantity:1}); renderRestockCartList(); } }
-        function renderRestockCartList() { const d = document.getElementById('rs-cart-items'); d.innerHTML=''; let t = 0, c = 0; RestockCart.forEach((i, idx) => { t += (i.cost*i.quantity); c += 1; d.innerHTML += `<div class="flex justify-between text-sm bg-slate-900 p-2 rounded mb-1"><span>${i.name} <span class="text-yellow-500">x${i.quantity}</span></span><div class="flex gap-2 items-center"><span class="text-red-400">$${i.cost*i.quantity}</span><i onclick="RestockCart.splice(${idx},1);renderRestockCartList()" class="fa-solid fa-trash text-slate-500 cursor-pointer"></i></div></div>`; }); document.getElementById('rs-cart-total').innerText = t.toLocaleString(); document.getElementById('rs-mob-total').innerText = '$' + t.toLocaleString(); document.getElementById('rs-mob-count').innerText = c; const f = document.getElementById('mobile-float-bar-restock'); if(c > 0 && UI.rsMode === 'inventory') f.classList.remove('translate-y-24'); else f.classList.add('translate-y-24'); }
+        function renderRestockCartList() { const d = document.getElementById('rs-cart-items'); d.innerHTML=''; let t = 0, c = 0; RestockCart.forEach((i, idx) => { t += (i.cost*i.quantity); c += 1; d.innerHTML += `<div class="flex justify-between text-sm bg-slate-900 p-2 rounded mb-1"><span>${i.name} <span class="text-yellow-500">x${i.quantity}</span></span><div class="flex gap-2 items-center"><span class="text-red-400">$${i.cost*i.quantity}</span><i onclick="RestockCart.splice(${idx},1);renderRestockCartList()" class="fa-solid fa-trash text-slate-500 cursor-pointer"></i></div></div>`; }); document.getElementById('rs-cart-total').innerText = t.toLocaleString(); document.getElementById('rs-mob-total').innerText = '$' + t.toLocaleString(); document.getElementById('rs-mob-count').innerText = c; const f = document.getElementById('mobile-float-bar-restock'); if(f) { if(c > 0 && UI.rsMode === 'inventory') f.classList.remove('translate-y-24'); else f.classList.add('translate-y-24'); } }
 
         async function submitRestock() { 
             if(RestockCart.length===0) return; 
@@ -1648,6 +1912,7 @@
                 color: 'white'
             });
             if (result.isConfirmed) {
+                localStorage.removeItem('pos_token');
                 localStorage.removeItem('pos_user_v30');
                 location.reload();
             }

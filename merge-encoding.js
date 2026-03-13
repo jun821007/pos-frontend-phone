@@ -1,0 +1,11 @@
+const fs = require('fs');
+const backup = fs.readFileSync('index.html.before-751-merge');
+const current = fs.readFileSync('index.html');
+const marker = Buffer.from('    <aside');
+const idxBackup = backup.indexOf(marker);
+const idxCurrent = current.indexOf(marker);
+const head = backup.slice(0, idxBackup);
+const body = current.slice(idxCurrent);
+const out = Buffer.concat([head, body]);
+fs.writeFileSync('index.html', out);
+console.log('Done. Login placeholder:', out.slice(out.indexOf('id="login-user"'), out.indexOf('id="login-user"')+60).toString('utf8'));

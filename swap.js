@@ -1,0 +1,1 @@
+const fs=require("fs");let h=fs.readFileSync("index.html","utf8");h=h.replace('id="view-pos" class="view-section flex-1','id="view-pos" class="hidden view-section flex-1');h=h.replace('id="view-setting" class="hidden view-section flex-1','id="view-setting" class="view-section flex-1');fs.writeFileSync("index.html",h);console.log("ok");

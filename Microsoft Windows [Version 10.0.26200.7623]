@@ -1,0 +1,40 @@
+[33ma9bdf97[m 同行對帳：左右雙面板、方案 A 按鈕配置、完成後自動 push 規則
+[33m9a65ac6[m feat: 同行對帳雙向 + 還款方式(現金/商品抵債)
+[33m0b1adf9[m feat: 結帳區新增 客人/同行 下拉選單（預設客人）
+[33mfbe653f[m feat: 同行對帳完整功能 + 同業版 Web App
+[33ma2e7801[m feat: 同行對帳選單（左側未結帳款之上，骨架頁）
+[33m2afc74c[m chore: 移除同行批量調貨、title改通用、.gitignore排除patch檔
+[33mfa17309[m fix: 按贈商品結帳車顯示(贈)、星號改右下角
+[33m327358a[m feat: 配件常用功能
+[33m09acacf[m feat: 結帳後刷新、帳務前綴顏色、配件贈按鈕、側欄順序
+[33m14ce58b[m fix: 同行調貨新增按鈕不再呼叫 Swal.fire 避免 modal 被關閉
+[33m14a5bbe[m feat: 同行調貨 新增按鈕 保留同行名稱客戶名稱
+[33md8594fb[m feat: 同行批量調貨功能
+[33m38cb211[m fix: modalWrap price to Number, history stats.cash deduct expense (v37.9)
+[33mef5eca5[m fix: add bundlePrice to multi-phone items for correct 出貨紀錄 (v37.8)
+[33m60fa421[m fix: add clearCart, fix editAccessory crash, remove duplicate clearRestockCart, clean debug logs (v37.7)
+[33m65674b3[m fix: use stored profit from sheet for display in all report views (v37.6)
+[33me38d7a2[m debug: add multiphone totalCost log + bump v37.5
+[33m9e1a0ae[m debug: add console.log to flatMap for multi-phone (v37.4)
+[33m1c51fb9[m fix: fetchData after return so phone reappears in inventory (v37.3)
+[33m2ad53ae[m chore: bump version to v37.2
+[33m0c8b20a[m fix: multi-phone profit deducts total cost of all phones (v37.1)
+[33m3919464[m chore: bump version to v37.0
+[33m508e957[m fix: multi-phone extra rows excluded from all stats and totals
+[33m9deefdf[m fix: pending list group by orderId not customer to prevent partial settle
+[33m697244d[m feat: add software service card with cost/price input
+[33m7d2a110[m fix: exclude multi-phone bundle rows from gift cost calculation in renderReport
+[33m438a2e9[m fix: multi-phone each row writes full total price to sheets
+[33m2d493ac[m fix: remove duplicate HTML/JS fragment that broke script parsing
+[33m5a941db[m fix: broken template literal causing SyntaxError on line 743
+[33me606ba1[m fix: multi-phone extra rows show correctly in ledger after sheet round-trip
+[33m92f7817[m fix: multi-phone checkout price and gift badge conflict
+[33mc2b6b0b[m fix: move multi-select button inline with phone status pills
+[33m8bd9b54[m feat: phone single-price + multi-select mode
+[33m3df97e4[m ?賊?頛詨?寧憭批?????
+[33md2e115e[m 閮剖??啣??辣????文?貉疏?脰疏鈭活蝣箄????SIM
+[33m98f27f8[m feat: PWA 全螢幕模式，加入主畫面後不顯示網址列
+[33m01e9759[m feat: 維修登記庫存電池移除成本欄位，自動帶入庫存成本
+[33m5222f39[m feat: 未結顯示Line Pay與掛帳標示
+[33m1f3bc41[m 更新內容
+[33mbd752fd[m POS 前端
