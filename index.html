@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="zh-TW">
 <head>
     <meta charset="UTF-8">
@@ -193,7 +193,7 @@
             <div id="rs-cart-panel" class="hidden md:flex w-80 bg-slate-900 border-l border-slate-800 flex-col h-full z-30 absolute md:static inset-0 md:inset-auto">
                 <div class="p-3 border-b border-slate-800 flex justify-between items-center bg-slate-800/50"><h2 class="font-bold text-white">進貨清單</h2><button onclick="toggleMobileCart('restock',false)" class="md:hidden text-slate-400 p-2"><i class="fa-solid fa-chevron-down"></i></button><button onclick="clearRestockCart()" class="text-xs text-red-400 hidden md:block">清空</button></div>
                 <div id="rs-cart-items" class="flex-1 overflow-y-auto p-3 space-y-2"></div>
-                <div class="p-4 bg-slate-800 border-t border-slate-700 space-y-3"><div class="flex justify-between items-end"><span class="text-slate-400 text-sm">總支出</span><span class="text-2xl font-bold text-red-400" id="rs-cart-total">0</span></div><button id="btn-submit-restock" onclick="submitRestock()" class="w-full bg-red-600 hover:bg-red-500 text-white font-bold py-3 rounded-xl shadow-lg active:scale-95 transition">確認送出</button></div>
+                <div class="p-4 bg-slate-800 border-t border-slate-700 space-y-3"><div class="flex justify-between items-end"><span class="text-slate-400 text-sm">總支出</span><span class="text-2xl font-bold text-red-400" id="rs-cart-total">0</span></div><div><label class="text-slate-400 text-sm block mb-1">廠商名稱</label><input type="text" id="rs-vendor-name" placeholder="選填，例：日奇" class="w-full px-3 py-2 rounded-lg bg-slate-900 border border-slate-700 text-white placeholder-slate-500 focus:border-red-500 outline-none text-sm"></div><button id="btn-submit-restock" onclick="submitRestock()" class="w-full bg-red-600 hover:bg-red-500 text-white font-bold py-3 rounded-xl shadow-lg active:scale-95 transition">確認送出</button></div>
             </div>
             <div id="mobile-float-bar-restock" onclick="toggleMobileCart('restock', true)" class="md:hidden fixed bottom-16 left-4 right-4 bg-red-600 text-white p-3 rounded-xl shadow-2xl flex justify-between items-center z-40 transform translate-y-24 transition-transform duration-300 hidden"><div class="font-bold flex items-center gap-2"><div class="bg-white text-red-600 w-6 h-6 rounded-full flex items-center justify-center text-xs" id="rs-mob-count">0</div> 待入庫</div><div class="font-mono font-bold text-lg" id="rs-mob-total">0</div></div>
         </div>
@@ -296,7 +296,7 @@
         let Cart = [], RestockCart = [];
         let BlackList = { orders: [], items: [] }; 
         // API 基礎 URL（開發環境：localhost，生產環境：Railway）
-        // 本地開發時改回：'http://localhost:3001/api'
+        // 本地測試用：'http://localhost:3000/api'；上線改回 Railway URL
         const API_BASE_URL = 'https://web-production-4ab5e4.up.railway.app/api';
         
         // API 封裝函數（取代 google.script.run）
@@ -1392,9 +1392,10 @@
             if (!confirm.isConfirmed) return;
             const btn = document.getElementById('btn-submit-restock');
             if(btn){ btn.disabled=true; btn.textContent='送出中...'; }
-            const oid = 'EXP'+Date.now().toString().slice(-6); 
+            const oid = 'EXP'+Date.now().toString().slice(-6);
+                const vendorName = (document.getElementById('rs-vendor-name') && document.getElementById('rs-vendor-name').value) ? document.getElementById('rs-vendor-name').value.trim() : '';
             try {
-                const r = await API.handleRestock({items:RestockCart, person:User.name, orderId:oid});
+                const r = await API.handleRestock({items:RestockCart, person:User.name, orderId:oid, vendorName: vendorName || undefined});
                 if(r.status==='error'){ 
                     Swal.fire({icon:'error', title:'進貨失敗', text: r.msg||'請重試', background:'#1e293b'}); 
                     return; 
@@ -1655,3 +1656,5 @@
     </script>
 </body>
 </html>
+
+
