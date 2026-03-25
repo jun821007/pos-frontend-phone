@@ -712,10 +712,19 @@
             return d.toLocaleString('zh-TW');
         }
         
-        function renderOrderRow(g) {
+        function renderOrderRow(g, opts = {}) {
+            const compact = !!opts.compact;
             if (BlackList.orders.includes(g.orderId)) return ''; 
             let statusClass = g.status==='Pending' ? 'text-red-400' : 'text-green-400';
             let statusText = g.status==='Pending' ? '未結' : '已結';
+            let payBadge = '';
+            if (!compact && g.status === 'Pending') {
+                if (g.payMethod === 'linepay') {
+                    payBadge = `<span class="inline-flex items-center gap-1 text-[10px] text-green-300"><i class="fa-brands fa-line"></i>LINE Pay</span>`;
+                } else if (g.payMethod === 'credit') {
+                    payBadge = `<span class="inline-flex items-center gap-1 text-[10px] text-amber-300"><i class="fa-solid fa-file-invoice-dollar"></i>掛帳</span>`;
+                }
+            }
             let netColor = g.net >= 0 ? 'text-green-400' : 'text-red-400';
             let details = g.items.map(it => {
                 if (BlackList.items.includes(it.orderId + '_' + it.itemId)) return ''; 
@@ -764,15 +773,15 @@
             <div id="group-${g.orderId}" class="border-b border-slate-700 bg-slate-900/20">
                 <div onclick="this.nextElementSibling.classList.toggle('open')" class="list-row flex justify-between items-center">
                     <div class="flex-1">
-                        <div class="text-white text-sm font-bold">${formatDate(g.time)}</div>
-                        <div class="text-xs text-slate-500">${g.orderId || ''}</div>
+                        <div class="text-white text-sm font-bold">${compact ? formatDate(g.time) : (g.customer || '過路客')}</div>
+                        <div class="text-xs text-slate-500">${compact ? (g.orderId || '') : formatDate(g.time)}</div>
                     </div>
                     <div class="w-24 text-right">
                         <div id="total-${g.orderId}" class="text-yellow-500 font-mono text-sm">$${(Number(g.total) || 0).toLocaleString()}</div>
                         <div class="text-xs font-mono ${netColor}">利 ${(Number(g.net) || 0).toLocaleString()}</div>
                     </div>
                     <div class="w-16 text-right text-xs flex flex-col items-end gap-1">
-                        <div class="flex items-center gap-1"><span class="${statusClass}">${statusText}</span></div>
+                        <div class="flex items-center gap-1"><span class="${statusClass}">${statusText}</span>${payBadge}</div>
                         ${g.status === 'Pending' ? `<button onclick="event.stopPropagation(); settle('${g.orderId}', ${g.total})" class="text-[10px] bg-green-900 text-green-200 px-1.5 rounded border border-green-700 hover:bg-green-800">入帳</button>` : ''}
                         <button onclick="event.stopPropagation(); confirmDeleteOrder('${g.orderId}')" class="text-[10px] bg-red-900 text-red-200 px-1.5 rounded border border-red-700 hover:bg-red-800">刪單</button>
                     </div>
@@ -902,7 +911,7 @@
                 ].filter(Boolean).join('');
                 d.innerHTML += `
                 <div class="mb-3 rounded-xl border border-slate-700 overflow-hidden">
-                    <div class="px-3 py-2 bg-slate-800/70 flex justify-between items-center">
+                    <div onclick="this.nextElementSibling.classList.toggle('open')" class="px-3 py-2 bg-slate-800/70 flex justify-between items-center cursor-pointer">
                         <div class="flex items-center gap-2">
                             <div class="text-white font-bold">${bucket.name}</div>
                             ${methodBadges}
@@ -912,8 +921,8 @@
                             <div class="text-xs font-mono ${netCls}">利 ${bucket.net.toLocaleString()}</div>
                         </div>
                     </div>
-                    <div class="bg-slate-900/30">
-                        ${bucket.orders.map(g => renderOrderRow(g)).join('')}
+                    <div class="accordion-content open bg-slate-900/30">
+                        ${bucket.orders.map(g => renderOrderRow(g, { compact: true })).join('')}
                     </div>
                 </div>`;
             });
@@ -1691,5 +1700,3 @@
     </script>
 </body>
 </html>
-
-
