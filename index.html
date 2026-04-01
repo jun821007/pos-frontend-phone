@@ -147,7 +147,9 @@
         </div>
 
         <div id="view-report" class="hidden view-section flex-1 flex flex-col overflow-hidden p-4">
-            <h2 class="text-xl font-bold text-white mb-4">今日帳務</h2>
+            <h2 class="text-xl font-bold text-white mb-2">今日帳務</h2>
+            <p class="text-xs text-slate-500 mb-2">異動紀錄可搜尋：時間、客戶、品項、單號、經手人（多關鍵字用空格，需全部命中）</p>
+            <div class="relative mb-4"><i class="fa-solid fa-search absolute left-3 top-3 text-slate-500"></i><input type="text" id="report-search" oninput="renderReport()" placeholder="搜尋今日異動…" class="w-full pl-10 pr-4 py-2.5 rounded-xl input-dark text-sm"></div>
             <div class="grid grid-cols-2 md:grid-cols-3 gap-3 mb-4">
                 <div class="glass p-3 rounded-xl border-l-4 border-green-500"><div class="text-[10px] text-slate-400">現金實收 (扣支出)</div><div class="text-lg font-bold text-white" id="today-cash">0</div></div>
                 <div class="glass p-3 rounded-xl border-l-4 border-red-500"><div class="text-[10px] text-slate-400">待收帳款</div><div class="text-lg font-bold text-red-400" id="today-pending">0</div></div>
@@ -170,8 +172,10 @@
         </div>
 
         <div id="view-history" class="hidden view-section flex-1 flex flex-col overflow-hidden p-4">
-            <div class="flex justify-between items-center mb-4"><h2 class="text-xl font-bold text-white">歷史查詢</h2><div class="flex gap-2"><button onclick="setQuickDate('week')" class="bg-slate-800 px-3 py-1 rounded text-xs text-slate-300">本週</button><button onclick="setQuickDate('month')" class="bg-slate-800 px-3 py-1 rounded text-xs text-slate-300">本月</button></div></div>
-            <div class="flex gap-2 mb-4"><input type="date" id="h-start" class="flex-1 input-dark p-2 rounded text-sm"><input type="date" id="h-end" class="flex-1 input-dark p-2 rounded text-sm"><button onclick="doHistorySearch()" class="bg-yellow-600 w-10 rounded flex items-center justify-center"><i class="fa-solid fa-search"></i></button></div>
+            <div class="flex justify-between items-center mb-2"><h2 class="text-xl font-bold text-white">歷史查詢</h2><div class="flex gap-2"><button onclick="setQuickDate('week')" class="bg-slate-800 px-3 py-1 rounded text-xs text-slate-300">本週</button><button onclick="setQuickDate('month')" class="bg-slate-800 px-3 py-1 rounded text-xs text-slate-300">本月</button></div></div>
+            <p class="text-xs text-slate-500 mb-2">日期區間內所有異動皆載入；可搜尋時間、客戶、出貨品項、單號、經手人（空格分隔多關鍵字）</p>
+            <div class="flex gap-2 mb-2"><input type="date" id="h-start" class="flex-1 input-dark p-2 rounded text-sm"><input type="date" id="h-end" class="flex-1 input-dark p-2 rounded text-sm"><button onclick="doHistorySearch()" class="bg-yellow-600 w-10 rounded flex items-center justify-center"><i class="fa-solid fa-search"></i></button></div>
+            <div class="relative mb-4"><i class="fa-solid fa-search absolute left-3 top-3 text-slate-500"></i><input type="text" id="history-search" oninput="renderHistoryList()" placeholder="搜尋區間內異動…" class="w-full pl-10 pr-4 py-2.5 rounded-xl input-dark text-sm"></div>
             <div class="grid grid-cols-2 md:grid-cols-3 gap-3 mb-4">
                 <div class="glass p-3 rounded-xl border-l-4 border-green-500"><div class="text-[10px] text-slate-400">期間現金實收</div><div class="text-lg font-bold text-white" id="h-cash">0</div></div>
                 <div class="glass p-3 rounded-xl border-l-4 border-red-500"><div class="text-[10px] text-slate-400">期間待收帳款</div><div class="text-lg font-bold text-red-400" id="h-pending">0</div></div>
@@ -725,6 +729,32 @@
             if (!d || isNaN(d.getTime())) return 'Invalid Date';
             return d.toLocaleString('zh-TW');
         }
+
+        function ledgerFilterTokens(q) {
+            if (!q || !String(q).trim()) return [];
+            return String(q).toLowerCase().trim().split(/\s+/).filter(Boolean);
+        }
+        function matchesLedgerFilter(i, tokens) {
+            if (!tokens || tokens.length === 0) return true;
+            const hay = [
+                String(i.time || ''),
+                formatDate(i.time),
+                String(i.customer || ''),
+                String(i.itemName || ''),
+                String(i.orderId || ''),
+                String(i.person || ''),
+                String(i.payMethod || ''),
+                String(i.status || ''),
+                String(i.type || '')
+            ].join(' ').toLowerCase();
+            return tokens.every(t => hay.includes(t));
+        }
+        function orderGroupMatchesLedgerFilter(g, tokens) {
+            if (!tokens || tokens.length === 0) return true;
+            const header = [String(g.time || ''), formatDate(g.time), String(g.customer || ''), String(g.orderId || ''), String(g.person || ''), String(g.payMethod || ''), String(g.status || '')].join(' ').toLowerCase();
+            if (tokens.every(t => header.includes(t))) return true;
+            return (g.items || []).some(it => matchesLedgerFilter(it, tokens));
+        }
         
         function renderOrderRow(g, opts = {}) {
             const compact = !!opts.compact;
@@ -820,8 +850,12 @@
         }
         function renderReport() {
             let stats = { cash:0, pending:0, profit:0, pot:0, exp:0, gift:0 };
-            const div = document.getElementById('today-list'); div.innerHTML='';
+            const div = document.getElementById('today-list');
+            const searchEl = document.getElementById('report-search');
+            const tokens = ledgerFilterTokens(searchEl ? searchEl.value : '');
+            div.innerHTML = '';
             const groups = {};
+            const expenseRows = [];
             DB.sales.slice().reverse().forEach(i => {
                 if(BlackList.orders.includes(i.orderId)) return;
                 if(BlackList.items.includes(i.orderId + '_' + i.itemId)) return;
@@ -831,7 +865,7 @@
                     let cost = Number(i.cost) || 0;
                     stats.exp += Math.abs(cost); 
                     stats.cash -= Math.abs(cost);
-                    div.innerHTML += renderExpenseRow(i);
+                    expenseRows.push(i);
                 } else {
                     if(!groups[i.orderId]) groups[i.orderId] = { ...i, items:[], total:0, net:0 };
                     groups[i.orderId].items.push(i);
@@ -854,7 +888,9 @@
                     if (sale===0 && cost>0 && !isMultiExtra) stats.gift += cost;
                 }
             });
-            Object.values(groups).forEach(g => { div.innerHTML += renderOrderRow(g); });
+            expenseRows.forEach(i => { if (matchesLedgerFilter(i, tokens)) div.innerHTML += renderExpenseRow(i); });
+            Object.values(groups).filter(g => orderGroupMatchesLedgerFilter(g, tokens)).forEach(g => { div.innerHTML += renderOrderRow(g); });
+            if (tokens.length && !div.innerHTML.trim()) div.innerHTML = '<div class="text-center text-slate-500 py-8">沒有符合搜尋條件的異動</div>';
             document.getElementById('today-cash').innerText = stats.cash.toLocaleString();
             document.getElementById('today-pending').innerText = stats.pending.toLocaleString();
             document.getElementById('today-profit').innerText = stats.profit.toLocaleString();
@@ -961,9 +997,13 @@
             }
         }
         function renderHistoryList() {
-            const div = document.getElementById('history-list'); div.innerHTML='';
+            const div = document.getElementById('history-list');
+            const searchEl = document.getElementById('history-search');
+            const tokens = ledgerFilterTokens(searchEl ? searchEl.value : '');
+            div.innerHTML = '';
             let stats = { cash:0, pending:0, profit:0, pot:0, exp:0, gift:0 };
             const groups = {};
+            const expenseRows = [];
             DB.history.forEach(i => {
                 if(BlackList.orders.includes(i.orderId)) return;
                 if(BlackList.items.includes(i.orderId + '_' + i.itemId)) return;
@@ -973,7 +1013,7 @@
                     let cost = Number(i.cost) || 0;
                     stats.exp += Math.abs(cost);
                     stats.cash -= Math.abs(cost);
-                    div.innerHTML += renderExpenseRow(i);
+                    expenseRows.push(i);
                 } else {
                     if(!groups[i.orderId]) groups[i.orderId] = { ...i, items:[], total:0, net:0 };
                     groups[i.orderId].items.push(i);
@@ -993,9 +1033,11 @@
             document.getElementById('h-pot').innerText = stats.pot.toLocaleString();
             document.getElementById('h-exp').innerText = stats.exp.toLocaleString();
             document.getElementById('h-gift').innerText = stats.gift.toLocaleString();
-            Object.values(groups).reverse().forEach(g => { div.innerHTML += renderOrderRow(g); });
+            expenseRows.forEach(i => { if (matchesLedgerFilter(i, tokens)) div.innerHTML += renderExpenseRow(i); });
+            Object.values(groups).filter(g => orderGroupMatchesLedgerFilter(g, tokens)).reverse().forEach(g => { div.innerHTML += renderOrderRow(g); });
+            if (tokens.length && !div.innerHTML.trim()) div.innerHTML = '<div class="text-center text-slate-500 py-8">沒有符合搜尋條件的異動</div>';
         }
-
+        
         function toggleAcc(id) { document.getElementById(id).classList.toggle('open'); }
         
         async function handleReturnFromRegistry(key) {
