@@ -32,6 +32,8 @@
         .mobile-nav-item { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 8px 0; color: #64748b; font-size: 10px; transition: color 0.2s; }
         .mobile-nav-item i { font-size: 20px; margin-bottom: 2px; }
         .mobile-nav-item.active { color: #eab308; }
+        /* 桌機左欄：文字標籤跟隨按鈕目前文字色 */
+        .nav-btn .nav-label { color: inherit; }
         .accordion-content { max-height: 0; overflow: hidden; transition: max-height 0.3s ease-out; background: #020617; border-bottom: 1px solid #1e293b; }
         .accordion-content.open { max-height: 5000px; transition: max-height 0.5s ease-in; }
         .list-row { border-bottom: 1px solid #334155; padding: 12px 8px; cursor: pointer; transition: background 0.2s; }
@@ -75,15 +77,20 @@
         </div>
     </div>
 
-    <aside class="hidden md:flex w-20 bg-slate-900 flex-col items-center py-6 border-r border-slate-800 z-20 shrink-0 gap-6">
-        <div class="text-2xl text-yellow-500 font-bold mb-4"><i class="fa-solid fa-cube"></i></div>
-        <button id="d-nav-pos" onclick="switchView('pos')" class="nav-btn w-12 h-12 rounded-xl text-yellow-400 bg-slate-800 flex items-center justify-center transition"><i class="fa-solid fa-cash-register text-xl"></i></button>
-        <button id="d-nav-report" onclick="openReport()" class="nav-btn w-12 h-12 rounded-xl text-slate-500 hover:text-yellow-400 flex items-center justify-center transition"><i class="fa-solid fa-file-invoice-dollar text-xl"></i></button>
-        <button id="d-nav-history" onclick="openHistory()" class="nav-btn w-12 h-12 rounded-xl text-slate-500 hover:text-yellow-400 flex items-center justify-center transition"><i class="fa-solid fa-chart-pie text-xl"></i></button>
-        <button id="d-nav-pending" onclick="openPending()" class="nav-btn w-12 h-12 rounded-xl text-slate-500 hover:text-yellow-400 flex items-center justify-center transition"><i class="fa-solid fa-wallet text-xl"></i></button>
-        <button id="d-nav-restock" onclick="switchView('restock')" class="nav-btn w-12 h-12 rounded-xl text-slate-500 hover:text-yellow-400 flex items-center justify-center transition"><i class="fa-solid fa-dolly text-xl"></i></button>
-        <button id="d-nav-setting" onclick="switchView('setting')" class="nav-btn w-12 h-12 rounded-xl text-slate-500 hover:text-yellow-400 flex items-center justify-center transition"><i class="fa-solid fa-gear text-xl"></i></button>
-        <div class="mt-auto"><button onclick="softRefresh()" class="w-12 h-12 text-blue-500 hover:bg-slate-800 rounded-xl flex items-center justify-center"><i class="fa-solid fa-sync"></i></button></div>
+    <aside class="hidden md:flex w-44 bg-slate-900 flex-col py-4 px-2 border-r border-slate-800 z-20 shrink-0 gap-1">
+        <div class="flex items-center gap-2 px-2 py-2 mb-3 border-b border-slate-800/80">
+            <span class="text-xl text-yellow-500 shrink-0"><i class="fa-solid fa-cube"></i></span>
+            <span class="text-xs font-bold tracking-wide text-slate-500 leading-tight">內部 POS</span>
+        </div>
+        <button type="button" id="d-nav-pos" onclick="switchView('pos')" class="nav-btn w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-yellow-400 bg-slate-800 transition hover:opacity-95"><i class="fa-solid fa-cash-register w-5 text-center text-lg shrink-0"></i><span class="nav-label text-sm font-semibold">收銀</span></button>
+        <button type="button" id="d-nav-report" onclick="openReport()" class="nav-btn w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-slate-500 hover:text-yellow-400 transition"><i class="fa-solid fa-file-invoice-dollar w-5 text-center text-lg shrink-0"></i><span class="nav-label text-sm font-semibold">今日</span></button>
+        <button type="button" id="d-nav-history" onclick="openHistory()" class="nav-btn w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-slate-500 hover:text-yellow-400 transition"><i class="fa-solid fa-chart-pie w-5 text-center text-lg shrink-0"></i><span class="nav-label text-sm font-semibold">歷史</span></button>
+        <button type="button" id="d-nav-pending" onclick="openPending()" class="nav-btn w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-slate-500 hover:text-yellow-400 transition"><i class="fa-solid fa-wallet w-5 text-center text-lg shrink-0"></i><span class="nav-label text-sm font-semibold">未結</span></button>
+        <button type="button" id="d-nav-restock" onclick="switchView('restock')" class="nav-btn w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-slate-500 hover:text-yellow-400 transition"><i class="fa-solid fa-dolly w-5 text-center text-lg shrink-0"></i><span class="nav-label text-sm font-semibold">進貨</span></button>
+        <button type="button" id="d-nav-setting" onclick="switchView('setting')" class="nav-btn w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-slate-500 hover:text-yellow-400 transition"><i class="fa-solid fa-gear w-5 text-center text-lg shrink-0"></i><span class="nav-label text-sm font-semibold">設定</span></button>
+        <div class="mt-auto pt-4 border-t border-slate-800/80">
+            <button type="button" onclick="softRefresh()" title="重新同步庫存與帳務" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-blue-400 hover:bg-slate-800 transition text-left"><i class="fa-solid fa-sync w-5 text-center text-lg shrink-0"></i><span class="text-sm font-semibold">同步</span></button>
+        </div>
     </aside>
 
     <main class="flex-1 flex flex-col relative bg-slate-950 overflow-hidden w-full">
@@ -591,8 +598,15 @@
             document.querySelectorAll('.view-section').forEach(e => e.classList.add('hidden'));
             ev.classList.remove('hidden');
             ev.offsetHeight; // 強制 reflow，避免手機版 Flex 高度未重算導致空白頁
-            document.querySelectorAll('.nav-btn').forEach(b => b.classList.replace('text-yellow-400','text-slate-500'));
-            const d = document.getElementById('d-nav-'+v); if (d) d.classList.replace('text-slate-500','text-yellow-400');
+            document.querySelectorAll('.nav-btn').forEach(b => {
+                b.classList.remove('text-yellow-400', 'bg-slate-800');
+                b.classList.add('text-slate-500');
+            });
+            const d = document.getElementById('d-nav-'+v);
+            if (d) {
+                d.classList.remove('text-slate-500');
+                d.classList.add('text-yellow-400', 'bg-slate-800');
+            }
             document.querySelectorAll('.mobile-nav-item').forEach(b => b.classList.remove('active'));
             const m = document.getElementById('m-nav-'+v); if (m) m.classList.add('active');
             if (window.innerWidth < 768) {
