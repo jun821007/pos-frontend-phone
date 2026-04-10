@@ -341,22 +341,6 @@ function apiHandleTransaction(data) {
               }
               const logSheet = aSS.getSheetByName("進出庫流水帳");
               if (logSheet) logSheet.appendRow([Utilities.getUuid().slice(0, 8), category, cleanName, new Date(), "調整入庫", qty, `[退貨回補] 原客戶:${customer}`]);
-              if (aSheet && aRows.length > 1 && itemId) {
-                const wantId = String(itemId).trim();
-                const wantName = cleanName;
-                for (let r = 1; r < aRows.length; r++) {
-                  const rowId = String(aRows[r][0] != null ? aRows[r][0] : "").trim();
-                  const rowName = String(aRows[r][3] != null ? aRows[r][3] : "").trim();
-                  const matchById = wantId && (rowId === wantId || rowId === String(Number(wantId)) || String(Number(rowId)) === wantId);
-                  const matchByName = wantName && (rowName === wantName || rowName.indexOf(wantName) !== -1 || wantName.indexOf(rowName) !== -1);
-                  if (matchById || matchByName) {
-                    const currentStock = Number(aRows[r][7]);
-                    const newStock = (isNaN(currentStock) ? 0 : currentStock) + qty;
-                    aSheet.getRange(r + 1, 8).setValue(newStock);
-                    break;
-                  }
-                }
-              }
             }
             break;
           }
@@ -390,6 +374,7 @@ function apiHandleTransaction(data) {
 }
 
 // 整筆結帳：一次接收整筆訂單，後端迴圈寫入（減少來回次數）
+// 配件庫存以「進出庫流水帳」為準；庫存清單 H 欄由試算表公式回算，不在此寫入。
 function apiCheckoutOrder(data) {
   const pSS = SpreadsheetApp.openById(PHONE_SS_ID);
   const aSS = SpreadsheetApp.openById(ACC_SS_ID);
@@ -413,7 +398,6 @@ function apiCheckoutOrder(data) {
     var stockLogRows = [];
     var invSheet = aSS.getSheetByName("庫存清單");
     var invRows = invSheet ? invSheet.getDataRange().getValues() : [];
-    var stockUpdates = [];
     for (let i = 0; i < items.length; i++) {
       const it = items[i];
       const qty = it.quantity || 1;
@@ -469,7 +453,6 @@ function apiCheckoutOrder(data) {
             if (matchById || matchByName) {
               const currentStock = Number(invRows[r][7]);
               const newStock = Math.max(0, (isNaN(currentStock) ? 0 : currentStock) - qty);
-              stockUpdates.push({ row: r + 1, value: newStock });
               invRows[r][7] = newStock;
               break;
             }
@@ -485,11 +468,6 @@ function apiCheckoutOrder(data) {
     if (logSheet && stockLogRows.length > 0) {
       const logLast = logSheet.getLastRow();
       logSheet.getRange(logLast + 1, 1, stockLogRows.length, 7).setValues(stockLogRows);
-    }
-    if (invSheet && stockUpdates.length > 0) {
-      for (let u = 0; u < stockUpdates.length; u++) {
-        invSheet.getRange(stockUpdates[u].row, 8).setValue(stockUpdates[u].value);
-      }
     }
     SpreadsheetApp.flush();
     return JSON.stringify({ status: 'success' });
