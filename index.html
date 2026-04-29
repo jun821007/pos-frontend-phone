@@ -800,6 +800,7 @@
             });
             if (kind === 'used') {
                 const usedItems = normalized.filter(it => it.type === 'phone' || it.type === 'peer_phone');
+                const usedIdItems = items.filter(it => it.type === 'phone' || it.type === 'peer_phone');
                 const usedProfit = usedItems.reduce((s, it) => {
                     const sale = Number(it.salePrice) || 0;
                     const cost = Number(it.cost) || 0;
@@ -812,7 +813,7 @@
                     return s + ((sale === 0 && cost > 0) ? cost : 0);
                 }, 0);
                 const pure = usedProfit - giftCostAll;
-                const ids = usedItems.map(it => {
+                const ids = usedIdItems.map(it => {
                     const sid = String(it.stock_id || '').trim();
                     if (sid) return sid;
                     const iid = String(it.itemId || '').trim();
