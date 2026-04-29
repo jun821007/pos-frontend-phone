@@ -406,7 +406,8 @@
           }
         };
         
-        let ItemRegistry = {}; 
+        let ItemRegistry = {};
+        let OrderRegistry = {};
         let User = { name: '', isAdmin: false };
         let UI = { tab: 'phone', sub: '', rsMode: 'inventory', rsCat: 'all', multiSelect: false, selectedPhones: new Set() };
         let cartFooterTranslateY = 0;
@@ -759,6 +760,82 @@
             if (tokens.every(t => header.includes(t))) return true;
             return (g.items || []).some(it => matchesLedgerFilter(it, tokens));
         }
+        function stripLedgerName(name) {
+            return String(name || '')
+                .replace(/^\((二|新|配|維|包|軟|調|運)\)\s*/g, '')
+                .replace(/\s*\(贈\)\s*/g, ' ')
+                .replace(/\s*x\d+$/i, '')
+                .trim();
+        }
+        async function copyTextToClipboard(text) {
+            try {
+                if (navigator.clipboard && navigator.clipboard.writeText) {
+                    await navigator.clipboard.writeText(text);
+                    return true;
+                }
+            } catch (e) {}
+            try {
+                const ta = document.createElement('textarea');
+                ta.value = text;
+                ta.style.position = 'fixed';
+                ta.style.left = '-9999px';
+                document.body.appendChild(ta);
+                ta.select();
+                const ok = document.execCommand('copy');
+                document.body.removeChild(ta);
+                return !!ok;
+            } catch (e) {
+                return false;
+            }
+        }
+        async function copyOrderSummary(kind, orderId) {
+            const o = OrderRegistry[orderId];
+            if (!o) return;
+            const items = o.items || [];
+            const customer = (o.customer || '過路客').trim() || '過路客';
+            const normalized = items.filter(it => {
+                const sale = Number(it.salePrice) || 0;
+                const isMultiExtra = it.type === 'phone' && sale === 0 && (it.itemName || '').includes(' + ');
+                return !isMultiExtra;
+            });
+            if (kind === 'used') {
+                const usedItems = normalized.filter(it => it.type === 'phone' || it.type === 'peer_phone');
+                const usedProfit = usedItems.reduce((s, it) => {
+                    const sale = Number(it.salePrice) || 0;
+                    const cost = Number(it.cost) || 0;
+                    const p = (it.profit !== undefined && it.profit !== null && it.profit !== '') ? Number(it.profit) : (sale - cost);
+                    return s + p;
+                }, 0);
+                const giftCostAll = normalized.reduce((s, it) => {
+                    const sale = Number(it.salePrice) || 0;
+                    const cost = Number(it.cost) || 0;
+                    return s + ((sale === 0 && cost > 0) ? cost : 0);
+                }, 0);
+                const pure = usedProfit - giftCostAll;
+                const ids = usedItems.map(it => it.stock_id || it.itemId).filter(Boolean).map(x => String(x));
+                const line2 = ids.length ? `#二手機編號${ids.join(',')}` : '#二手機編號';
+                const text = `${customer} $${pure.toLocaleString()}\n${line2}`;
+                const ok = await copyTextToClipboard(text);
+                if (ok) Swal.fire({ icon:'success', title:'已複製二手機內容', toast:true, position:'top', timer:1500, showConfirmButton:false, background:'#1e293b', color:'white' });
+                else Swal.fire({ icon:'error', title:'複製失敗', text:'請手動複製', background:'#1e293b', color:'white' });
+                return;
+            }
+            if (kind === 'acc') {
+                const accItems = normalized.filter(it => it.type === 'accessory');
+                const nonGiftAcc = accItems.filter(it => !((Number(it.salePrice) || 0) === 0 && (Number(it.cost) || 0) > 0));
+                const pure = nonGiftAcc.reduce((s, it) => {
+                    const sale = Number(it.salePrice) || 0;
+                    const cost = Number(it.cost) || 0;
+                    const p = (it.profit !== undefined && it.profit !== null && it.profit !== '') ? Number(it.profit) : (sale - cost);
+                    return s + p;
+                }, 0);
+                const names = nonGiftAcc.map((it, idx) => `${idx + 1}. ${stripLedgerName(it.itemName || it.name || '')}`);
+                const text = `${customer} $${pure.toLocaleString()}\n${names.join('\n')}`.trim();
+                const ok = await copyTextToClipboard(text);
+                if (ok) Swal.fire({ icon:'success', title:'已複製配件內容', toast:true, position:'top', timer:1500, showConfirmButton:false, background:'#1e293b', color:'white' });
+                else Swal.fire({ icon:'error', title:'複製失敗', text:'請手動複製', background:'#1e293b', color:'white' });
+            }
+        }
         function mapLedgerType(type) {
             if (type === 'phone' || type === 'peer_phone') return { key: 'used', label: '(二)', order: 1 };
             if (type === 'new_phone') return { key: 'new', label: '(新)', order: 2 };
@@ -810,6 +887,7 @@
         function renderOrderRow(g, opts = {}) {
             const compact = !!opts.compact;
             if (BlackList.orders.includes(g.orderId)) return ''; 
+            OrderRegistry[g.orderId] = { customer: g.customer || '過路客', items: g.items || [] };
             let statusClass = g.status==='Pending' ? 'text-red-400' : 'text-green-400';
             let statusText = g.status==='Pending' ? '未結' : '已結';
             let payBadge = '';
@@ -866,6 +944,9 @@
             }).join('');
             if (details.trim() === '') return '';
             const ledgerFormula = buildLedgerFormulaHtml(g.items || []);
+            const hasUsedItems = (g.items || []).some(it => it.type === 'phone' || it.type === 'peer_phone');
+            const hasAccItems = (g.items || []).some(it => it.type === 'accessory');
+            const oidEsc = String(g.orderId || '').replace(/\\/g, '\\\\').replace(/'/g, "\\'");
             return `
             <div id="group-${g.orderId}" class="border-b border-slate-700 bg-slate-900/20">
                 <div onclick="this.nextElementSibling.classList.toggle('open')" class="list-row flex justify-between items-center">
@@ -883,7 +964,7 @@
                         <button onclick="event.stopPropagation(); confirmDeleteOrder('${g.orderId}')" class="text-[10px] bg-red-900 text-red-200 px-1.5 rounded border border-red-700 hover:bg-red-800">刪單</button>
                     </div>
                 </div>
-                <div class="accordion-content shadow-inner">${details}<div class="border-t border-slate-800 bg-slate-950/30"><button onclick="event.stopPropagation(); this.nextElementSibling.classList.toggle('hidden')" class="w-full text-left px-3 py-2 text-[11px] text-slate-400 hover:text-slate-200">記帳算式 ▾</button><div class="hidden px-3 pb-3 space-y-1">${ledgerFormula}</div></div></div>
+                <div class="accordion-content shadow-inner">${details}<div class="border-t border-slate-800 bg-slate-950/30"><div class="px-3 pt-2 flex flex-wrap gap-2">${hasUsedItems ? `<button onclick="event.stopPropagation(); copyOrderSummary('used', '${oidEsc}')" class="text-[11px] bg-indigo-900/50 text-indigo-200 px-2 py-1 rounded border border-indigo-700 hover:bg-indigo-800/50">複製二手機</button>` : ''}${hasAccItems ? `<button onclick="event.stopPropagation(); copyOrderSummary('acc', '${oidEsc}')" class="text-[11px] bg-emerald-900/50 text-emerald-200 px-2 py-1 rounded border border-emerald-700 hover:bg-emerald-800/50">複製配件</button>` : ''}</div><button onclick="event.stopPropagation(); this.nextElementSibling.classList.toggle('hidden')" class="w-full text-left px-3 py-2 text-[11px] text-slate-400 hover:text-slate-200">記帳算式 ▾</button><div class="hidden px-3 pb-3 space-y-1">${ledgerFormula}</div></div></div>
             </div>`;
         }
 
