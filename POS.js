@@ -274,7 +274,7 @@ function apiHandleTransaction(data) {
         return JSON.stringify({ status: 'error', msg: '寫入流水失敗: ' + (e.message || '') });
       }
 
-      if (data.type == 'phone' || data.type == 'peer_phone') {
+      if (data.type == 'phone' || data.type == 'peer_phone' || data.type == 'software_phone') {
         try {
           const outSheet = pSS.getSheetByName("二手機出貨紀錄");
           if (outSheet) outSheet.appendRow([new Date(), data.itemId, data.imei, data.customer + data.salePrice]);
@@ -403,13 +403,13 @@ function apiCheckoutOrder(data) {
       const qty = it.quantity || 1;
       const displayName = (it.itemName || "") + (qty > 1 ? " x" + qty : "");
       dailyRows.push([now, "出庫", displayName, it.itemId, it.type, it.salePrice, it.cost, it.profit, person, payMethod, customer, orderId, status]);
-      if (it.type === 'phone' || it.type === 'peer_phone') {
+      if (it.type === 'phone' || it.type === 'peer_phone' || it.type === 'software_phone') {
         try {
           const outSheet = pSS.getSheetByName("二手機出貨紀錄");
           if (outSheet) {
             const rowCustomer = it.customer || customer;
             // 欄位：日期、編號、IMEI、客戶價格（與試算表抬頭一致）
-            if (it.type === 'peer_phone' && it.dealerName != null && it.dealerName !== '') {
+            if ((it.type === 'peer_phone' || it.type === 'software_phone') && it.dealerName != null && it.dealerName !== '') {
               outSheet.appendRow([dateStr, it.dealerName + it.cost, it.imei || "", rowCustomer + it.salePrice]);
             } else {
               outSheet.appendRow([dateStr, it.itemId, it.imei || "", rowCustomer + it.salePrice]);

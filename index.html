@@ -846,6 +846,22 @@
                 else Swal.fire({ icon:'error', title:'複製失敗', text:'請手動複製', background:'#1e293b', color:'white' });
                 return;
             }
+            if (kind === 'soft') {
+                const softItems = normalized.filter(it => it.type === 'software' || it.type === 'software_phone');
+                const orderTotal = normalized.reduce((sum, it) => sum + (Number(it.salePrice) || 0), 0);
+                const handsetCost = normalized.reduce((sum, it) => {
+                    if (it.type === 'phone' || it.type === 'peer_phone' || it.type === 'software_phone') return sum + (Number(it.cost) || 0);
+                    return sum;
+                }, 0);
+                const accCost = normalized.reduce((sum, it) => it.type === 'accessory' ? sum + (Number(it.cost) || 0) : sum, 0);
+                const pure = orderTotal - handsetCost - accCost;
+                const names = softItems.map((it, idx) => `${idx + 1}. ${stripLedgerName(it.itemName || it.name || '')}`);
+                const text = `${customer} $${pure.toLocaleString()}\n${names.join('\n')}`.trim();
+                const ok = await copyTextToClipboard(text);
+                if (ok) Swal.fire({ icon:'success', title:'\u5df2\u8907\u88fd\u8edf\u9ad4\u5167\u5bb9', toast:true, position:'top', timer:1500, showConfirmButton:false, background:'#1e293b', color:'white' });
+                else Swal.fire({ icon:'error', title:'\u8907\u88fd\u5931\u6557', text:'\u8acb\u624b\u52d5\u8907\u88fd', background:'#1e293b', color:'white' });
+                return;
+            }
             if (kind === 'card') {
                 const isCardItem = (it) => {
                     const n = (it.itemName || it.name || '').toLowerCase();
@@ -867,15 +883,15 @@
             }
         }
         function mapLedgerType(type) {
-            if (type === 'phone' || type === 'peer_phone') return { key: 'used', label: '(二)', order: 1 };
-            if (type === 'new_phone') return { key: 'new', label: '(新)', order: 2 };
-            if (type === 'accessory') return { key: 'acc', label: '(配)', order: 3 };
-            if (type === 'repair') return { key: 'repair', label: '(維)', order: 4 };
-            if (type === 'wrap') return { key: 'wrap', label: '(包)', order: 5 };
-            if (type === 'software') return { key: 'soft', label: '(軟)', order: 6 };
-            if (type === 'shipping') return { key: 'ship', label: '(運)', order: 7 };
-            if (type === 'direct_transfer') return { key: 'transfer', label: '(調)', order: 8 };
-            return { key: type || 'other', label: '(其)', order: 99 };
+            if (type === 'phone' || type === 'peer_phone') return { key: 'used', label: '(\u4e8c)', order: 1 };
+            if (type === 'new_phone') return { key: 'new', label: '(\u65b0)', order: 2 };
+            if (type === 'accessory') return { key: 'acc', label: '(\u914d)', order: 3 };
+            if (type === 'repair') return { key: 'repair', label: '(\u7dad)', order: 4 };
+            if (type === 'wrap') return { key: 'wrap', label: '(\u5305)', order: 5 };
+            if (type === 'software' || type === 'software_phone') return { key: 'soft', label: '(\u8edf)', order: 6 };
+            if (type === 'shipping') return { key: 'ship', label: '(\u904b)', order: 7 };
+            if (type === 'direct_transfer') return { key: 'transfer', label: '(\u8abf)', order: 8 };
+            return { key: type || 'other', label: '(\u5176)', order: 99 };
         }
         function fmtMoney(v) { return (Number(v) || 0).toLocaleString(); }
         function buildLedgerFormulaHtml(items) {
@@ -936,17 +952,17 @@
                 let pc = p >= 0 ? 'text-green-400' : 'text-red-400';
                 let dName = it.itemName;
                 let prefix = '';
-                if(it.type === 'new_phone') prefix = '(新)';
-                else if(it.type === 'phone' || it.type === 'peer_phone') prefix = '(二)';
-                else if(it.type === 'accessory') prefix = '(配)';
-                else if(it.type === 'repair') prefix = '(維)';
-                else if(it.type === 'wrap') prefix = '(包)';
-                else if(it.type === 'software') prefix = '(軟)';
-                else if(it.type === 'direct_transfer') prefix = '(調)';
-                else if(it.type === 'shipping') prefix = '(運)';
-                if(prefix) { const cM={'(二)':'text-red-400','(配)':'text-green-400','(新)':'text-yellow-400','(維)':'text-purple-400','(軟)':'text-cyan-400','(運)':'text-blue-400'}; const cls=cM[prefix]||'text-slate-400'; if(!dName.includes(prefix)) dName='<span class="'+cls+'">'+prefix+'</span> '+dName; }
+                if(it.type === 'new_phone') prefix = '(\u65b0)';
+                else if(it.type === 'phone' || it.type === 'peer_phone') prefix = '(\u4e8c)';
+                else if(it.type === 'accessory') prefix = '(\u914d)';
+                else if(it.type === 'repair') prefix = '(\u7dad)';
+                else if(it.type === 'wrap') prefix = '(\u5305)';
+                else if(it.type === 'software' || it.type === 'software_phone') prefix = '(\u8edf)';
+                else if(it.type === 'direct_transfer') prefix = '(\u8abf)';
+                else if(it.type === 'shipping') prefix = '(\u904b)';
+                if(prefix) { const cM={'(\u4e8c)':'text-red-400','(\u914d)':'text-green-400','(\u65b0)':'text-yellow-400','(\u7dad)':'text-purple-400','(\u8edf)':'text-cyan-400','(\u904b)':'text-blue-400'}; const cls=cM[prefix]||'text-slate-400'; if(!dName.includes(prefix)) dName='<span class="'+cls+'">'+prefix+'</span> '+dName; }
                 // 二手機類型：顯示編號（優先使用 stock_id，如果沒有則使用 itemId）
-                if((it.type === 'phone' || it.type === 'new_phone' || it.type === 'peer_phone') && !dName.includes('#')) {
+                if((it.type === 'phone' || it.type === 'new_phone' || it.type === 'peer_phone' || it.type === 'software_phone') && !dName.includes('#')) {
                     const stockId = it.stock_id || it.itemId || '';
                     if(stockId) { dName += ` #${stockId}`; }
                 } else if(it.stock_id && !dName.includes('#')) { 
@@ -976,6 +992,7 @@
             const ledgerFormula = buildLedgerFormulaHtml(g.items || []);
             const hasUsedItems = (g.items || []).some(it => it.type === 'phone' || it.type === 'peer_phone');
             const hasAccItems = (g.items || []).some(it => it.type === 'accessory');
+            const hasSoftItems = (g.items || []).some(it => it.type === 'software' || it.type === 'software_phone');
             const hasCardItems = (g.items || []).some(it => { const n=(it.itemName || it.name || '').toLowerCase(); return n.includes('\u6cf0\u570b\u8a3b\u518a\u5361') || n.includes('\u7db2\u5361') || n.includes('esim'); });
             const oidEsc = String(g.orderId || '').replace(/\\/g, '\\\\').replace(/'/g, "\\'");
             return `
@@ -995,7 +1012,7 @@
                         <button onclick="event.stopPropagation(); confirmDeleteOrder('${g.orderId}')" class="text-[10px] bg-red-900 text-red-200 px-1.5 rounded border border-red-700 hover:bg-red-800">刪單</button>
                     </div>
                 </div>
-                <div class="accordion-content shadow-inner">${details}<div class="border-t border-slate-800 bg-slate-950/30"><div class="px-3 pt-2 flex flex-wrap gap-2">${hasUsedItems ? `<button onclick="event.stopPropagation(); copyOrderSummary('used', '${oidEsc}')" class="text-[11px] bg-indigo-900/50 text-indigo-200 px-2 py-1 rounded border border-indigo-700 hover:bg-indigo-800/50">複製二手機</button>` : ''}${hasAccItems ? `<button onclick="event.stopPropagation(); copyOrderSummary('acc', '${oidEsc}')" class="text-[11px] bg-emerald-900/50 text-emerald-200 px-2 py-1 rounded border border-emerald-700 hover:bg-emerald-800/50">複製配件</button>` : ''}${hasCardItems ? `<button onclick="event.stopPropagation(); copyOrderSummary('card', '${oidEsc}')" class="text-[11px] bg-sky-900/50 text-sky-200 px-2 py-1 rounded border border-sky-700 hover:bg-sky-800/50">\u8907\u88fd\u5361\u7247</button>` : ''}</div><button onclick="event.stopPropagation(); this.nextElementSibling.classList.toggle('hidden')" class="w-full text-left px-3 py-2 text-[11px] text-slate-400 hover:text-slate-200">記帳算式 ▾</button><div class="hidden px-3 pb-3 space-y-1">${ledgerFormula}</div></div></div>
+                <div class="accordion-content shadow-inner">${details}<div class="border-t border-slate-800 bg-slate-950/30"><div class="px-3 pt-2 flex flex-wrap gap-2">${hasUsedItems ? `<button onclick="event.stopPropagation(); copyOrderSummary('used', '${oidEsc}')" class="text-[11px] bg-indigo-900/50 text-indigo-200 px-2 py-1 rounded border border-indigo-700 hover:bg-indigo-800/50">複製二手機</button>` : ''}${hasAccItems ? `<button onclick="event.stopPropagation(); copyOrderSummary('acc', '${oidEsc}')" class="text-[11px] bg-emerald-900/50 text-emerald-200 px-2 py-1 rounded border border-emerald-700 hover:bg-emerald-800/50">複製配件</button>` : ''}${hasSoftItems ? `<button onclick="event.stopPropagation(); copyOrderSummary('soft', '${oidEsc}')" class="text-[11px] bg-violet-900/50 text-violet-200 px-2 py-1 rounded border border-violet-700 hover:bg-violet-800/50">\u8907\u88fd\u8edf\u9ad4</button>` : ''}${hasCardItems ? `<button onclick="event.stopPropagation(); copyOrderSummary('card', '${oidEsc}')" class="text-[11px] bg-sky-900/50 text-sky-200 px-2 py-1 rounded border border-sky-700 hover:bg-sky-800/50">\u8907\u88fd\u5361\u7247</button>` : ''}</div><button onclick="event.stopPropagation(); this.nextElementSibling.classList.toggle('hidden')" class="w-full text-left px-3 py-2 text-[11px] text-slate-400 hover:text-slate-200">記帳算式 ▾</button><div class="hidden px-3 pb-3 space-y-1">${ledgerFormula}</div></div></div>
             </div>`;
         }
 
@@ -1578,12 +1595,13 @@
                     if (item._prebuilt) return item;
                     let finalName = item.name; 
                     let prefix = '';
-                    if(item.type === 'new_phone') prefix = '(新) ';
-                    else if(item.type === 'phone' || item.type === 'peer_phone') prefix = '(二) ';
-                    else if(item.type === 'repair') prefix = '(維) ';
-                    else if(item.type === 'wrap') prefix = '(包) ';
-                    else if(item.type === 'direct_transfer') prefix = '(調) ';
-                    else if(item.type === 'shipping') prefix = '(運) ';
+                    if(item.type === 'new_phone') prefix = '(\u65b0) ';
+                    else if(item.type === 'phone' || item.type === 'peer_phone') prefix = '(\u4e8c) ';
+                    else if(item.type === 'repair') prefix = '(\u7dad) ';
+                    else if(item.type === 'wrap') prefix = '(\u5305) ';
+                    else if(item.type === 'direct_transfer') prefix = '(\u8abf) ';
+                    else if(item.type === 'shipping') prefix = '(\u904b) ';
+                    else if(item.type === 'software' || item.type === 'software_phone') prefix = '(\u8edf) ';
                     let suffix = ''; if(item.type === 'phone' && item.stock_id) { suffix = ` #${item.stock_id}`; }
                     if(item.type !== 'accessory' && item.type !== 'direct_transfer') finalName = prefix + item.name.replace('(贈)', '').trim() + suffix; 
                     else finalName = item.name.replace('(贈)', '').trim();
@@ -1797,7 +1815,50 @@
 
         async function modalWrap(){const {value:v}=await Swal.fire({html:'<input id="w1" class="swal2-input" placeholder="項目"><input id="w2" class="swal2-input" placeholder="售價">',background:'#1e293b',preConfirm:()=>[document.getElementById('w1').value,document.getElementById('w2').value]}); if(v){Cart.push({type:'wrap',name:'包膜:'+v[0],cost:0,price:Number(v[1])||0,quantity:1,itemId:'W-'+Date.now()});renderCart();}}
         async function modalESIM(){const {value:v}=await Swal.fire({title:'eSIM',html:'<input id="es1" class="swal2-input" type="number" placeholder="成本"><input id="es2" class="swal2-input" type="number" placeholder="結帳金額">',background:'#1e293b',color:'white',preConfirm:()=>[document.getElementById('es1').value,document.getElementById('es2').value]}); if(v&&v[1]){Cart.push({type:'esim',name:'eSIM',cost:Number(v[0])||0,price:Number(v[1])||0,quantity:1,itemId:'ESIM-'+Date.now()});renderCart();}}
-        async function modalSoftware(){const {value:v}=await Swal.fire({title:'軟體',html:'<input id="sf1" class="swal2-input" type="number" placeholder="成本"><input id="sf2" class="swal2-input" type="number" placeholder="售價">',background:'#1e293b',color:'white',showCancelButton:true,preConfirm:()=>[document.getElementById('sf1').value,document.getElementById('sf2').value]}); if(v&&v[1]){Cart.push({type:'software',name:'軟體',cost:Number(v[0])||0,price:Number(v[1])||0,quantity:1,itemId:'SW-'+Date.now(),originalPrice:Number(v[1])||0,isGift:false});renderCart();}}
+        async function modalSoftware(){
+            const { value: mode } = await Swal.fire({
+                title:'\u8edf\u9ad4',
+                input:'select',
+                inputOptions:{ soft:'\u55ae\u8edf\u9ad4', soft_phone:'\u6709\u4e8c\u624b\u6a5f' },
+                inputPlaceholder:'\u8acb\u9078\u64c7\u6a21\u5f0f',
+                background:'#1e293b',
+                color:'white',
+                showCancelButton:true,
+                confirmButtonText:'\u4e0b\u4e00\u6b65',
+                cancelButtonText:'\u53d6\u6d88'
+            });
+            if(!mode) return;
+            if(mode === 'soft_phone') { await modalSoftwareWithPhone(); return; }
+            const {value:v}=await Swal.fire({title:'\u8edf\u9ad4',html:'<input id="sf1" class="swal2-input" type="number" placeholder="\u6210\u672c"><input id="sf2" class="swal2-input" type="number" placeholder="\u552e\u50f9">',background:'#1e293b',color:'white',showCancelButton:true,preConfirm:()=>[document.getElementById('sf1').value,document.getElementById('sf2').value]});
+            if(v&&v[1]){Cart.push({type:'software',name:'\u8edf\u9ad4',cost:Number(v[0])||0,price:Number(v[1])||0,quantity:1,itemId:'SW-'+Date.now(),originalPrice:Number(v[1])||0,isGift:false});renderCart();}
+        }
+        async function modalSoftwareWithPhone() {
+            const gp = id => document.getElementById(id);
+            const html = `<input id="sp1" class="swal2-input" placeholder="\u540c\u884c\u540d\u7a31"><input id="sp2" class="swal2-input" type="number" placeholder="\u6210\u672c"><input id="sp3" class="swal2-input" placeholder="IMEI"><input id="sp4" class="swal2-input" type="number" placeholder="\u92b7\u552e\u91d1\u984d"><input id="sp5" class="swal2-input" placeholder="\u5ba2\u6236\u540d\u7a31"><input id="sp6" class="swal2-input" placeholder="\u578b\u865f\uff08\u6d41\u6c34\u7528\uff09"><input id="sp7" class="swal2-input" placeholder="\u5bb9\u91cf\uff08\u6d41\u6c34\u7528\uff09"><input id="sp8" class="swal2-input" placeholder="\u984f\u8272\uff08\u6d41\u6c34\u7528\uff09">`;
+            const { value: v } = await Swal.fire({
+                title: '\u8edf\u9ad4\uff08\u6709\u4e8c\u624b\u6a5f\uff09',
+                html,
+                background:'#1e293b',
+                color:'white',
+                showCancelButton:true,
+                preConfirm: () => [gp('sp1'),gp('sp2'),gp('sp3'),gp('sp4'),gp('sp5'),gp('sp6'),gp('sp7'),gp('sp8')].map(el=>el?el.value:'').map(x=>typeof x==='string'?x.trim():x)
+            });
+            if(v && v[0] && v[1] && v[4]) {
+                const spec = [v[5],v[6],v[7]].filter(Boolean).join(' ');
+                Cart.push({
+                    type:'software_phone',
+                    name:'\u8edf\u9ad4 \u540c\u884c '+v[0]+(spec?' '+spec:''),
+                    dealerName:v[0],
+                    cost:Number(v[1])||0,
+                    price:Number(v[3])||0,
+                    imei:v[2]||'',
+                    customer:v[4]||'',
+                    quantity:1,
+                    itemId:'SP-'+Date.now()+'-'+Math.random().toString(36).slice(2,9)
+                });
+                renderCart();
+            }
+        }
         async function modalShipping(){const {value:v}=await Swal.fire({title:'運費',input:'number',inputPlaceholder:'金額',background:'#1e293b',color:'white'}); if(v!=null&&v!==''){const amt=Number(v)||0; Cart.push({type:'shipping',name:'運費',cost:amt,price:amt,quantity:1,itemId:'SF-'+Date.now(),originalPrice:amt,isGift:false}); renderCart();}}
         function renderDirectTransferGrid() {
             const grid = document.getElementById('item-grid');
