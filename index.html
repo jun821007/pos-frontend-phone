@@ -767,6 +767,17 @@
                 .replace(/\s*x\d+$/i, '')
                 .trim();
         }
+        function formatCardCopyLabel(it) {
+            const raw = String(it.itemName || it.name || '');
+            const base = stripLedgerName(raw);
+            let q = parseInt(String(it.quantity != null && it.quantity !== '' ? it.quantity : ''), 10);
+            if (!isFinite(q) || q < 1) {
+                const m = raw.match(/\s*x(\d+)$/i);
+                q = m ? parseInt(m[1], 10) : 1;
+            }
+            if (!isFinite(q) || q < 1) q = 1;
+            return q > 1 ? `${base} x${q}` : base;
+        }
         async function copyTextToClipboard(text) {
             try {
                 if (navigator.clipboard && navigator.clipboard.writeText) {
@@ -875,7 +886,7 @@
                     const p = (it.profit !== undefined && it.profit !== null && it.profit !== '') ? Number(it.profit) : (sale - cost);
                     return s + p;
                 }, 0);
-                const names = nonGiftCards.map((it, idx) => `${idx + 1}. ${stripLedgerName(it.itemName || it.name || '')}`);
+                const names = nonGiftCards.map((it, idx) => `${idx + 1}. ${formatCardCopyLabel(it)}`);
                 const text = `${customer} $${pure.toLocaleString()}\n${names.join('\n')}`.trim();
                 const ok = await copyTextToClipboard(text);
                 if (ok) Swal.fire({ icon:'success', title:'已複製卡片內容', toast:true, position:'top', timer:1500, showConfirmButton:false, background:'#1e293b', color:'white' });
