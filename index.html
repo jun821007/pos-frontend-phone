@@ -115,6 +115,7 @@
                             <div id="multi-select-confirm" class="hidden items-center gap-2 flex">
                                 <span id="multi-count" class="text-xs text-slate-400 shrink-0">0 台</span>
                                 <button onclick="confirmMultiPhone()" class="bg-yellow-500 text-black font-bold px-3 py-1.5 rounded-xl text-xs shrink-0">加入</button>
+                                <button onclick="batchChangeSelectedPhoneStatus()" class="bg-blue-600 text-white font-bold px-3 py-1.5 rounded-xl text-xs shrink-0">批次改狀態</button>
                                 <button onclick="cancelMultiSelect()" class="text-slate-400 text-xs shrink-0">取消</button>
                             </div>
                         </div>
@@ -721,7 +722,7 @@
             let list = DB.inv.filter(i => { if (i.isHidden && !i.category.includes("加工好電池")) return false; if(term) return (i.name.toLowerCase().includes(term) || String(i.stock_id).includes(term)) && i.type === UI.tab; if(UI.tab === 'phone') return i.type === 'phone' && i.status_label === val; if(UI.tab === 'accessory') return i.type === 'accessory' && i.category === val; return false; }); 
             if(list.length === 0) { grid.innerHTML = '<div class="col-span-full text-center text-slate-600 mt-10">無資料</div>'; return; } 
             const fav = UI.tab === 'accessory' ? getFavAccessories() : [];
-            list.forEach(i => { let color = i.type==='phone' ? 'border-blue-500' : 'border-green-500'; let price = i.price > 0 ? `$${i.price.toLocaleString()}` : (i.defaultPrice > 0 ? `$${i.defaultPrice.toLocaleString()}` : ''); let idBadge = i.type==='phone' ? `<span class="text-[10px] bg-slate-800 px-1 rounded text-slate-400">#${i.stock_id}</span>` : ''; let specs = ''; if(i.type === 'phone') { if(i.battery) specs += `<span class="spec-tag"><i class="fa-solid fa-battery-half mr-1"></i>${i.battery}%</span>`; if(i.ios) specs += `<span class="spec-tag">iOS ${i.ios}</span>`; } let switchBtn = ''; if(i.type === 'phone') { switchBtn = `<button onclick="event.stopPropagation(); changeStatus('${i.id}', '${i.status_label}')" class="absolute top-4 right-2 w-8 h-8 rounded-full bg-slate-800 hover:bg-slate-700 text-slate-400 flex items-center justify-center transition shadow-lg"><i class="fa-solid fa-repeat text-xs"></i></button>`; } let favStar = ''; if(i.type === 'accessory') { const isFav = fav.includes(String(i.id)); favStar = `<button onclick="event.stopPropagation();toggleFavAccessory('${i.id}')" class="absolute bottom-2 right-2 w-8 h-8 rounded-full ${isFav?'bg-amber-500/30 text-amber-400':'bg-slate-800 text-slate-500 hover:text-amber-400'} flex items-center justify-center transition"><i class="fa-${isFav?'solid':'regular'} fa-star text-xs"></i></button>`; } let selOverlay = i.type==='phone' ? `<div id="sel-${i.id}" class="hidden absolute inset-0 rounded-xl bg-yellow-500/20 border-2 border-yellow-400 pointer-events-none flex items-center justify-center"><i class="fa-solid fa-check-circle text-yellow-400 text-3xl"></i></div>` : ""; grid.innerHTML += `<div onclick="triggerAddToCart('${i.id}')" class="glass p-3 rounded-xl border-l-4 ${color} relative group active:scale-95 transition" id="card-${i.id}">${selOverlay}${switchBtn}${favStar}<div class="flex justify-between mb-1">${idBadge}<span class="text-xs font-bold text-slate-400">庫: ${i.stock}</span></div><div class="font-bold text-sm text-slate-200 line-clamp-2 leading-tight h-9">${i.name}</div><div class="mt-1 flex flex-wrap gap-1">${specs}</div><div class="mt-2 text-right font-bold text-yellow-500">${price}</div></div>`; }); 
+            list.forEach(i => { let color = i.type==='phone' ? 'border-blue-500' : 'border-green-500'; let price = i.price > 0 ? `$${i.price.toLocaleString()}` : (i.defaultPrice > 0 ? `$${i.defaultPrice.toLocaleString()}` : ''); let idBadge = i.type==='phone' ? `<span class="text-[10px] bg-slate-800 px-1 rounded text-slate-400">#${i.stock_id}</span>` : ''; let specs = ''; if(i.type === 'phone') { if(i.battery) specs += `<span class="spec-tag"><i class="fa-solid fa-battery-half mr-1"></i>${i.battery}%</span>`; if(i.ios) specs += `<span class="spec-tag">iOS ${i.ios}</span>`; } let switchBtn = ''; let favStar = ''; if(i.type === 'accessory') { const isFav = fav.includes(String(i.id)); favStar = `<button onclick="event.stopPropagation();toggleFavAccessory('${i.id}')" class="absolute bottom-2 right-2 w-8 h-8 rounded-full ${isFav?'bg-amber-500/30 text-amber-400':'bg-slate-800 text-slate-500 hover:text-amber-400'} flex items-center justify-center transition"><i class="fa-${isFav?'solid':'regular'} fa-star text-xs"></i></button>`; } let selOverlay = i.type==='phone' ? `<div id="sel-${i.id}" class="hidden absolute inset-0 rounded-xl bg-yellow-500/20 border-2 border-yellow-400 pointer-events-none flex items-center justify-center"><i class="fa-solid fa-check-circle text-yellow-400 text-3xl"></i></div>` : ""; grid.innerHTML += `<div onclick="triggerAddToCart('${i.id}')" class="glass p-3 rounded-xl border-l-4 ${color} relative group active:scale-95 transition" id="card-${i.id}">${selOverlay}${switchBtn}${favStar}<div class="flex justify-between mb-1">${idBadge}<span class="text-xs font-bold text-slate-400">庫: ${i.stock}</span></div><div class="font-bold text-sm text-slate-200 line-clamp-2 leading-tight h-9">${i.name}</div><div class="mt-1 flex flex-wrap gap-1">${specs}</div><div class="mt-2 text-right font-bold text-yellow-500">${price}</div></div>`; }); 
         }
 
         async function triggerAddToCart(id) {
@@ -2017,6 +2018,43 @@
                 else el.classList.add('hidden');
             });
         }
+        async function batchChangeSelectedPhoneStatus() {
+            if (UI.selectedPhones.size === 0) return;
+            const phones = Array.from(UI.selectedPhones).map(id => DB.inv.find(x => String(x.id) === String(id))).filter(Boolean);
+            if (phones.length === 0) return;
+            const baseStatus = String(phones[0].status_label || '');
+            const mixedStatus = phones.some(p => String(p.status_label || '') !== baseStatus);
+            if (mixedStatus) {
+                Swal.fire({ icon:'warning', title:'只能同狀態批次變更', text:'請先只選同一種原始狀態的手機', background:'#1e293b', color:'white' });
+                return;
+            }
+            const nextStatus = baseStatus === '庫存中' ? '客訂中' : '庫存中';
+            const ok = await Swal.fire({
+                icon: 'question',
+                title: `批次改為${nextStatus}`,
+                text: `共 ${phones.length} 台`,
+                showCancelButton: true,
+                confirmButtonText: '確認',
+                cancelButtonText: '取消',
+                background: '#1e293b',
+                color: 'white'
+            });
+            if (!ok.isConfirmed) return;
+            try {
+                for (const p of phones) {
+                    const res = await API.changePhoneStatus(p.id, p.status_label);
+                    if (!res || res.status !== 'success') throw new Error(res?.msg || '更新失敗');
+                    p.status_label = nextStatus;
+                }
+                Swal.fire({ icon:'success', title:'批次更新完成', toast:true, position:'top', timer:1200, showConfirmButton:false, background:'#1e293b', color:'white' });
+                const active = document.querySelector('.pill-btn.active');
+                filterItems(null, active ? active.innerText : '庫存中');
+                cancelMultiSelect();
+            } catch (e) {
+                Swal.fire({ icon:'error', title:'批次更新失敗', text: e.message || '請稍後重試', background:'#1e293b', color:'white' });
+            }
+        }
+
         async function confirmMultiPhone() {
             if (UI.selectedPhones.size === 0) return;
             const phones = Array.from(UI.selectedPhones).map(id => DB.inv.find(x => String(x.id) === String(id))).filter(Boolean);
