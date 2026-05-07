@@ -55,7 +55,7 @@
         /* 手機版：結帳清單 footer 預設位置往上一些 */
         @media (max-width: 767px) {
             #cart-panel.mobile-cart-open #cart-footer-draggable {
-                transform: translateY(-120px);
+                transform: translateY(-170px);
             }
         }
         /* 手機版：總金額與確認結帳同一行，省高度讓按鈕一定露出 */
@@ -149,8 +149,9 @@
         <div id="view-report" class="hidden view-section flex-1 flex flex-col overflow-hidden p-4">
             <h2 class="text-xl font-bold text-white mb-2">今日帳務</h2>
             <p class="text-xs text-slate-500 mb-2">異動紀錄可搜尋：時間、客戶、品項、單號、經手人（多關鍵字用空格，需全部命中）</p>
-            <div class="relative mb-4"><i class="fa-solid fa-search absolute left-3 top-3 text-slate-500"></i><input type="text" id="report-search" oninput="renderReport()" placeholder="搜尋今日異動…" class="w-full pl-10 pr-4 py-2.5 rounded-xl input-dark text-sm"></div>
-            <div class="grid grid-cols-2 md:grid-cols-3 gap-3 mb-4">
+            <div class="relative mb-2"><i class="fa-solid fa-search absolute left-3 top-3 text-slate-500"></i><input type="text" id="report-search" oninput="renderReport()" placeholder="搜尋今日異動…" class="w-full pl-10 pr-4 py-2.5 rounded-xl input-dark text-sm"></div>
+            <button onclick="toggleStatsPanel('report')" class="w-full mb-3 px-3 py-2 rounded-lg bg-slate-900 border border-slate-700 text-slate-300 text-xs flex items-center justify-between"><span id="report-stats-toggle-text">展開統計卡</span><i id="report-stats-toggle-icon" class="fa-solid fa-chevron-down"></i></button>
+            <div id="report-stats-grid" class="grid grid-cols-2 md:grid-cols-3 gap-3 mb-4 hidden">
                 <div class="glass p-3 rounded-xl border-l-4 border-green-500"><div class="text-[10px] text-slate-400">現金實收 (扣支出)</div><div class="text-lg font-bold text-white" id="today-cash">0</div></div>
                 <div class="glass p-3 rounded-xl border-l-4 border-red-500"><div class="text-[10px] text-slate-400">待收帳款</div><div class="text-lg font-bold text-red-400" id="today-pending">0</div></div>
                 <div class="glass p-3 rounded-xl border-l-4 border-yellow-500"><div class="text-[10px] text-slate-400">今日毛利 (售價-成本)</div><div class="text-lg font-bold text-yellow-400" id="today-profit">0</div></div>
@@ -179,8 +180,9 @@
             <div class="flex justify-between items-center mb-2"><h2 class="text-xl font-bold text-white">歷史查詢</h2><div class="flex gap-2"><button onclick="setQuickDate('week')" class="bg-slate-800 px-3 py-1 rounded text-xs text-slate-300">本週</button><button onclick="setQuickDate('month')" class="bg-slate-800 px-3 py-1 rounded text-xs text-slate-300">本月</button></div></div>
             <p class="text-xs text-slate-500 mb-2">日期區間內所有異動皆載入；可搜尋時間、客戶、出貨品項、單號、經手人（空格分隔多關鍵字）</p>
             <div class="flex gap-2 mb-2"><input type="date" id="h-start" class="flex-1 input-dark p-2 rounded text-sm"><input type="date" id="h-end" class="flex-1 input-dark p-2 rounded text-sm"><button onclick="doHistorySearch()" class="bg-yellow-600 w-10 rounded flex items-center justify-center"><i class="fa-solid fa-search"></i></button></div>
-            <div class="relative mb-4"><i class="fa-solid fa-search absolute left-3 top-3 text-slate-500"></i><input type="text" id="history-search" oninput="renderHistoryList()" placeholder="搜尋區間內異動…" class="w-full pl-10 pr-4 py-2.5 rounded-xl input-dark text-sm"></div>
-            <div class="grid grid-cols-2 md:grid-cols-3 gap-3 mb-4">
+            <div class="relative mb-2"><i class="fa-solid fa-search absolute left-3 top-3 text-slate-500"></i><input type="text" id="history-search" oninput="renderHistoryList()" placeholder="搜尋區間內異動…" class="w-full pl-10 pr-4 py-2.5 rounded-xl input-dark text-sm"></div>
+            <button onclick="toggleStatsPanel('history')" class="w-full mb-3 px-3 py-2 rounded-lg bg-slate-900 border border-slate-700 text-slate-300 text-xs flex items-center justify-between"><span id="history-stats-toggle-text">展開統計卡</span><i id="history-stats-toggle-icon" class="fa-solid fa-chevron-down"></i></button>
+            <div id="history-stats-grid" class="grid grid-cols-2 md:grid-cols-3 gap-3 mb-4 hidden">
                 <div class="glass p-3 rounded-xl border-l-4 border-green-500"><div class="text-[10px] text-slate-400">期間現金實收</div><div class="text-lg font-bold text-white" id="h-cash">0</div></div>
                 <div class="glass p-3 rounded-xl border-l-4 border-red-500"><div class="text-[10px] text-slate-400">期間待收帳款</div><div class="text-lg font-bold text-red-400" id="h-pending">0</div></div>
                 <div class="glass p-3 rounded-xl border-l-4 border-yellow-500"><div class="text-[10px] text-slate-400">期間毛利</div><div class="text-lg font-bold text-yellow-400" id="h-profit">0</div></div>
@@ -409,10 +411,10 @@
         let ItemRegistry = {};
         let OrderRegistry = {};
         let User = { name: '', isAdmin: false };
-        let UI = { tab: 'phone', sub: '', rsMode: 'inventory', rsCat: 'all', multiSelect: false, selectedPhones: new Set() };
+        let UI = { tab: 'phone', sub: '', rsMode: 'inventory', rsCat: 'all', multiSelect: false, selectedPhones: new Set(), statsCollapsed: { report: true, history: true } };
         let cartFooterTranslateY = 0;
-        const CART_FOOTER_DRAG_MAX_UP = 280;
-        const CART_FOOTER_DRAG_MAX_DOWN = 20;
+        const CART_FOOTER_DRAG_MAX_UP = 360;
+        const CART_FOOTER_DRAG_MAX_DOWN = 0;
 
         function resetCartFooterDrag() {
             const el = document.getElementById('cart-footer-draggable');
@@ -449,6 +451,8 @@
             const settingVer = document.getElementById('setting-version');
             if (settingVer) settingVer.textContent = POS_VERSION + ' Stable';
             initCartFooterDrag();
+            applyStatsPanelState('report');
+            applyStatsPanelState('history');
             // 載入記住的帳號密碼
             try { 
                 const lastUser = localStorage.getItem('pos_last_user'); 
@@ -628,6 +632,30 @@
                 // 設定頁面打開時，不自動展開任何區塊
             }
         }
+
+        function applyStatsPanelState(panel) {
+            const collapsed = !(UI && UI.statsCollapsed) ? true : !!UI.statsCollapsed[panel];
+            const grid = document.getElementById(panel + '-stats-grid');
+            const textEl = document.getElementById(panel + '-stats-toggle-text');
+            const iconEl = document.getElementById(panel + '-stats-toggle-icon');
+            if (!grid || !textEl || !iconEl) return;
+            if (collapsed) {
+                grid.classList.add('hidden');
+                textEl.innerText = '展開統計卡';
+                iconEl.classList.remove('fa-chevron-up');
+                iconEl.classList.add('fa-chevron-down');
+            } else {
+                grid.classList.remove('hidden');
+                textEl.innerText = '收合統計卡';
+                iconEl.classList.remove('fa-chevron-down');
+                iconEl.classList.add('fa-chevron-up');
+            }
+        }
+        function toggleStatsPanel(panel) {
+            if (!UI.statsCollapsed) UI.statsCollapsed = { report: true, history: true };
+            UI.statsCollapsed[panel] = !UI.statsCollapsed[panel];
+            applyStatsPanelState(panel);
+        }
         function toggleSettingSection(sectionId) {
             const content = document.getElementById(sectionId + '-content');
             const icon = document.getElementById(sectionId + '-icon');
@@ -693,7 +721,7 @@
             let list = DB.inv.filter(i => { if (i.isHidden && !i.category.includes("加工好電池")) return false; if(term) return (i.name.toLowerCase().includes(term) || String(i.stock_id).includes(term)) && i.type === UI.tab; if(UI.tab === 'phone') return i.type === 'phone' && i.status_label === val; if(UI.tab === 'accessory') return i.type === 'accessory' && i.category === val; return false; }); 
             if(list.length === 0) { grid.innerHTML = '<div class="col-span-full text-center text-slate-600 mt-10">無資料</div>'; return; } 
             const fav = UI.tab === 'accessory' ? getFavAccessories() : [];
-            list.forEach(i => { let color = i.type==='phone' ? 'border-blue-500' : 'border-green-500'; let price = i.price > 0 ? `$${i.price.toLocaleString()}` : (i.defaultPrice > 0 ? `$${i.defaultPrice.toLocaleString()}` : ''); let idBadge = i.type==='phone' ? `<span class="text-[10px] bg-slate-800 px-1 rounded text-slate-400">#${i.stock_id}</span>` : ''; let specs = ''; if(i.type === 'phone') { if(i.battery) specs += `<span class="spec-tag"><i class="fa-solid fa-battery-half mr-1"></i>${i.battery}%</span>`; if(i.ios) specs += `<span class="spec-tag">iOS ${i.ios}</span>`; } let switchBtn = ''; if(i.type === 'phone') { switchBtn = `<button onclick="event.stopPropagation(); changeStatus('${i.id}', '${i.status_label}')" class="absolute top-2 right-2 w-8 h-8 rounded-full bg-slate-800 hover:bg-slate-700 text-slate-400 flex items-center justify-center transition shadow-lg"><i class="fa-solid fa-repeat text-xs"></i></button>`; } let favStar = ''; if(i.type === 'accessory') { const isFav = fav.includes(String(i.id)); favStar = `<button onclick="event.stopPropagation();toggleFavAccessory('${i.id}')" class="absolute bottom-2 right-2 w-8 h-8 rounded-full ${isFav?'bg-amber-500/30 text-amber-400':'bg-slate-800 text-slate-500 hover:text-amber-400'} flex items-center justify-center transition"><i class="fa-${isFav?'solid':'regular'} fa-star text-xs"></i></button>`; } let selOverlay = i.type==='phone' ? `<div id="sel-${i.id}" class="hidden absolute inset-0 rounded-xl bg-yellow-500/20 border-2 border-yellow-400 pointer-events-none flex items-center justify-center"><i class="fa-solid fa-check-circle text-yellow-400 text-3xl"></i></div>` : ""; grid.innerHTML += `<div onclick="triggerAddToCart('${i.id}')" class="glass p-3 rounded-xl border-l-4 ${color} relative group active:scale-95 transition" id="card-${i.id}">${selOverlay}${switchBtn}${favStar}<div class="flex justify-between mb-1">${idBadge}<span class="text-xs font-bold text-slate-400">庫: ${i.stock}</span></div><div class="font-bold text-sm text-slate-200 line-clamp-2 leading-tight h-9">${i.name}</div><div class="mt-1 flex flex-wrap gap-1">${specs}</div><div class="mt-2 text-right font-bold text-yellow-500">${price}</div></div>`; }); 
+            list.forEach(i => { let color = i.type==='phone' ? 'border-blue-500' : 'border-green-500'; let price = i.price > 0 ? `$${i.price.toLocaleString()}` : (i.defaultPrice > 0 ? `$${i.defaultPrice.toLocaleString()}` : ''); let idBadge = i.type==='phone' ? `<span class="text-[10px] bg-slate-800 px-1 rounded text-slate-400">#${i.stock_id}</span>` : ''; let specs = ''; if(i.type === 'phone') { if(i.battery) specs += `<span class="spec-tag"><i class="fa-solid fa-battery-half mr-1"></i>${i.battery}%</span>`; if(i.ios) specs += `<span class="spec-tag">iOS ${i.ios}</span>`; } let switchBtn = ''; if(i.type === 'phone') { switchBtn = `<button onclick="event.stopPropagation(); changeStatus('${i.id}', '${i.status_label}')" class="absolute top-4 right-2 w-8 h-8 rounded-full bg-slate-800 hover:bg-slate-700 text-slate-400 flex items-center justify-center transition shadow-lg"><i class="fa-solid fa-repeat text-xs"></i></button>`; } let favStar = ''; if(i.type === 'accessory') { const isFav = fav.includes(String(i.id)); favStar = `<button onclick="event.stopPropagation();toggleFavAccessory('${i.id}')" class="absolute bottom-2 right-2 w-8 h-8 rounded-full ${isFav?'bg-amber-500/30 text-amber-400':'bg-slate-800 text-slate-500 hover:text-amber-400'} flex items-center justify-center transition"><i class="fa-${isFav?'solid':'regular'} fa-star text-xs"></i></button>`; } let selOverlay = i.type==='phone' ? `<div id="sel-${i.id}" class="hidden absolute inset-0 rounded-xl bg-yellow-500/20 border-2 border-yellow-400 pointer-events-none flex items-center justify-center"><i class="fa-solid fa-check-circle text-yellow-400 text-3xl"></i></div>` : ""; grid.innerHTML += `<div onclick="triggerAddToCart('${i.id}')" class="glass p-3 rounded-xl border-l-4 ${color} relative group active:scale-95 transition" id="card-${i.id}">${selOverlay}${switchBtn}${favStar}<div class="flex justify-between mb-1">${idBadge}<span class="text-xs font-bold text-slate-400">庫: ${i.stock}</span></div><div class="font-bold text-sm text-slate-200 line-clamp-2 leading-tight h-9">${i.name}</div><div class="mt-1 flex flex-wrap gap-1">${specs}</div><div class="mt-2 text-right font-bold text-yellow-500">${price}</div></div>`; }); 
         }
 
         async function triggerAddToCart(id) {
@@ -1084,6 +1112,7 @@
                 return;
             }
             switchView('report'); 
+            applyStatsPanelState('report');
             renderReport(); 
         }
         function renderReport() {
@@ -1223,7 +1252,7 @@
             });
         }
 
-        function openHistory() { switchView('history'); setQuickDate('month'); }
+        function openHistory() { switchView('history'); applyStatsPanelState('history'); setQuickDate('month'); }
         function setQuickDate(m) { const n = new Date(); const t = d => d.toISOString().split('T')[0]; const s = new Date(); if(m==='month') s.setDate(1); document.getElementById('h-end').value = t(n); document.getElementById('h-start').value = t(s); doHistorySearch(); }
         async function doHistorySearch() { 
             const s = document.getElementById('h-start').value; 
