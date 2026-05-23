@@ -812,31 +812,46 @@
             const cost = Number(it.cost) || 0;
             return (it.profit !== undefined && it.profit !== null && it.profit !== '') ? Number(it.profit) : (sale - cost);
         }
-        function calcGiftAccessoryShare(normalized, targetKind) {
-            const giftAccCost = normalized.reduce((s, it) => {
-                const sale = Number(it.salePrice) || 0;
-                const cost = Number(it.cost) || 0;
-                if (it.type === 'accessory' && sale === 0 && cost > 0) return s + cost;
-                return s;
-            }, 0);
-            if (giftAccCost <= 0) return 0;
-            const typeMap = {
-                used: ['phone', 'peer_phone'],
-                repair: ['repair'],
-                new: ['new_phone']
-            };
-            const kinds = ['used', 'repair', 'new'];
-            const baseByKind = {};
-            kinds.forEach((k) => {
-                const allowTypes = typeMap[k];
-                const base = normalized
-                    .filter(it => allowTypes.includes(it.type))
-                    .reduce((s, it) => s + calcCopyProfit(it), 0);
-                baseByKind[k] = Math.max(0, base);
-            });
-            const sumBase = kinds.reduce((s, k) => s + (baseByKind[k] || 0), 0);
-            if (sumBase <= 0) return 0;
-            return giftAccCost * ((baseByKind[targetKind] || 0) / sumBase);
+        function isGiftAccessory(it) {
+            const sale = Number(it.salePrice) || 0;
+            const cost = Number(it.cost) || 0;
+            return it.type === 'accessory' && sale === 0 && cost > 0;
+        }
+        function isCardCopyItem(it) {
+            const n = (it.itemName || it.name || '').toLowerCase();
+            return n.includes('泰國註冊卡') || n.includes('網卡') || n.includes('esim');
+        }
+        function calcGiftAllocation(normalized) {
+            const G = normalized.reduce((s, it) => isGiftAccessory(it) ? s + (Number(it.cost) || 0) : s, 0);
+            const alloc = { used: 0, new: 0, repair: 0, acc: 0, card: 0 };
+            if (G <= 0) return alloc;
+            const hasUsed = normalized.some(it => it.type === 'phone' || it.type === 'peer_phone');
+            const hasNew = normalized.some(it => it.type === 'new_phone');
+            if (hasUsed || hasNew) {
+                let remaining = G;
+                if (hasUsed) {
+                    const usedProfit = normalized
+                        .filter(it => it.type === 'phone' || it.type === 'peer_phone')
+                        .reduce((s, it) => s + calcCopyProfit(it), 0);
+                    alloc.used = hasNew ? Math.min(remaining, Math.max(0, usedProfit)) : remaining;
+                    remaining -= alloc.used;
+                }
+                if (hasNew && remaining > 0) alloc.new = remaining;
+                return alloc;
+            }
+            if (normalized.some(it => it.type === 'accessory' && !isGiftAccessory(it) && !isCardCopyItem(it))) {
+                alloc.acc = G;
+                return alloc;
+            }
+            if (normalized.some(it => isCardCopyItem(it) && !isGiftAccessory(it))) {
+                alloc.card = G;
+                return alloc;
+            }
+            if (normalized.some(it => it.type === 'repair')) {
+                alloc.repair = G;
+                return alloc;
+            }
+            return alloc;
         }
         async function copyTextToClipboard(text) {
             try {
@@ -869,11 +884,12 @@
                 const isMultiExtra = it.type === 'phone' && sale === 0 && (it.itemName || '').includes(' + ');
                 return !isMultiExtra;
             });
+            const giftAlloc = calcGiftAllocation(normalized);
             if (kind === 'used') {
                 const usedItems = normalized.filter(it => it.type === 'phone' || it.type === 'peer_phone');
                 const usedIdItems = items.filter(it => it.type === 'phone' || it.type === 'peer_phone');
                 const usedProfit = usedItems.reduce((s, it) => s + calcCopyProfit(it), 0);
-                const pure = usedProfit - calcGiftAccessoryShare(normalized, 'used');
+                const pure = usedProfit - giftAlloc.used;
                 const ids = usedIdItems.map(it => {
                     const sid = String(it.stock_id || '').trim();
                     if (sid) return sid;
@@ -893,13 +909,8 @@
             }
             if (kind === 'acc') {
                 const accItems = normalized.filter(it => it.type === 'accessory');
-                const nonGiftAcc = accItems.filter(it => !((Number(it.salePrice) || 0) === 0 && (Number(it.cost) || 0) > 0));
-                const pure = nonGiftAcc.reduce((s, it) => {
-                    const sale = Number(it.salePrice) || 0;
-                    const cost = Number(it.cost) || 0;
-                    const p = (it.profit !== undefined && it.profit !== null && it.profit !== '') ? Number(it.profit) : (sale - cost);
-                    return s + p;
-                }, 0);
+                const nonGiftAcc = accItems.filter(it => !isGiftAccessory(it));
+                const pure = nonGiftAcc.reduce((s, it) => s + calcCopyProfit(it), 0) - giftAlloc.acc;
                 const names = nonGiftAcc.map((it, idx) => `${idx + 1}. ${stripLedgerName(it.itemName || it.name || '')}`);
                 const text = `${customer} $${pure.toLocaleString()}\n${names.join('\n')}`.trim();
                 const ok = await copyTextToClipboard(text);
@@ -924,18 +935,9 @@
                 return;
             }
             if (kind === 'card') {
-                const isCardItem = (it) => {
-                    const n = (it.itemName || it.name || '').toLowerCase();
-                    return n.includes('泰國註冊卡') || n.includes('網卡') || n.includes('esim');
-                };
-                const cardItems = normalized.filter(isCardItem);
-                const nonGiftCards = cardItems.filter(it => !((Number(it.salePrice) || 0) === 0 && (Number(it.cost) || 0) > 0));
-                const pure = nonGiftCards.reduce((s, it) => {
-                    const sale = Number(it.salePrice) || 0;
-                    const cost = Number(it.cost) || 0;
-                    const p = (it.profit !== undefined && it.profit !== null && it.profit !== '') ? Number(it.profit) : (sale - cost);
-                    return s + p;
-                }, 0);
+                const cardItems = normalized.filter(isCardCopyItem);
+                const nonGiftCards = cardItems.filter(it => !isGiftAccessory(it));
+                const pure = nonGiftCards.reduce((s, it) => s + calcCopyProfit(it), 0) - giftAlloc.card;
                 const names = nonGiftCards.map((it, idx) => `${idx + 1}. ${formatCardCopyLabel(it)}`);
                 const text = `${customer} $${pure.toLocaleString()}\n${names.join('\n')}`.trim();
                 const ok = await copyTextToClipboard(text);
@@ -946,7 +948,7 @@
             if (kind === 'repair') {
                 const repairItems = normalized.filter(it => it.type === 'repair');
                 const repairProfit = repairItems.reduce((s, it) => s + calcCopyProfit(it), 0);
-                const pure = repairProfit - calcGiftAccessoryShare(normalized, 'repair');
+                const pure = repairProfit - giftAlloc.repair;
                 const names = repairItems.map((it, idx) => `${idx + 1}. ${stripLedgerName(it.itemName || it.name || '')}`);
                 const text = `${customer} $${pure.toLocaleString()}\n${names.join('\n')}`.trim();
                 const ok = await copyTextToClipboard(text);
@@ -957,7 +959,7 @@
             if (kind === 'new') {
                 const newItems = normalized.filter(it => it.type === 'new_phone');
                 const newProfit = newItems.reduce((s, it) => s + calcCopyProfit(it), 0);
-                const pure = newProfit - calcGiftAccessoryShare(normalized, 'new');
+                const pure = newProfit - giftAlloc.new;
                 const names = newItems.map((it, idx) => `${idx + 1}. ${stripLedgerName(it.itemName || it.name || '')}`);
                 const text = `${customer} $${pure.toLocaleString()}\n${names.join('\n')}`.trim();
                 const ok = await copyTextToClipboard(text);
@@ -1824,9 +1826,9 @@
             if (!t) return;
             if (t === 'stock') {
                 // 電池維修：選擇庫存電池，然後顯示維修登記表單
-                const BATTERY_CATS = ['已加工成品電池', '成品大容量電池'];
+                const BATTERY_CATS = ['已加工成品電池', '成品大容量電池', '原廠拆機電池0循環'];
                 const batteries = DB.inv.filter(i => i.type === 'accessory' && i.category && BATTERY_CATS.includes(i.category) && Number(i.stock) > 0);
-                if (batteries.length === 0) { Swal.fire({ icon: 'warning', title: '無庫存電池', text: '請先至進貨補貨（僅顯示已加工成品電池、成品大容量電池）', background: '#1e293b', color: 'white' }); return; }
+                if (batteries.length === 0) { Swal.fire({ icon: 'warning', title: '無庫存電池', text: '請先至進貨補貨（已加工成品電池、成品大容量電池、原廠拆機電池0循環）', background: '#1e293b', color: 'white' }); return; }
                 const options = {}; batteries.forEach(b => { options['b' + b.id] = (b.category || '電池') + ' - ' + b.name + ' (庫存 ' + b.stock + ')'; });
                 const { value: bid } = await Swal.fire({ title: '選擇庫存電池', input: 'select', inputOptions: options, background: '#1e293b', color: 'white' });
                 if (!bid) return;
