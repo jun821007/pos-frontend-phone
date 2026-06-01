@@ -807,7 +807,7 @@
                 .replace(/\s*x\d+$/i, '')
                 .trim();
         }
-        function formatCardCopyLabel(it) {
+        function formatCopyLabelWithQty(it) {
             const raw = String(it.itemName || it.name || '');
             const base = stripLedgerName(raw);
             let q = parseInt(String(it.quantity != null && it.quantity !== '' ? it.quantity : ''), 10);
@@ -818,6 +818,8 @@
             if (!isFinite(q) || q < 1) q = 1;
             return q > 1 ? `${base} x${q}` : base;
         }
+        function formatCardCopyLabel(it) { return formatCopyLabelWithQty(it); }
+        function formatAccessoryCopyLabel(it) { return formatCopyLabelWithQty(it); }
         function calcCopyProfit(it) {
             const sale = Number(it.salePrice) || 0;
             const cost = Number(it.cost) || 0;
@@ -922,7 +924,7 @@
                 const accItems = normalized.filter(it => it.type === 'accessory');
                 const nonGiftAcc = accItems.filter(it => !isGiftAccessory(it));
                 const pure = nonGiftAcc.reduce((s, it) => s + calcCopyProfit(it), 0) - giftAlloc.acc;
-                const names = nonGiftAcc.map((it, idx) => `${idx + 1}. ${stripLedgerName(it.itemName || it.name || '')}`);
+                const names = nonGiftAcc.map((it, idx) => `${idx + 1}. ${formatAccessoryCopyLabel(it)}`);
                 const text = `${customer} $${pure.toLocaleString()}\n${names.join('\n')}`.trim();
                 const ok = await copyTextToClipboard(text);
                 if (ok) Swal.fire({ icon:'success', title:'已複製配件內容', toast:true, position:'top', timer:1500, showConfirmButton:false, background:'#1e293b', color:'white' });
@@ -1030,8 +1032,6 @@
             const compact = !!opts.compact;
             if (BlackList.orders.includes(g.orderId)) return ''; 
             OrderRegistry[g.orderId] = { customer: g.customer || '過路客', items: g.items || [] };
-            let statusClass = g.status==='Pending' ? 'text-red-400' : 'text-green-400';
-            let statusText = g.status==='Pending' ? '未結' : '已結';
             let payBadge = '';
             if (!compact && g.status === 'Pending') {
                 if (g.payMethod === 'linepay') {
@@ -1093,6 +1093,9 @@
             const hasSoftItems = (g.items || []).some(it => it.type === 'software' || it.type === 'software_phone');
             const hasCardItems = (g.items || []).some(it => { const n=(it.itemName || it.name || '').toLowerCase(); return n.includes('\u6cf0\u570b\u8a3b\u518a\u5361') || n.includes('\u7db2\u5361') || n.includes('esim'); });
             const oidEsc = String(g.orderId || '').replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+            const statusHtml = g.status === 'Pending'
+                ? '<span class="text-red-400">未結</span>'
+                : `<button type="button" onclick="event.stopPropagation(); confirmUnsettle('${oidEsc}', ${Number(g.total) || 0})" class="text-[10px] bg-green-900/40 text-green-300 px-1.5 py-0.5 rounded border border-green-700 hover:bg-green-800 hover:text-green-200">已結</button>`;
             const selectable = !!opts.selectable && g.status === 'Pending';
             const isSelected = selectable && UI.selectedPendingOrders.has(String(g.orderId));
             const selectBox = selectable ? `<label class="shrink-0 mr-2 flex items-center" onclick="event.stopPropagation()"><input type="checkbox" class="pending-order-cb accent-yellow-500 w-4 h-4" data-order-id="${oidEsc}" ${isSelected ? 'checked' : ''} onchange="setPendingOrderSelected('${oidEsc}', this.checked)"></label>` : '';
@@ -1112,7 +1115,7 @@
                     </div>
                     </div>
                     <div class="w-16 text-right text-xs flex flex-col items-end gap-1 shrink-0">
-                        <div class="flex items-center gap-1"><span class="${statusClass}">${statusText}</span>${payBadge}</div>
+                        <div class="flex items-center gap-1">${statusHtml}${payBadge}</div>
                         ${g.status === 'Pending' ? `<button onclick="event.stopPropagation(); settle('${g.orderId}', ${g.total})" class="text-[10px] bg-green-900 text-green-200 px-1.5 rounded border border-green-700 hover:bg-green-800">入帳</button>` : ''}
                         <button onclick="event.stopPropagation(); confirmDeleteOrder('${g.orderId}')" class="text-[10px] bg-red-900 text-red-200 px-1.5 rounded border border-red-700 hover:bg-red-800">刪單</button>
                     </div>
@@ -1574,6 +1577,34 @@
                 Swal.fire({ icon: 'warning', title: `完成 ${ok.length} 筆，失敗 ${fail.length} 筆`, text: failLines, background: '#1e293b', color: 'white' });
             } else {
                 Swal.fire({ icon: 'success', title: `已入帳 ${ok.length} 筆`, timer: 1500, background: '#1e293b' });
+            }
+        }
+
+        async function confirmUnsettle(oid, amt) {
+            const r = await Swal.fire({
+                title: '改回未結？',
+                text: `此筆訂單將改回未結帳：$${(Number(amt) || 0).toLocaleString()}`,
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonText: '確認改回未結',
+                cancelButtonText: '取消',
+                background: '#1e293b',
+                color: 'white'
+            });
+            if (!r.isConfirmed) return;
+            try {
+                const res = await API.handleTransaction({ action: 'unsettle', orderId: oid });
+                if (res && res.status === 'error') {
+                    Swal.fire({ icon: 'error', title: '操作失敗', text: res.msg || '請重試', background: '#1e293b', color: 'white' });
+                    return;
+                }
+                if (!document.getElementById('view-report').classList.contains('hidden')) renderReport();
+                if (!document.getElementById('view-history').classList.contains('hidden')) renderHistoryList();
+                fetchData();
+                Swal.fire({ icon: 'success', title: '已改回未結', timer: 1000, background: '#1e293b' });
+            } catch (e) {
+                console.error('改回未結失敗:', e);
+                Swal.fire({ icon: 'error', title: '操作失敗', text: e.message || '請重試', background: '#1e293b', color: 'white' });
             }
         }
 
