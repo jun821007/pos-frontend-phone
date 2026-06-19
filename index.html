@@ -177,6 +177,11 @@
         </div>
 
         <div id="view-pending" class="hidden view-section flex-1 flex flex-col overflow-hidden p-4">
+            <div class="flex gap-2 mb-4">
+                <button type="button" id="pending-tab-unpaid" onclick="switchPendingTab('unpaid')" class="flex-1 py-2 rounded-lg text-sm font-bold bg-yellow-600 text-black">未結帳款</button>
+                <button type="button" id="pending-tab-pickup" onclick="switchPendingTab('pickup')" class="flex-1 py-2 rounded-lg text-sm font-bold bg-slate-800 text-slate-300 border border-slate-600">待取件</button>
+            </div>
+            <div id="pending-panel-unpaid" class="flex-1 flex flex-col overflow-hidden min-h-0">
             <h2 class="text-xl font-bold text-white mb-4">未結帳款</h2>
             <div class="grid grid-cols-2 gap-3 mb-4">
                 <div class="glass p-3 rounded-xl border-l-4 border-yellow-500"><div class="text-[10px] text-slate-400">未結總金額</div><div class="text-lg font-bold text-yellow-400" id="pending-total-amt">0</div></div>
@@ -191,6 +196,12 @@
                 <button type="button" onclick="batchSettlePending()" class="bg-green-600 hover:bg-green-500 text-white font-bold px-4 py-1.5 rounded-lg text-sm">批次入帳</button>
             </div>
             <div id="pending-list" class="flex-1 overflow-y-auto pb-20"></div>
+            </div>
+            <div id="pending-panel-pickup" class="hidden flex-1 flex flex-col overflow-hidden min-h-0">
+                <h2 class="text-xl font-bold text-white mb-2">待取件維修</h2>
+                <p class="text-xs text-slate-500 mb-3">留機維修在此取件結帳收款；利潤於取件日（掛帳則入帳後）計入。</p>
+                <div id="pickup-pending-list" class="flex-1 overflow-y-auto pb-20"></div>
+            </div>
         </div>
 
         <div id="view-history" class="hidden view-section flex-1 flex flex-col overflow-hidden p-4">
@@ -434,6 +445,18 @@
               return { status: 'error', msg: data.msg || data.message || ('上傳失敗 HTTP ' + res.status) };
             }
             return data;
+          },
+          getPendingPickupRepairs: async () => {
+            const res = await fetch(`${API_BASE_URL}/repair-pending-pickups`);
+            return await res.json();
+          },
+          repairPickup: async (data) => {
+            const res = await fetch(`${API_BASE_URL}/repair-pickup`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(data)
+            });
+            return await res.json();
           }
         };
         
@@ -444,7 +467,7 @@
         let ItemRegistry = {};
         let OrderRegistry = {};
         let User = { name: '', isAdmin: false };
-        let UI = { tab: 'phone', sub: '', rsMode: 'inventory', rsCat: 'all', multiSelect: false, selectedPhones: new Set(), selectedPendingOrders: new Set(), pendingOrderMeta: {}, pendingOrdersByCustomer: {}, allPendingOrderIds: [], statsCollapsed: { report: true, history: true } };
+        let UI = { tab: 'phone', sub: '', rsMode: 'inventory', rsCat: 'all', multiSelect: false, selectedPhones: new Set(), selectedPendingOrders: new Set(), pendingOrderMeta: {}, pendingOrdersByCustomer: {}, allPendingOrderIds: [], pendingTab: 'unpaid', statsCollapsed: { report: true, history: true } };
         let cartFooterTranslateY = 0;
         const CART_FOOTER_DRAG_MAX_UP = 360;
         const CART_FOOTER_DRAG_MAX_DOWN = 0;
@@ -1241,11 +1264,20 @@
         const REPAIR_PHOTO_MAX = 6;
         let repairPhotoQueue = [];
         function resetRepairPhotoQueue() { repairPhotoQueue = []; }
-        async function prepareRepairPhotoFile(file) {
-            if (!file || !file.type || !file.type.startsWith('image/')) return null;
-            try {
-                const bmp = await createImageBitmap(file);
-                const maxSide = 1920;
+        async function fileToBase64(file) {
+            return new Promise((resolve, reject) => {
+                const r = new FileReader();
+                r.onload = () => resolve(String(r.result).split(',')[1] || '');
+                r.onerror = reject;
+                r.readAsDataURL(file);
+            });
+        }
+        async function compressRepairPhotoUnderLimit(file, maxBytes) {
+            const bmp = await createImageBitmap(file);
+            let quality = 0.92;
+            let maxSide = Math.max(bmp.width, bmp.height);
+            const base = String(file.name || 'photo').replace(/\.[^.]+$/, '');
+            for (let attempt = 0; attempt < 8; attempt++) {
                 let w = bmp.width, h = bmp.height;
                 if (w > maxSide || h > maxSide) {
                     const scale = maxSide / Math.max(w, h);
@@ -1258,24 +1290,40 @@
                 const ctx = canvas.getContext('2d');
                 if (!ctx) throw new Error('canvas');
                 ctx.drawImage(bmp, 0, 0, w, h);
-                if (bmp.close) bmp.close();
-                const blob = await new Promise((resolve, reject) => canvas.toBlob((b) => b ? resolve(b) : reject(new Error('blob')), 'image/jpeg', 0.85));
-                const data = await new Promise((resolve, reject) => {
-                    const r = new FileReader();
-                    r.onload = () => resolve(String(r.result).split(',')[1] || '');
-                    r.onerror = reject;
-                    r.readAsDataURL(blob);
-                });
-                const base = String(file.name || 'photo').replace(/\.[^.]+$/, '');
-                return { name: base + '.jpg', mimeType: 'image/jpeg', data };
+                const blob = await new Promise((resolve, reject) => canvas.toBlob((b) => b ? resolve(b) : reject(new Error('blob')), 'image/jpeg', quality));
+                if (blob.size <= maxBytes) {
+                    if (bmp.close) bmp.close();
+                    const data = await new Promise((resolve, reject) => {
+                        const r = new FileReader();
+                        r.onload = () => resolve(String(r.result).split(',')[1] || '');
+                        r.onerror = reject;
+                        r.readAsDataURL(blob);
+                    });
+                    return { name: base + '.jpg', mimeType: 'image/jpeg', data };
+                }
+                if (quality > 0.7) quality -= 0.06;
+                else maxSide = Math.round(maxSide * 0.85);
+            }
+            if (bmp.close) bmp.close();
+            throw new Error('照片壓縮後仍超過 4MB，請改用較小圖片');
+        }
+        async function prepareRepairPhotoFile(file) {
+            if (!file || !file.type || !file.type.startsWith('image/')) return null;
+            const MAX_BYTES = 4 * 1024 * 1024;
+            try {
+                if ((file.size || 0) <= MAX_BYTES) {
+                    const data = await fileToBase64(file);
+                    return { name: file.name || 'photo.jpg', mimeType: file.type || 'image/jpeg', data };
+                }
+                return await compressRepairPhotoUnderLimit(file, MAX_BYTES);
             } catch (e) {
-                const data = await new Promise((resolve, reject) => {
-                    const r = new FileReader();
-                    r.onload = () => resolve(String(r.result).split(',')[1] || '');
-                    r.onerror = reject;
-                    r.readAsDataURL(file);
-                });
-                return { name: file.name || 'photo.jpg', mimeType: file.type || 'image/jpeg', data };
+                try {
+                    const data = await fileToBase64(file);
+                    return { name: file.name || 'photo.jpg', mimeType: file.type || 'image/jpeg', data };
+                } catch (err) {
+                    console.error('照片處理失敗:', err);
+                    return null;
+                }
             }
         }
         async function addRepairPhotoFiles(fileList) {
@@ -1345,7 +1393,7 @@
             resetRepairPhotoQueue();
             return (res.urls || []).join(',');
         }
-        const REPAIR_EXTRA_HTML = '<textarea id="r-notes" class="swal2-textarea" placeholder="備註（選填）" rows="2"></textarea><label class="block text-left text-xs text-slate-400 mt-2 mb-1 px-2">圖（最多6張）<span id="r-photo-count" class="float-right text-yellow-500/80">0 / 6</span></label><div id="r-photo-paste" tabindex="0" class="swal2-input text-sm min-h-[48px] flex items-center justify-center text-center text-slate-400 cursor-pointer outline-none focus:border-yellow-500 mx-2">點此貼上圖片</div><div id="r-photo-preview" class="px-2 flex flex-wrap min-h-[8px]"></div><div class="px-2 flex gap-2 mb-1"><button type="button" id="r-pick-album" class="flex-1 py-2 rounded-lg bg-slate-700 text-white text-sm border border-slate-600">相簿</button><button type="button" id="r-pick-camera" class="flex-1 py-2 rounded-lg bg-slate-700 text-white text-sm border border-slate-600">拍照</button></div><input id="r-photos" type="file" accept="image/*" multiple class="hidden"><input id="r-photos-cam" type="file" accept="image/*" capture="environment" class="hidden">';
+        const REPAIR_EXTRA_HTML = '<textarea id="r-notes" class="swal2-textarea" placeholder="備註（選填）" rows="2"></textarea><label class="block text-left text-xs text-slate-300 mt-2 px-2"><input type="checkbox" id="r-deferred" class="mr-1 accent-yellow-500">客戶尚未取件（留機，取件時收款）</label><label class="block text-left text-xs text-slate-400 mt-2 mb-1 px-2">圖（最多6張）<span id="r-photo-count" class="float-right text-yellow-500/80">0 / 6</span></label><div id="r-photo-paste" tabindex="0" class="swal2-input text-sm min-h-[48px] flex items-center justify-center text-center text-slate-400 cursor-pointer outline-none focus:border-yellow-500 mx-2">點此貼上圖片</div><div id="r-photo-preview" class="px-2 flex flex-wrap min-h-[8px]"></div><div class="px-2 flex gap-2 mb-1"><button type="button" id="r-pick-album" class="flex-1 py-2 rounded-lg bg-slate-700 text-white text-sm border border-slate-600">相簿</button><button type="button" id="r-pick-camera" class="flex-1 py-2 rounded-lg bg-slate-700 text-white text-sm border border-slate-600">拍照</button></div><input id="r-photos" type="file" accept="image/*" multiple class="hidden"><input id="r-photos-cam" type="file" accept="image/*" capture="environment" class="hidden">';
         function renderReport() {
             let stats = { cash:0, pending:0, profit:0, pot:0, exp:0, gift:0 };
             const div = document.getElementById('today-list');
@@ -1401,16 +1449,104 @@
             document.getElementById('today-gift').innerText = stats.gift.toLocaleString();
         }
 
-        function openPending() { 
+        function switchPendingTab(tab) {
+            UI.pendingTab = tab;
+            const unpaidBtn = document.getElementById('pending-tab-unpaid');
+            const pickupBtn = document.getElementById('pending-tab-pickup');
+            const unpaidPanel = document.getElementById('pending-panel-unpaid');
+            const pickupPanel = document.getElementById('pending-panel-pickup');
+            const isUnpaid = tab !== 'pickup';
+            if (unpaidBtn) unpaidBtn.className = isUnpaid ? 'flex-1 py-2 rounded-lg text-sm font-bold bg-yellow-600 text-black' : 'flex-1 py-2 rounded-lg text-sm font-bold bg-slate-800 text-slate-300 border border-slate-600';
+            if (pickupBtn) pickupBtn.className = !isUnpaid ? 'flex-1 py-2 rounded-lg text-sm font-bold bg-yellow-600 text-black' : 'flex-1 py-2 rounded-lg text-sm font-bold bg-slate-800 text-slate-300 border border-slate-600';
+            if (unpaidPanel) unpaidPanel.classList.toggle('hidden', !isUnpaid);
+            if (pickupPanel) pickupPanel.classList.toggle('hidden', isUnpaid);
+            if (isUnpaid) loadPending();
+            else loadPendingPickups();
+        }
+        async function loadPendingPickups() {
+            const d = document.getElementById('pickup-pending-list');
+            if (!d) return;
+            d.innerHTML = '<div class="text-center mt-10"><span class="loader"></span></div>';
+            try {
+                const rows = await API.getPendingPickupRepairs();
+                DB.pendingPickups = Array.isArray(rows) ? rows : [];
+                renderPendingPickupList();
+            } catch (e) {
+                console.error('載入待取件失敗:', e);
+                d.innerHTML = '<div class="text-center text-red-500 mt-10">載入失敗，請重試</div>';
+            }
+        }
+        function renderPendingPickupList() {
+            const d = document.getElementById('pickup-pending-list');
+            if (!d) return;
+            d.innerHTML = '';
+            const rows = DB.pendingPickups || [];
+            if (!rows.length) {
+                d.innerHTML = '<div class="text-center text-slate-500 mt-10">無待取件維修</div>';
+                return;
+            }
+            rows.forEach((row) => {
+                const esc = (s) => String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;');
+                d.innerHTML += `<div class="mb-3 p-3 rounded-xl bg-slate-800 border border-slate-700">
+                    <div class="flex justify-between items-start gap-2">
+                        <div class="min-w-0">
+                            <div class="text-white font-bold truncate">${esc(row.customer || '過路客')} · ${esc(row.model || '-')}</div>
+                            <div class="text-xs text-slate-400 mt-1">送修 ${esc(row.dateTime)} · 報價 $${(Number(row.quote) || 0).toLocaleString()}</div>
+                            <div class="text-xs text-slate-500">${esc(row.imei || '')} ${row.phone ? '· ' + esc(row.phone) : ''}</div>
+                        </div>
+                        <button type="button" onclick="confirmRepairPickup(${Number(row.sheetRowNumber) || 0})" class="shrink-0 text-xs bg-green-700 hover:bg-green-600 text-white px-3 py-2 rounded-lg font-bold">取件結帳</button>
+                    </div>
+                </div>`;
+            });
+        }
+        async function confirmRepairPickup(sheetRowNumber) {
+            if (!sheetRowNumber) return;
+            const row = (DB.pendingPickups || []).find((r) => Number(r.sheetRowNumber) === Number(sheetRowNumber));
+            if (!row) return;
+            const { value: pay } = await Swal.fire({
+                title: '取件結帳',
+                html: `<div class="text-left text-sm space-y-1"><p><strong>客戶：</strong>${row.customer || '-'}</p><p><strong>型號：</strong>${row.model || '-'}</p><p><strong>報價：</strong>$${(Number(row.quote) || 0).toLocaleString()}</p></div>`,
+                input: 'select',
+                inputOptions: { cash: '現金', linepay: 'Line Pay', credit: '掛帳' },
+                inputValue: 'cash',
+                showCancelButton: true,
+                confirmButtonText: '確認收款',
+                cancelButtonText: '取消',
+                background: '#1e293b',
+                color: 'white'
+            });
+            if (!pay) return;
+            Swal.fire({ title: '處理中...', allowOutsideClick: false, didOpen: () => { Swal.showLoading(); } });
+            try {
+                const res = await API.repairPickup({
+                    sheetRowNumber,
+                    orderId: row.orderId || '',
+                    payMethod: pay,
+                    person: User.name,
+                    salePrice: row.quote
+                });
+                if (res.status === 'error') throw new Error(res.msg || '取件失敗');
+                await loadPendingPickups();
+                try {
+                    const fd = await API.getTodaySalesOnly();
+                    if (fd.todaySales) { DB.sales = fd.todaySales; renderReport(); }
+                } catch (e) { /* ignore */ }
+                Swal.fire({ icon: 'success', title: '取件完成', timer: 1200, background: '#1e293b' });
+            } catch (e) {
+                Swal.fire({ icon: 'error', title: '取件失敗', text: e.message || '', background: '#1e293b' });
+            }
+        }
+
+        function openPending() {
             // 限制 a002 帳號不能使用「未結」功能
             if (User && User.username === 'a002') {
                 Swal.fire({ icon: 'warning', title: '權限不足', text: '此帳號無法使用「未結帳款」功能', background: '#1e293b', color: 'white' });
                 return;
             }
             switchView('pending'); 
-            loadPending(); 
+            switchPendingTab(UI.pendingTab || 'unpaid');
         }
-        async function loadPending() { 
+        async function loadPending() {
             const d = document.getElementById('pending-list'); 
             d.innerHTML = '<div class="text-center mt-10"><span class="loader"></span></div>'; 
             try {
@@ -2012,19 +2148,21 @@
             c.innerHTML = ''; 
             let t = 0, cn = 0; 
             Cart.forEach((item, idx) => { 
-                let s = item.price * item.quantity; 
-                t += s; 
+                let s = item.price * item.quantity;
+                const isDeferredRepair = !!(item.deferredPickup && item.type === 'repair');
+                if (!isDeferredRepair) t += s; 
                 cn += item.quantity; 
                 let g = item.isGift ? 'text-red-400 border-red-400' : 'text-slate-500 border-slate-600'; 
                 let nameLine = item.name; 
                 if (item.isGift && !nameLine.includes('贈')) nameLine += ' <span class="text-red-400 text-xs border border-red-400 px-1 rounded">贈</span>';
+                if (isDeferredRepair) nameLine += ' <span class="text-amber-300 text-xs border border-amber-600 px-1 rounded">待取件</span>';
                 if (item.type === 'phone' || item.type === 'new_phone' || item.type === 'peer_phone') { 
                     if (item.stock_id) nameLine += ' <span class="text-slate-400 text-xs">#' + item.stock_id + '</span>'; 
                 } 
                 nameLine += ' <span class="text-yellow-500 text-xs">x' + item.quantity + '</span>'; 
-                // 配件和所有維修都可以標記為「贈」
-                const showGiftBtn = (item.type === 'accessory' || item.type === 'repair' || item.type === 'shipping');
-                c.innerHTML += `<div class="bg-slate-800 p-2 rounded-lg flex justify-between items-center text-sm"><div class="flex-1"><div class="text-white font-bold">${nameLine}</div><div class="text-xs text-slate-500">$${item.price}</div></div><div class="flex items-center gap-2">${showGiftBtn ? `<button onclick="toggleGift(${idx})" class="text-xs border px-1 rounded ${g}">贈</button>` : ''}<button onclick="Cart.splice(${idx},1);renderCart()" class="text-slate-500 px-2"><i class="fa-solid fa-trash"></i></button></div></div>`; 
+                const showGiftBtn = (item.type === 'accessory' || item.type === 'repair' || item.type === 'shipping') && !isDeferredRepair;
+                const priceLine = isDeferredRepair ? `<div class="text-xs text-amber-300">報價 $${item.price}（取件收款）</div>` : `<div class="text-xs text-slate-500">$${item.price}</div>`;
+                c.innerHTML += `<div class="bg-slate-800 p-2 rounded-lg flex justify-between items-center text-sm"><div class="flex-1"><div class="text-white font-bold">${nameLine}</div>${priceLine}</div><div class="flex items-center gap-2">${showGiftBtn ? `<button onclick="toggleGift(${idx})" class="text-xs border px-1 rounded ${g}">贈</button>` : ''}<button onclick="Cart.splice(${idx},1);renderCart()" class="text-slate-500 px-2"><i class="fa-solid fa-trash"></i></button></div></div>`; 
             }); 
             document.getElementById('cart-total').innerText = t.toLocaleString(); 
             document.getElementById('mob-total').innerText = '$' + t.toLocaleString(); 
@@ -2039,8 +2177,24 @@
         
         async function confirmCheckout() { 
             try {
-                if(Cart.length === 0) return; 
-                const confirm = await Swal.fire({ title: '確定要結帳嗎？', showCancelButton: true, confirmButtonText: '確定結帳', cancelButtonText: '取消', background: '#1e293b', color: 'white' });
+                if(Cart.length === 0) return;
+                const payableTotal = Cart.reduce((sum, item) => {
+                    if (item.deferredPickup && item.type === 'repair') return sum;
+                    return sum + (Number(item.price) || 0) * (Number(item.quantity) || 1);
+                }, 0);
+                const hasDeferred = Cart.some((item) => item.deferredPickup && item.type === 'repair');
+                const confirmText = hasDeferred
+                    ? (payableTotal > 0 ? `本次收款 $${payableTotal.toLocaleString()}；待取件項目取件時再收款。` : '此單為留機登記，取件時再收款。')
+                    : '';
+                const confirm = await Swal.fire({
+                    title: '確定要結帳嗎？',
+                    text: confirmText,
+                    showCancelButton: true,
+                    confirmButtonText: '確定結帳',
+                    cancelButtonText: '取消',
+                    background: '#1e293b',
+                    color: 'white'
+                });
                 if (!confirm.isConfirmed) return;
                 const cust = document.getElementById('cust-name').value || '過路客'; 
                 const pay = document.querySelector('input[name="pay"]:checked').value; 
@@ -2083,7 +2237,8 @@
                         customer: item.customer||'',
                         customerPhone: item.customerPhone||'',
                         repairNotes: item.repairNotes||'',
-                        photoUrls: item.photoUrls||''
+                        photoUrls: item.photoUrls||'',
+                        deferredPickup: !!item.deferredPickup
                     };
                 });
                 Swal.fire({ title: '結帳處理中...', html: '正在寫入資料，請勿關閉視窗', allowOutsideClick: false, didOpen: () => { Swal.showLoading(); } }); 
@@ -2224,7 +2379,8 @@
                             document.getElementById('r5').value,
                             document.getElementById('r6').value,
                             document.getElementById('r-notes').value,
-                            photoUrls
+                            photoUrls,
+                            !!document.getElementById('r-deferred')?.checked
                         ];
                         } catch (err) {
                             Swal.showValidationMessage(err.message || '照片上傳失敗');
@@ -2244,6 +2400,7 @@
                         customerPhone: v[4] || '',       // 客戶電話
                         repairNotes: v[6] || '',
                         photoUrls: v[7] || '',
+                        deferredPickup: !!v[8],
                         cost: item.cost || 0,            // 庫存已有成本，自動帶入
                         price: Number(v[5]) || 0,        // 價格
                         quantity: 1, 
@@ -2274,7 +2431,8 @@
                             document.getElementById('r6').value,
                             document.getElementById('r7').value,
                             document.getElementById('r-notes').value,
-                            photoUrls
+                            photoUrls,
+                            !!document.getElementById('r-deferred')?.checked
                         ];
                         } catch (err) {
                             Swal.showValidationMessage(err.message || '照片上傳失敗');
@@ -2294,6 +2452,7 @@
                         customerPhone: v[4] || '',  // 客戶電話
                         repairNotes: v[7] || '',
                         photoUrls: v[8] || '',
+                        deferredPickup: !!v[9],
                         cost: Number(v[5]) || 0,   // 成本（當日叫貨用，僅流水與利潤顯示）
                         price: Number(v[6]) || 0,   // 價格
                         quantity: 1, 
