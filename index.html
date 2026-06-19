@@ -140,6 +140,9 @@
                         <label><input type="radio" name="pay" value="linepay" class="peer hidden"><div class="py-1.5 md:p-2 rounded border border-slate-600 peer-checked:bg-green-500 peer-checked:text-black cursor-pointer">Line Pay</div></label>
                         <label><input type="radio" name="pay" value="credit" class="peer hidden"><div class="py-1.5 md:p-2 rounded border border-slate-600 peer-checked:bg-red-600 peer-checked:text-white cursor-pointer">掛帳</div></label>
                     </div>
+                    <label class="flex items-center justify-center py-1.5 rounded border border-slate-600 cursor-pointer" title="同事案（對帳用，僅本機）">
+                        <input type="checkbox" id="order-peer-mark" class="accent-cyan-500 w-4 h-4">
+                    </label>
                     <div class="cart-total-row-mobile flex flex-row md:flex-col items-center justify-between md:justify-start gap-2 md:gap-0">
                         <div class="flex justify-between items-center flex-shrink-0 md:w-full"><span class="text-slate-400 text-xs md:text-sm cart-total-label">總金額</span><span class="text-xl md:text-2xl font-bold text-yellow-400 ml-2 md:ml-0" id="cart-total">0</span></div>
                         <button onclick="confirmCheckout()" class="cart-confirm-btn-mobile flex-1 md:w-full min-w-0 bg-yellow-500 hover:bg-yellow-400 text-black font-bold py-2.5 md:py-3 rounded-xl shadow-lg active:scale-95 transition text-sm md:text-base">確認結帳</button>
@@ -420,6 +423,10 @@
           }
         };
         
+        const PEER_MARK_KEY = 'pos_peer_marks_v1';
+        function loadPeerMarks() { try { return JSON.parse(localStorage.getItem(PEER_MARK_KEY) || '{}'); } catch (e) { return {}; } }
+        function savePeerMark(orderId) { if (!orderId) return; const m = loadPeerMarks(); m[orderId] = true; localStorage.setItem(PEER_MARK_KEY, JSON.stringify(m)); }
+        function isOrderPeerMarked(orderId) { return !!loadPeerMarks()[orderId]; }
         let ItemRegistry = {};
         let OrderRegistry = {};
         let User = { name: '', isAdmin: false };
@@ -796,7 +803,7 @@
         }
         function orderGroupMatchesLedgerFilter(g, tokens) {
             if (!tokens || tokens.length === 0) return true;
-            const header = [String(g.time || ''), formatDate(g.time), String(g.customer || ''), String(g.orderId || ''), String(g.person || ''), String(g.payMethod || ''), String(g.status || '')].join(' ').toLowerCase();
+            const header = [String(g.time || ''), formatDate(g.time), String(g.customer || ''), String(g.orderId || ''), String(g.person || ''), String(g.payMethod || ''), String(g.status || ''), isOrderPeerMarked(g.orderId) ? '同事案' : ''].join(' ').toLowerCase();
             if (tokens.every(t => header.includes(t))) return true;
             return (g.items || []).some(it => matchesLedgerFilter(it, tokens));
         }
@@ -830,12 +837,21 @@
             const cost = Number(it.cost) || 0;
             return it.type === 'accessory' && sale === 0 && cost > 0;
         }
+        function isGiftDeduction(it) {
+            const sale = Number(it.salePrice) || 0;
+            const cost = Number(it.cost) || 0;
+            if (cost <= 0) return false;
+            if (it.type === 'accessory' && sale === 0) return true;
+            if (it.type === 'repair' && sale === 0) return true;
+            if (it.type === 'shipping' && sale === 0) return true;
+            return false;
+        }
         function isCardCopyItem(it) {
             const n = (it.itemName || it.name || '').toLowerCase();
             return n.includes('泰國註冊卡') || n.includes('網卡') || n.includes('esim');
         }
         function calcGiftAllocation(normalized) {
-            const G = normalized.reduce((s, it) => isGiftAccessory(it) ? s + (Number(it.cost) || 0) : s, 0);
+            const G = normalized.reduce((s, it) => isGiftDeduction(it) ? s + (Number(it.cost) || 0) : s, 0);
             const alloc = { used: 0, new: 0, repair: 0, acc: 0, card: 0 };
             if (G <= 0) return alloc;
             const hasUsed = normalized.some(it => it.type === 'phone' || it.type === 'peer_phone');
@@ -1093,6 +1109,7 @@
             const hasSoftItems = (g.items || []).some(it => it.type === 'software' || it.type === 'software_phone');
             const hasCardItems = (g.items || []).some(it => { const n=(it.itemName || it.name || '').toLowerCase(); return n.includes('\u6cf0\u570b\u8a3b\u518a\u5361') || n.includes('\u7db2\u5361') || n.includes('esim'); });
             const oidEsc = String(g.orderId || '').replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+            const markBadge = (g.peerMark || isOrderPeerMarked(g.orderId)) ? '<span class="text-[10px] text-cyan-400 ml-1" title="同事案">✓</span>' : '';
             const statusHtml = g.status === 'Pending'
                 ? '<span class="text-red-400">未結</span>'
                 : `<button type="button" onclick="event.stopPropagation(); confirmUnsettle('${oidEsc}', ${Number(g.total) || 0})" class="text-[10px] bg-green-900/40 text-green-300 px-1.5 py-0.5 rounded border border-green-700 hover:bg-green-800 hover:text-green-200">已結</button>`;
@@ -1106,7 +1123,7 @@
                     ${selectBox}
                     <div ${rowToggle} class="flex-1 flex justify-between items-center cursor-pointer min-w-0">
                     <div class="flex-1 min-w-0">
-                        <div class="text-white text-sm font-bold">${compact ? formatDate(g.time) : (g.customer || '過路客')}</div>
+                        <div class="text-white text-sm font-bold">${compact ? formatDate(g.time) : (g.customer || '過路客')}${markBadge}</div>
                         <div class="text-xs text-slate-500">${compact ? (g.orderId || '') : formatDate(g.time)}</div>
                     </div>
                     <div class="w-24 text-right shrink-0">
@@ -1166,6 +1183,7 @@
                     expenseRows.push(i);
                 } else {
                     if(!groups[i.orderId]) groups[i.orderId] = { ...i, items:[], total:0, net:0 };
+                    if (isOrderPeerMarked(i.orderId)) groups[i.orderId].peerMark = true;
                     groups[i.orderId].items.push(i);
                     let sale = Number(i.salePrice) || 0;
                     let cost = Number(i.cost) || 0;
@@ -1346,6 +1364,7 @@
                     expenseRows.push(i);
                 } else {
                     if(!groups[i.orderId]) groups[i.orderId] = { ...i, items:[], total:0, net:0 };
+                    if (isOrderPeerMarked(i.orderId)) groups[i.orderId].peerMark = true;
                     groups[i.orderId].items.push(i);
                     let sale = i.salePrice || 0;
                     let cost = i.cost || 0;
@@ -1837,40 +1856,10 @@
                 if (!confirm.isConfirmed) return;
                 const cust = document.getElementById('cust-name').value || '過路客'; 
                 const pay = document.querySelector('input[name="pay"]:checked').value; 
-                const oid = 'ORD' + Date.now().toString().slice(-6); 
-                const items = Cart.flatMap(item => {
-                    if (item.isMultiPhone && item.allIds) {
-                        const totalCost = item.allIds.reduce((sum, pid) => {
-                            const ph = DB.inv.find(x => String(x.id) === String(pid));
-                            return sum + (ph ? (Number(ph.cost) || 0) : 0);
-                        }, 0);
-                        return item.allIds.map((pid, idx) => {
-                            const ph = DB.inv.find(x => String(x.id) === String(pid));
-                            const phName = ph ? ph.name : item.name;
-                            if(ph) ph.status_label = '已售出';
-                            return {
-                                itemName: '(二) ' + item.name + (item.allStockIds ? ' #' + item.allStockIds.join('+') : ''),
-                                name: item.name,
-                                type: 'phone',
-                                itemId: pid,
-                                salePrice: idx === 0 ? item.price : 0,
-                                cost: ph ? (Number(ph.cost) || 0) : 0,
-                                profit: idx === 0 ? (item.price - totalCost) : 0,
-                                bundlePrice: item.price,
-                                isMultiPhoneExtra: idx > 0,
-                                quantity: 1,
-                                imei: ph ? (ph.imei || '') : '',
-                                modelName: phName,
-                                reason: '', description: '', isStockBattery: false,
-                                isDirectTransfer: false, batteryCat: '', category: '',
-                                dealerName: '', customer: '',
-                                _prebuilt: true
-                            };
-                        });
-                    }
-                    return [item];
-                }).map(item => {
-                    if (item._prebuilt) return item;
+                const oid = 'ORD' + Date.now().toString().slice(-6);
+                const markEl = document.getElementById('order-peer-mark');
+                const peerMarkChecked = !!(markEl && markEl.checked);
+                const items = Cart.map(item => {
                     let finalName = item.name; 
                     let prefix = '';
                     if(item.type === 'new_phone') prefix = '(\u65b0) ';
@@ -1913,7 +1902,9 @@
                         Swal.fire({icon:'error', title:'結帳失敗', text: result.msg || '請截圖通知管理員', background: '#1e293b'}); 
                         return; 
                     }
-                    Cart = []; 
+                    Cart = [];
+                    if (peerMarkChecked) savePeerMark(oid);
+                    if (markEl) markEl.checked = false;
                     renderCart(); 
                     toggleMobileCart('pos', false);
                     try { const activeBtn = document.querySelector('.pill-btn.active'); if(activeBtn) filterItems(null, activeBtn.innerText); } catch(e) {}
@@ -2251,34 +2242,57 @@
             if (UI.selectedPhones.size === 0) return;
             const phones = Array.from(UI.selectedPhones).map(id => DB.inv.find(x => String(x.id) === String(id))).filter(Boolean);
             if (phones.length === 0) return;
-            const listHTML = phones.map(p => `<div class="text-sm text-slate-300 py-1 border-b border-slate-700">${p.name} <span class="text-slate-500 text-xs">#${p.stock_id}</span></div>`).join('');
-            const totalCost = phones.reduce((s, p) => s + (Number(p.cost) || 0), 0);
-            const { value } = await Swal.fire({
+            const rowsHTML = phones.map((p, idx) => {
+                const def = (Number(p.price) > 0 ? p.price : (Number(p.defaultPrice) > 0 ? p.defaultPrice : ''));
+                const costHint = Number(p.cost) > 0 ? `<span class="text-slate-500 text-[10px] ml-1">本 ${Number(p.cost).toLocaleString()}</span>` : '';
+                return `<div class="flex items-center gap-2 py-1.5 border-b border-slate-700 text-left">
+                    <div class="flex-1 min-w-0 text-sm text-slate-300 truncate">${p.name} <span class="text-slate-500 text-xs">#${p.stock_id}</span>${costHint}</div>
+                    <input id="multi-price-${idx}" type="number" class="swal2-input !my-0 !w-24 !text-sm" placeholder="售價" value="${def}">
+                </div>`;
+            }).join('');
+            const { value: prices } = await Swal.fire({
                 title: `共 ${phones.length} 台手機`,
-                html: `<div class="mb-3 max-h-40 overflow-y-auto">${listHTML}</div><input id="multi-price" type="number" class="swal2-input" placeholder="總價格">`,
+                html: `<div class="mb-2 max-h-48 overflow-y-auto text-left">${rowsHTML}</div>
+                    <div class="flex gap-2 items-center mt-2">
+                        <input id="multi-total-fill" type="number" class="swal2-input !my-0 flex-1 !text-sm" placeholder="總價（選填）">
+                        <button type="button" id="multi-split-btn" class="text-xs px-2 py-2 rounded bg-slate-600 text-white shrink-0">平均分配</button>
+                    </div>`,
                 background: '#1e293b', color: 'white',
                 showCancelButton: true, confirmButtonText: '加入購物車', cancelButtonText: '取消',
-                preConfirm: () => document.getElementById('multi-price').value
+                didOpen: () => {
+                    const btn = document.getElementById('multi-split-btn');
+                    if (btn) btn.onclick = () => {
+                        const total = parseInt(document.getElementById('multi-total-fill')?.value) || 0;
+                        if (total <= 0) return;
+                        const base = Math.floor(total / phones.length);
+                        let rem = total - base * phones.length;
+                        phones.forEach((_, idx) => {
+                            const el = document.getElementById('multi-price-' + idx);
+                            if (el) el.value = String(base + (idx < rem ? 1 : 0));
+                        });
+                    };
+                },
+                preConfirm: () => {
+                    const vals = phones.map((_, idx) => parseInt(document.getElementById('multi-price-' + idx)?.value) || 0);
+                    if (vals.some(v => v <= 0)) { Swal.showValidationMessage('每台請填售價'); return false; }
+                    return vals;
+                }
             });
-            if (!value) return;
-            const totalPrice = parseInt(value) || 0;
-            const names = phones.map(p => p.name).join(' + ');
-            const combinedItem = {
-                id: phones[0].id,
-                stock_id: phones.map(p => p.stock_id).join('+'),
-                type: 'phone',
-                name: names,
-                price: totalPrice,
-                cost: totalCost,
-                quantity: 1,
-                itemId: phones[0].id,
-                originalPrice: totalPrice,
-                isGift: false,
-                isMultiPhone: true,
-                allIds: phones.map(p => p.id),
-                allStockIds: phones.map(p => p.stock_id)
-            };
-            Cart.push(combinedItem);
+            if (!prices) return;
+            phones.forEach((p, idx) => {
+                Cart.push({
+                    id: p.id,
+                    stock_id: p.stock_id,
+                    type: 'phone',
+                    name: p.name,
+                    price: prices[idx],
+                    cost: Number(p.cost) || 0,
+                    quantity: 1,
+                    itemId: p.id,
+                    originalPrice: prices[idx],
+                    isGift: false
+                });
+            });
             renderCart();
             cancelMultiSelect();
         }

@@ -142,13 +142,22 @@ function isGiftAccessory(it) {
   const cost = Number(it.cost) || 0;
   return it.type === "accessory" && sale === 0 && cost > 0;
 }
+function isGiftDeduction(it) {
+  const sale = Number(it.salePrice) || 0;
+  const cost = Number(it.cost) || 0;
+  if (cost <= 0) return false;
+  if (it.type === "accessory" && sale === 0) return true;
+  if (it.type === "repair" && sale === 0) return true;
+  if (it.type === "shipping" && sale === 0) return true;
+  return false;
+}
 function isCardCopyItem(it) {
   const n = (it.itemName || it.name || "").toLowerCase();
   return n.includes("泰國註冊卡") || n.includes("網卡") || n.includes("esim");
 }
 function calcGiftAllocation(normalized) {
   const G = normalized.reduce(
-    (s, it) => (isGiftAccessory(it) ? s + (Number(it.cost) || 0) : s),
+    (s, it) => (isGiftDeduction(it) ? s + (Number(it.cost) || 0) : s),
     0,
   );
   const alloc = { used: 0, new: 0, repair: 0, acc: 0, card: 0 };
@@ -297,5 +306,13 @@ assert(
   "repair does not share gift when used exists",
 );
 assert(copyPure([usedPhone, repair, gift], "repair") === 1200, "repair full when used bears gift");
+
+const giftShip = { type: "shipping", itemName: "(運) 運費 (贈)", salePrice: 0, cost: 80, profit: -80 };
+assert(
+  JSON.stringify(calcGiftAllocation([usedPhone, giftShip])) ===
+    JSON.stringify({ used: 80, new: 0, repair: 0, acc: 0, card: 0 }),
+  "gift shipping on used",
+);
+assert(copyPure([usedPhone, giftShip], "used") === 1920, "used copy deducts gift shipping");
 
 console.log("ledger-and-gift.mjs: all assertions passed.");
