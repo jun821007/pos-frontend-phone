@@ -422,6 +422,14 @@
               body: JSON.stringify({ category, name })
             });
             return await res.json();
+          },
+          uploadRepairPhotos: async (files) => {
+            const res = await fetch(`${API_BASE_URL}/repair-upload`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ files })
+            });
+            return await res.json();
           }
         };
         
@@ -1176,6 +1184,81 @@
             applyStatsPanelState('report');
             renderReport(); 
         }
+
+        function parseLedgerDate(v) {
+            if (!v) return null;
+            const s = typeof v === 'string' ? v.replace(/\s*下午\s*/, ' ').replace(/\s*上午\s*/, ' ') : v;
+            const d = new Date(s);
+            return isNaN(d.getTime()) ? null : d;
+        }
+        function isDeferredPayMethod(pm) { return pm === 'linepay' || pm === 'credit'; }
+        function ledgerTodayRange() {
+            const n = new Date();
+            const rangeStart = new Date(n); rangeStart.setHours(0, 0, 0, 0);
+            const rangeEnd = new Date(n); rangeEnd.setHours(23, 59, 59, 999);
+            return { rangeStart, rangeEnd };
+        }
+        function ledgerRangeFromInputs(startId, endId) {
+            const elS = document.getElementById(startId);
+            const elE = document.getElementById(endId);
+            if (!elS || !elE || !elS.value || !elE.value) return null;
+            const rangeStart = new Date(elS.value);
+            const rangeEnd = new Date(elE.value);
+            if (isNaN(rangeStart.getTime()) || isNaN(rangeEnd.getTime())) return null;
+            rangeStart.setHours(0, 0, 0, 0);
+            rangeEnd.setHours(23, 59, 59, 999);
+            return { rangeStart, rangeEnd };
+        }
+        function ledgerCountsCompletedCash(i, rangeStart, rangeEnd) {
+            if (i.status !== 'Completed') return false;
+            const sale = Number(i.salePrice) || 0;
+            if (!sale) return false;
+            if (isDeferredPayMethod(i.payMethod)) {
+                const settled = parseLedgerDate(i.settledAt) || parseLedgerDate(i.time);
+                return settled && settled >= rangeStart && settled <= rangeEnd;
+            }
+            const checkout = parseLedgerDate(i.time);
+            return checkout && checkout >= rangeStart && checkout <= rangeEnd;
+        }
+        function ledgerCountsCompletedProfit(i, rangeStart, rangeEnd) {
+            if (i.status !== 'Completed' || i.type === 'wrap') return false;
+            if (isDeferredPayMethod(i.payMethod)) {
+                const settled = parseLedgerDate(i.settledAt) || parseLedgerDate(i.time);
+                return settled && settled >= rangeStart && settled <= rangeEnd;
+            }
+            const checkout = parseLedgerDate(i.time);
+            return checkout && checkout >= rangeStart && checkout <= rangeEnd;
+        }
+        function ledgerCountsPendingPot(i, rangeStart, rangeEnd) {
+            if (i.status !== 'Pending') return false;
+            const checkout = parseLedgerDate(i.time);
+            return checkout && checkout >= rangeStart && checkout <= rangeEnd;
+        }
+        async function readRepairPhotoFiles(fileList) {
+            const files = Array.from(fileList || []).slice(0, 3);
+            const out = [];
+            for (const f of files) {
+                if (!f.type || !f.type.startsWith('image/')) continue;
+                const data = await new Promise((resolve, reject) => {
+                    const r = new FileReader();
+                    r.onload = () => resolve(String(r.result).split(',')[1] || '');
+                    r.onerror = reject;
+                    r.readAsDataURL(f);
+                });
+                out.push({ name: f.name, mimeType: f.type, data });
+            }
+            return out;
+        }
+        async function uploadRepairPhotosFromInput(inputId) {
+            const el = document.getElementById(inputId);
+            if (!el || !el.files || !el.files.length) return '';
+            const payload = await readRepairPhotoFiles(el.files);
+            if (!payload.length) return '';
+            const res = await API.uploadRepairPhotos(payload);
+            if (res.status !== 'success') throw new Error(res.msg || '照片上傳失敗');
+            return (res.urls || []).join(',');
+        }
+        const REPAIR_EXTRA_HTML = '<textarea id="r-notes" class="swal2-textarea" placeholder="備註（選填）" rows="2"></textarea><label class="block text-left text-xs text-slate-400 mt-2 mb-1 px-2">維修照片（最多3張，選填）</label><input id="r-photos" type="file" accept="image/*" multiple class="swal2-input text-sm">';
         function renderReport() {
             let stats = { cash:0, pending:0, profit:0, pot:0, exp:0, gift:0 };
             const div = document.getElementById('today-list');
@@ -1206,13 +1289,16 @@
                         groups[i.orderId].total += sale;
                         groups[i.orderId].net += iProfit;
                     }
+                    const todayRange = ledgerTodayRange();
                     if (i.status === 'Completed' && !isMultiExtra) { 
-                        stats.cash += sale; 
-                        if(i.type!=='wrap') stats.profit += iProfit; 
+                        if (ledgerCountsCompletedCash(i, todayRange.rangeStart, todayRange.rangeEnd)) stats.cash += sale; 
+                        if (ledgerCountsCompletedProfit(i, todayRange.rangeStart, todayRange.rangeEnd) && i.type!=='wrap') stats.profit += iProfit; 
                     }
                     else if (i.status === 'Pending' && !isMultiExtra) { 
-                        stats.pending += sale; 
-                        if(i.type!=='wrap') stats.pot += iProfit; 
+                        if (ledgerCountsPendingPot(i, todayRange.rangeStart, todayRange.rangeEnd)) {
+                            stats.pending += sale; 
+                            if(i.type!=='wrap') stats.pot += iProfit;
+                        }
                     }
                     if (sale===0 && cost>0 && !isMultiExtra) stats.gift += cost;
                 }
@@ -1363,6 +1449,7 @@
             const tokens = ledgerFilterTokens(searchEl ? searchEl.value : '');
             div.innerHTML = '';
             let stats = { cash:0, pending:0, profit:0, pot:0, exp:0, gift:0 };
+            const histRange = ledgerRangeFromInputs('h-start', 'h-end') || ledgerTodayRange();
             const groups = {};
             const expenseRows = [];
             DB.history.forEach(i => {
@@ -1384,8 +1471,9 @@
                     const isMultiExtra = i.type==='phone' && sale===0 && (i.itemName||'').includes(' + ');
                     const iHistProfit = (i.profit !== undefined && i.profit !== null && i.profit !== '') ? Number(i.profit) : (sale - cost);
                     if (!isMultiExtra) { groups[i.orderId].total += sale; groups[i.orderId].net += iHistProfit; }
-                    if (i.status === 'Completed' && !isMultiExtra) { stats.cash += sale; if(i.type!=='wrap') stats.profit += iHistProfit; }
-                    else if (i.status === 'Pending' && !isMultiExtra) { stats.pending += sale; if(i.type!=='wrap') stats.pot += iHistProfit; }
+                    if (ledgerCountsCompletedCash(i, histRange.rangeStart, histRange.rangeEnd) && !isMultiExtra) stats.cash += sale;
+                    if (ledgerCountsCompletedProfit(i, histRange.rangeStart, histRange.rangeEnd) && !isMultiExtra) stats.profit += iHistProfit;
+                    else if (ledgerCountsPendingPot(i, histRange.rangeStart, histRange.rangeEnd) && !isMultiExtra) { stats.pending += sale; if(i.type!=='wrap') stats.pot += iHistProfit; }
                     if (sale===0 && cost>0 && !isMultiExtra) stats.gift += cost;
                 }
             });
@@ -1906,7 +1994,9 @@
                         category: item.category||'', 
                         dealerName: item.dealerName||'', 
                         customer: item.customer||'',
-                        customerPhone: item.customerPhone||''
+                        customerPhone: item.customerPhone||'',
+                        repairNotes: item.repairNotes||'',
+                        photoUrls: item.photoUrls||''
                     };
                 });
                 Swal.fire({ title: '結帳處理中...', html: '正在寫入資料，請勿關閉視窗', allowOutsideClick: false, didOpen: () => { Swal.showLoading(); } }); 
@@ -2031,17 +2121,21 @@
                 // 庫存電池維修：顯示維修登記表單（型號、序號、更換物品、客戶、價格），然後寫入維修紀錄
                 const { value: v } = await Swal.fire({ 
                     title: '維修登記 - 庫存電池',
-                    html: '<input id="r1" class="swal2-input" placeholder="型號"><input id="r2" class="swal2-input" placeholder="序號（IMEI）"><input id="r3" class="swal2-input" placeholder="更換物品"><input id="r4" class="swal2-input" placeholder="客戶名稱"><input id="r5" class="swal2-input" placeholder="客戶電話"><input id="r6" class="swal2-input" type="number" placeholder="價格（成本已帶入庫存）">', 
+                    html: '<input id="r1" class="swal2-input" placeholder="型號"><input id="r2" class="swal2-input" placeholder="序號（IMEI）"><input id="r3" class="swal2-input" placeholder="更換物品"><input id="r4" class="swal2-input" placeholder="客戶名稱"><input id="r5" class="swal2-input" placeholder="客戶電話"><input id="r6" class="swal2-input" type="number" placeholder="價格（成本已帶入庫存）">' + REPAIR_EXTRA_HTML, 
                     background: '#1e293b', 
                     color: 'white', 
-                    preConfirm: () => [
-                        document.getElementById('r1').value,  // 型號
-                        document.getElementById('r2').value,  // 序號（IMEI）
-                        document.getElementById('r3').value,  // 更換物品（故障原因/描述）
-                        document.getElementById('r4').value,  // 客戶名稱
-                        document.getElementById('r5').value,  // 客戶電話
-                        document.getElementById('r6').value   // 價格
-                    ] 
+                    preConfirm: async () => {
+                        const photoUrls = await uploadRepairPhotosFromInput('r-photos');
+                        return [
+                        document.getElementById('r1').value,
+                        document.getElementById('r2').value,
+                        document.getElementById('r3').value,
+                        document.getElementById('r4').value,
+                        document.getElementById('r5').value,
+                        document.getElementById('r6').value,
+                        document.getElementById('r-notes').value,
+                        photoUrls
+                    ] } 
                 });
                 if (v && v[0] && v[5]) { 
                     Cart.push({ 
@@ -2053,6 +2147,8 @@
                         description: v[2] || '',         // 故障描述（與更換物品相同）
                         customer: v[3] || '',            // 客戶名稱
                         customerPhone: v[4] || '',       // 客戶電話
+                        repairNotes: v[6] || '',
+                        photoUrls: v[7] || '',
                         cost: item.cost || 0,            // 庫存已有成本，自動帶入
                         price: Number(v[5]) || 0,        // 價格
                         quantity: 1, 
@@ -2066,18 +2162,22 @@
             } else {
                 // 一般維修：輸入型號、序號（IMEI）、更換物品、客戶、成本、價格
                 const { value: v } = await Swal.fire({ 
-                    html: '<input id="r1" class="swal2-input" placeholder="型號"><input id="r2" class="swal2-input" placeholder="序號（IMEI）"><input id="r3" class="swal2-input" placeholder="更換物品"><input id="r4" class="swal2-input" placeholder="客戶名稱"><input id="r5" class="swal2-input" placeholder="客戶電話"><input id="r6" class="swal2-input" type="number" placeholder="成本"><input id="r7" class="swal2-input" type="number" placeholder="價格">', 
+                    html: '<input id="r1" class="swal2-input" placeholder="型號"><input id="r2" class="swal2-input" placeholder="序號（IMEI）"><input id="r3" class="swal2-input" placeholder="更換物品"><input id="r4" class="swal2-input" placeholder="客戶名稱"><input id="r5" class="swal2-input" placeholder="客戶電話"><input id="r6" class="swal2-input" type="number" placeholder="成本"><input id="r7" class="swal2-input" type="number" placeholder="價格">' + REPAIR_EXTRA_HTML, 
                     background: '#1e293b', 
                     color: 'white', 
-                    preConfirm: () => [
-                        document.getElementById('r1').value,  // 型號
-                        document.getElementById('r2').value,  // 序號（IMEI）
-                        document.getElementById('r3').value,  // 更換物品（故障原因/描述）
-                        document.getElementById('r4').value,  // 客戶名稱
-                        document.getElementById('r5').value,  // 客戶電話
-                        document.getElementById('r6').value,  // 成本
-                        document.getElementById('r7').value   // 價格
-                    ] 
+                    preConfirm: async () => {
+                        const photoUrls = await uploadRepairPhotosFromInput('r-photos');
+                        return [
+                        document.getElementById('r1').value,
+                        document.getElementById('r2').value,
+                        document.getElementById('r3').value,
+                        document.getElementById('r4').value,
+                        document.getElementById('r5').value,
+                        document.getElementById('r6').value,
+                        document.getElementById('r7').value,
+                        document.getElementById('r-notes').value,
+                        photoUrls
+                    ] } 
                 });
                 if (v && v[0] && v[6]) { 
                     Cart.push({ 
@@ -2089,6 +2189,8 @@
                         description: v[2] || '',    // 故障描述（與更換物品相同）
                         customer: v[3] || '',       // 客戶名稱
                         customerPhone: v[4] || '',  // 客戶電話
+                        repairNotes: v[7] || '',
+                        photoUrls: v[8] || '',
                         cost: Number(v[5]) || 0,   // 成本（當日叫貨用，僅流水與利潤顯示）
                         price: Number(v[6]) || 0,   // 價格
                         quantity: 1, 
