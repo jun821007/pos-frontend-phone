@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="zh-TW">
 <head>
     <meta charset="UTF-8">
@@ -429,7 +429,11 @@
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ files })
             });
-            return await res.json();
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok) {
+              return { status: 'error', msg: data.msg || data.message || ('上傳失敗 HTTP ' + res.status) };
+            }
+            return data;
           }
         };
         
@@ -1234,36 +1238,84 @@
             const checkout = parseLedgerDate(i.time);
             return checkout && checkout >= rangeStart && checkout <= rangeEnd;
         }
-        let repairPastedPhotos = [];
-        function resetRepairPastedPhotos() { repairPastedPhotos = []; }
-        async function readRepairPhotoFiles(fileList) {
-            const files = Array.from(fileList || []);
-            const out = [];
-            for (const f of files) {
-                if (!f.type || !f.type.startsWith('image/')) continue;
+        const REPAIR_PHOTO_MAX = 6;
+        let repairPhotoQueue = [];
+        function resetRepairPhotoQueue() { repairPhotoQueue = []; }
+        async function prepareRepairPhotoFile(file) {
+            if (!file || !file.type || !file.type.startsWith('image/')) return null;
+            try {
+                const bmp = await createImageBitmap(file);
+                const maxSide = 1920;
+                let w = bmp.width, h = bmp.height;
+                if (w > maxSide || h > maxSide) {
+                    const scale = maxSide / Math.max(w, h);
+                    w = Math.round(w * scale);
+                    h = Math.round(h * scale);
+                }
+                const canvas = document.createElement('canvas');
+                canvas.width = w;
+                canvas.height = h;
+                const ctx = canvas.getContext('2d');
+                if (!ctx) throw new Error('canvas');
+                ctx.drawImage(bmp, 0, 0, w, h);
+                if (bmp.close) bmp.close();
+                const blob = await new Promise((resolve, reject) => canvas.toBlob((b) => b ? resolve(b) : reject(new Error('blob')), 'image/jpeg', 0.85));
                 const data = await new Promise((resolve, reject) => {
                     const r = new FileReader();
                     r.onload = () => resolve(String(r.result).split(',')[1] || '');
                     r.onerror = reject;
-                    r.readAsDataURL(f);
+                    r.readAsDataURL(blob);
                 });
-                out.push({ name: f.name, mimeType: f.type, data });
+                const base = String(file.name || 'photo').replace(/\.[^.]+$/, '');
+                return { name: base + '.jpg', mimeType: 'image/jpeg', data };
+            } catch (e) {
+                const data = await new Promise((resolve, reject) => {
+                    const r = new FileReader();
+                    r.onload = () => resolve(String(r.result).split(',')[1] || '');
+                    r.onerror = reject;
+                    r.readAsDataURL(file);
+                });
+                return { name: file.name || 'photo.jpg', mimeType: file.type || 'image/jpeg', data };
             }
-            return out;
+        }
+        async function addRepairPhotoFiles(fileList) {
+            const files = Array.from(fileList || []);
+            for (const f of files) {
+                if (repairPhotoQueue.length >= REPAIR_PHOTO_MAX) {
+                    Swal.showValidationMessage('最多 ' + REPAIR_PHOTO_MAX + ' 張圖');
+                    break;
+                }
+                const prepared = await prepareRepairPhotoFile(f);
+                if (prepared) repairPhotoQueue.push(prepared);
+            }
+            renderRepairPhotoPreview();
         }
         function renderRepairPhotoPreview() {
             const preview = document.getElementById('r-photo-preview');
+            const countEl = document.getElementById('r-photo-count');
+            if (countEl) countEl.textContent = repairPhotoQueue.length + ' / ' + REPAIR_PHOTO_MAX;
             if (!preview) return;
-            preview.innerHTML = repairPastedPhotos.map((p, i) => '<span class="inline-block mr-2 mb-1 text-center"><img src="data:' + p.mimeType + ';base64,' + p.data + '" style="height:52px;border-radius:6px;border:1px solid #475569"><button type="button" class="block w-full text-red-400 text-[10px] r-photo-rm" data-i="' + i + '">移除</button></span>').join('');
+            preview.innerHTML = repairPhotoQueue.map((p, i) => '<span class="inline-block mr-2 mb-1 text-center"><img src="data:' + p.mimeType + ';base64,' + p.data + '" style="height:56px;width:56px;object-fit:cover;border-radius:6px;border:1px solid #475569"><button type="button" class="block w-full text-red-400 text-[10px] r-photo-rm" data-i="' + i + '">移除</button></span>').join('');
             preview.querySelectorAll('.r-photo-rm').forEach((btn) => {
-                btn.onclick = (e) => { e.preventDefault(); repairPastedPhotos.splice(Number(btn.dataset.i), 1); renderRepairPhotoPreview(); };
+                btn.onclick = (e) => { e.preventDefault(); repairPhotoQueue.splice(Number(btn.dataset.i), 1); renderRepairPhotoPreview(); };
             });
         }
+        function bindRepairPhotoPickers() {
+            const album = document.getElementById('r-photos');
+            const camera = document.getElementById('r-photos-cam');
+            const btnAlbum = document.getElementById('r-pick-album');
+            const btnCamera = document.getElementById('r-pick-camera');
+            if (btnAlbum && album) btnAlbum.onclick = (e) => { e.preventDefault(); album.click(); };
+            if (btnCamera && camera) btnCamera.onclick = (e) => { e.preventDefault(); camera.click(); };
+            if (album) album.onchange = async () => { await addRepairPhotoFiles(album.files); album.value = ''; };
+            if (camera) camera.onchange = async () => { await addRepairPhotoFiles(camera.files); camera.value = ''; };
+        }
         function initRepairPhotoPaste() {
-            resetRepairPastedPhotos();
+            resetRepairPhotoQueue();
+            bindRepairPhotoPickers();
             const zone = document.getElementById('r-photo-paste');
             if (!zone) return;
-            zone.textContent = '點此後 Ctrl+V 貼上圖片';
+            zone.textContent = '點此後 Ctrl+V 貼上（手機可長按貼上）';
             zone.onclick = () => zone.focus();
             zone.onpaste = async (e) => {
                 e.preventDefault();
@@ -1271,33 +1323,29 @@
                 if (!items) return;
                 for (const item of items) {
                     if (!item.type.startsWith('image/')) continue;
-                    if (repairPastedPhotos.length >= 6) { Swal.showValidationMessage('最多 6 張圖'); return; }
+                    if (repairPhotoQueue.length >= REPAIR_PHOTO_MAX) { Swal.showValidationMessage('最多 ' + REPAIR_PHOTO_MAX + ' 張圖'); return; }
                     const blob = item.getAsFile();
                     if (!blob) continue;
-                    const data = await new Promise((resolve, reject) => {
-                        const r = new FileReader();
-                        r.onload = () => resolve(String(r.result).split(',')[1] || '');
-                        r.onerror = reject;
-                        r.readAsDataURL(blob);
-                    });
-                    repairPastedPhotos.push({ name: 'paste-' + Date.now() + '.jpg', mimeType: item.type || 'image/jpeg', data });
-                    renderRepairPhotoPreview();
+                    const prepared = await prepareRepairPhotoFile(blob);
+                    if (prepared) {
+                        prepared.name = 'paste-' + Date.now() + '.jpg';
+                        repairPhotoQueue.push(prepared);
+                        renderRepairPhotoPreview();
+                    }
                     break;
                 }
             };
             renderRepairPhotoPreview();
         }
         async function uploadAllRepairPhotos() {
-            const el = document.getElementById('r-photos');
-            const fromFiles = el && el.files && el.files.length ? await readRepairPhotoFiles(el.files) : [];
-            const combined = [...repairPastedPhotos, ...fromFiles].slice(0, 6);
-            if (!combined.length) { resetRepairPastedPhotos(); return ''; }
-            const res = await API.uploadRepairPhotos(combined);
+            if (!repairPhotoQueue.length) { resetRepairPhotoQueue(); return ''; }
+            const payload = repairPhotoQueue.slice(0, REPAIR_PHOTO_MAX);
+            const res = await API.uploadRepairPhotos(payload);
             if (res.status !== 'success') throw new Error(res.msg || '照片上傳失敗');
-            resetRepairPastedPhotos();
+            resetRepairPhotoQueue();
             return (res.urls || []).join(',');
         }
-        const REPAIR_EXTRA_HTML = '<textarea id="r-notes" class="swal2-textarea" placeholder="備註（選填）" rows="2"></textarea><label class="block text-left text-xs text-slate-400 mt-2 mb-1 px-2">圖（最多6張，可貼上或選檔案）</label><div id="r-photo-paste" tabindex="0" class="swal2-input text-sm min-h-[52px] flex items-center justify-center text-center text-slate-400 cursor-pointer outline-none focus:border-yellow-500"></div><div id="r-photo-preview" class="px-2 flex flex-wrap"></div><input id="r-photos" type="file" accept="image/*" multiple class="swal2-input text-sm">';
+        const REPAIR_EXTRA_HTML = '<textarea id="r-notes" class="swal2-textarea" placeholder="備註（選填）" rows="2"></textarea><label class="block text-left text-xs text-slate-400 mt-2 mb-1 px-2">圖（最多6張）<span id="r-photo-count" class="float-right text-yellow-500/80">0 / 6</span></label><div id="r-photo-paste" tabindex="0" class="swal2-input text-sm min-h-[48px] flex items-center justify-center text-center text-slate-400 cursor-pointer outline-none focus:border-yellow-500 mx-2">點此貼上圖片</div><div id="r-photo-preview" class="px-2 flex flex-wrap min-h-[8px]"></div><div class="px-2 flex gap-2 mb-1"><button type="button" id="r-pick-album" class="flex-1 py-2 rounded-lg bg-slate-700 text-white text-sm border border-slate-600">相簿</button><button type="button" id="r-pick-camera" class="flex-1 py-2 rounded-lg bg-slate-700 text-white text-sm border border-slate-600">拍照</button></div><input id="r-photos" type="file" accept="image/*" multiple class="hidden"><input id="r-photos-cam" type="file" accept="image/*" capture="environment" class="hidden">';
         function renderReport() {
             let stats = { cash:0, pending:0, profit:0, pot:0, exp:0, gift:0 };
             const div = document.getElementById('today-list');
@@ -2164,18 +2212,25 @@
                     background: '#1e293b', 
                     color: 'white',
                     didOpen: () => { initRepairPhotoPaste(); },
+                    showLoaderOnConfirm: true,
                     preConfirm: async () => {
-                        const photoUrls = await uploadAllRepairPhotos();
-                        return [
-                        document.getElementById('r1').value,
-                        document.getElementById('r2').value,
-                        document.getElementById('r3').value,
-                        document.getElementById('r4').value,
-                        document.getElementById('r5').value,
-                        document.getElementById('r6').value,
-                        document.getElementById('r-notes').value,
-                        photoUrls
-                    ] } 
+                        try {
+                            const photoUrls = await uploadAllRepairPhotos();
+                            return [
+                            document.getElementById('r1').value,
+                            document.getElementById('r2').value,
+                            document.getElementById('r3').value,
+                            document.getElementById('r4').value,
+                            document.getElementById('r5').value,
+                            document.getElementById('r6').value,
+                            document.getElementById('r-notes').value,
+                            photoUrls
+                        ];
+                        } catch (err) {
+                            Swal.showValidationMessage(err.message || '照片上傳失敗');
+                            return false;
+                        }
+                    } 
                 });
                 if (v && v[0] && v[5]) { 
                     Cart.push({ 
@@ -2206,19 +2261,26 @@
                     background: '#1e293b', 
                     color: 'white',
                     didOpen: () => { initRepairPhotoPaste(); },
+                    showLoaderOnConfirm: true,
                     preConfirm: async () => {
-                        const photoUrls = await uploadAllRepairPhotos();
-                        return [
-                        document.getElementById('r1').value,
-                        document.getElementById('r2').value,
-                        document.getElementById('r3').value,
-                        document.getElementById('r4').value,
-                        document.getElementById('r5').value,
-                        document.getElementById('r6').value,
-                        document.getElementById('r7').value,
-                        document.getElementById('r-notes').value,
-                        photoUrls
-                    ] } 
+                        try {
+                            const photoUrls = await uploadAllRepairPhotos();
+                            return [
+                            document.getElementById('r1').value,
+                            document.getElementById('r2').value,
+                            document.getElementById('r3').value,
+                            document.getElementById('r4').value,
+                            document.getElementById('r5').value,
+                            document.getElementById('r6').value,
+                            document.getElementById('r7').value,
+                            document.getElementById('r-notes').value,
+                            photoUrls
+                        ];
+                        } catch (err) {
+                            Swal.showValidationMessage(err.message || '照片上傳失敗');
+                            return false;
+                        }
+                    } 
                 });
                 if (v && v[0] && v[6]) { 
                     Cart.push({ 
