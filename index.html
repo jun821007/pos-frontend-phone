@@ -135,14 +135,16 @@
                     </div>
                     <div class="cart-footer-wrap p-2 md:p-4 bg-slate-800 border-t border-slate-700 space-y-2 md:space-y-3 pb-safe">
                     <div class="grid grid-cols-2 gap-1.5 md:gap-2"><input type="text" id="cust-name" class="w-full py-1.5 md:p-2 rounded-lg input-dark text-xs md:text-sm text-center" placeholder="客戶名稱"><div class="flex items-center justify-center py-1.5 md:p-2 bg-slate-700/50 rounded-lg"><span id="staff-name" class="text-[10px] md:text-xs font-bold">--</span></div></div>
-                    <div class="grid grid-cols-3 gap-1 md:gap-2 text-center text-[10px] md:text-xs">
+                    <div class="flex gap-1 md:gap-2 items-center text-center text-[10px] md:text-xs">
+                        <div class="grid grid-cols-3 flex-1 min-w-0 gap-1 md:gap-2">
                         <label><input type="radio" name="pay" value="cash" checked class="peer hidden"><div class="py-1.5 md:p-2 rounded border border-slate-600 peer-checked:bg-green-600 peer-checked:text-white cursor-pointer">現金</div></label>
                         <label><input type="radio" name="pay" value="linepay" class="peer hidden"><div class="py-1.5 md:p-2 rounded border border-slate-600 peer-checked:bg-green-500 peer-checked:text-black cursor-pointer">Line Pay</div></label>
                         <label><input type="radio" name="pay" value="credit" class="peer hidden"><div class="py-1.5 md:p-2 rounded border border-slate-600 peer-checked:bg-red-600 peer-checked:text-white cursor-pointer">掛帳</div></label>
+                        </div>
+                        <label class="shrink-0 cursor-pointer p-1" title="同事案（對帳用，僅本機）">
+                            <input type="checkbox" id="order-peer-mark" class="accent-cyan-500 w-4 h-4 block">
+                        </label>
                     </div>
-                    <label class="flex items-center justify-center py-1.5 rounded border border-slate-600 cursor-pointer" title="同事案（對帳用，僅本機）">
-                        <input type="checkbox" id="order-peer-mark" class="accent-cyan-500 w-4 h-4">
-                    </label>
                     <div class="cart-total-row-mobile flex flex-row md:flex-col items-center justify-between md:justify-start gap-2 md:gap-0">
                         <div class="flex justify-between items-center flex-shrink-0 md:w-full"><span class="text-slate-400 text-xs md:text-sm cart-total-label">總金額</span><span class="text-xl md:text-2xl font-bold text-yellow-400 ml-2 md:ml-0" id="cart-total">0</span></div>
                         <button onclick="confirmCheckout()" class="cart-confirm-btn-mobile flex-1 md:w-full min-w-0 bg-yellow-500 hover:bg-yellow-400 text-black font-bold py-2.5 md:py-3 rounded-xl shadow-lg active:scale-95 transition text-sm md:text-base">確認結帳</button>
