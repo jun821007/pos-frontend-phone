@@ -1905,7 +1905,8 @@
                         batteryCat: item.batteryCat||'', 
                         category: item.category||'', 
                         dealerName: item.dealerName||'', 
-                        customer: item.customer||'' 
+                        customer: item.customer||'',
+                        customerPhone: item.customerPhone||''
                     };
                 });
                 Swal.fire({ title: '結帳處理中...', html: '正在寫入資料，請勿關閉視窗', allowOutsideClick: false, didOpen: () => { Swal.showLoading(); } }); 
@@ -2030,7 +2031,7 @@
                 // 庫存電池維修：顯示維修登記表單（型號、序號、更換物品、客戶、價格），然後寫入維修紀錄
                 const { value: v } = await Swal.fire({ 
                     title: '維修登記 - 庫存電池',
-                    html: '<input id="r1" class="swal2-input" placeholder="型號"><input id="r2" class="swal2-input" placeholder="序號（IMEI）"><input id="r3" class="swal2-input" placeholder="更換物品"><input id="r4" class="swal2-input" placeholder="客戶名稱"><input id="r5" class="swal2-input" type="number" placeholder="價格（成本已帶入庫存）">', 
+                    html: '<input id="r1" class="swal2-input" placeholder="型號"><input id="r2" class="swal2-input" placeholder="序號（IMEI）"><input id="r3" class="swal2-input" placeholder="更換物品"><input id="r4" class="swal2-input" placeholder="客戶名稱"><input id="r5" class="swal2-input" placeholder="客戶電話"><input id="r6" class="swal2-input" type="number" placeholder="價格（成本已帶入庫存）">', 
                     background: '#1e293b', 
                     color: 'white', 
                     preConfirm: () => [
@@ -2038,10 +2039,11 @@
                         document.getElementById('r2').value,  // 序號（IMEI）
                         document.getElementById('r3').value,  // 更換物品（故障原因/描述）
                         document.getElementById('r4').value,  // 客戶名稱
-                        document.getElementById('r5').value   // 價格
+                        document.getElementById('r5').value,  // 客戶電話
+                        document.getElementById('r6').value   // 價格
                     ] 
                 });
-                if (v && v[0] && v[4]) { 
+                if (v && v[0] && v[5]) { 
                     Cart.push({ 
                         type: 'repair', 
                         name: '維修:庫存電池 ' + item.name, 
@@ -2050,8 +2052,9 @@
                         reason: v[2] || '',              // 更換物品（故障原因）
                         description: v[2] || '',         // 故障描述（與更換物品相同）
                         customer: v[3] || '',            // 客戶名稱
+                        customerPhone: v[4] || '',       // 客戶電話
                         cost: item.cost || 0,            // 庫存已有成本，自動帶入
-                        price: Number(v[4]) || 0,        // 價格
+                        price: Number(v[5]) || 0,        // 價格
                         quantity: 1, 
                         itemId: item.id,                 // 使用電池的 ID，用於扣庫存
                         isStockBattery: true,            // 標記為庫存電池維修
@@ -2063,7 +2066,7 @@
             } else {
                 // 一般維修：輸入型號、序號（IMEI）、更換物品、客戶、成本、價格
                 const { value: v } = await Swal.fire({ 
-                    html: '<input id="r1" class="swal2-input" placeholder="型號"><input id="r2" class="swal2-input" placeholder="序號（IMEI）"><input id="r3" class="swal2-input" placeholder="更換物品"><input id="r4" class="swal2-input" placeholder="客戶名稱"><input id="r5" class="swal2-input" type="number" placeholder="成本"><input id="r6" class="swal2-input" type="number" placeholder="價格">', 
+                    html: '<input id="r1" class="swal2-input" placeholder="型號"><input id="r2" class="swal2-input" placeholder="序號（IMEI）"><input id="r3" class="swal2-input" placeholder="更換物品"><input id="r4" class="swal2-input" placeholder="客戶名稱"><input id="r5" class="swal2-input" placeholder="客戶電話"><input id="r6" class="swal2-input" type="number" placeholder="成本"><input id="r7" class="swal2-input" type="number" placeholder="價格">', 
                     background: '#1e293b', 
                     color: 'white', 
                     preConfirm: () => [
@@ -2071,11 +2074,12 @@
                         document.getElementById('r2').value,  // 序號（IMEI）
                         document.getElementById('r3').value,  // 更換物品（故障原因/描述）
                         document.getElementById('r4').value,  // 客戶名稱
-                        document.getElementById('r5').value,  // 成本
-                        document.getElementById('r6').value   // 價格
+                        document.getElementById('r5').value,  // 客戶電話
+                        document.getElementById('r6').value,  // 成本
+                        document.getElementById('r7').value   // 價格
                     ] 
                 });
-                if (v && v[0] && v[5]) { 
+                if (v && v[0] && v[6]) { 
                     Cart.push({ 
                         type: 'repair', 
                         name: '維修:' + v[0], 
@@ -2084,8 +2088,9 @@
                         reason: v[2] || '',         // 更換物品（故障原因）
                         description: v[2] || '',    // 故障描述（與更換物品相同）
                         customer: v[3] || '',       // 客戶名稱
-                        cost: Number(v[4]) || 0,   // 成本（當日叫貨用，僅流水與利潤顯示）
-                        price: Number(v[5]) || 0,   // 價格
+                        customerPhone: v[4] || '',  // 客戶電話
+                        cost: Number(v[5]) || 0,   // 成本（當日叫貨用，僅流水與利潤顯示）
+                        price: Number(v[6]) || 0,   // 價格
                         quantity: 1, 
                         itemId: 'REP-' + Date.now(),
                         isStockBattery: false       // 一般維修，不是庫存電池
