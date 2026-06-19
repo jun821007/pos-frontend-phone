@@ -1234,8 +1234,10 @@
             const checkout = parseLedgerDate(i.time);
             return checkout && checkout >= rangeStart && checkout <= rangeEnd;
         }
+        let repairPastedPhotos = [];
+        function resetRepairPastedPhotos() { repairPastedPhotos = []; }
         async function readRepairPhotoFiles(fileList) {
-            const files = Array.from(fileList || []).slice(0, 3);
+            const files = Array.from(fileList || []);
             const out = [];
             for (const f of files) {
                 if (!f.type || !f.type.startsWith('image/')) continue;
@@ -1249,16 +1251,53 @@
             }
             return out;
         }
-        async function uploadRepairPhotosFromInput(inputId) {
-            const el = document.getElementById(inputId);
-            if (!el || !el.files || !el.files.length) return '';
-            const payload = await readRepairPhotoFiles(el.files);
-            if (!payload.length) return '';
-            const res = await API.uploadRepairPhotos(payload);
+        function renderRepairPhotoPreview() {
+            const preview = document.getElementById('r-photo-preview');
+            if (!preview) return;
+            preview.innerHTML = repairPastedPhotos.map((p, i) => '<span class="inline-block mr-2 mb-1 text-center"><img src="data:' + p.mimeType + ';base64,' + p.data + '" style="height:52px;border-radius:6px;border:1px solid #475569"><button type="button" class="block w-full text-red-400 text-[10px] r-photo-rm" data-i="' + i + '">移除</button></span>').join('');
+            preview.querySelectorAll('.r-photo-rm').forEach((btn) => {
+                btn.onclick = (e) => { e.preventDefault(); repairPastedPhotos.splice(Number(btn.dataset.i), 1); renderRepairPhotoPreview(); };
+            });
+        }
+        function initRepairPhotoPaste() {
+            resetRepairPastedPhotos();
+            const zone = document.getElementById('r-photo-paste');
+            if (!zone) return;
+            zone.textContent = '點此後 Ctrl+V 貼上圖片';
+            zone.onclick = () => zone.focus();
+            zone.onpaste = async (e) => {
+                e.preventDefault();
+                const items = e.clipboardData && e.clipboardData.items;
+                if (!items) return;
+                for (const item of items) {
+                    if (!item.type.startsWith('image/')) continue;
+                    if (repairPastedPhotos.length >= 3) { Swal.showValidationMessage('最多 3 張圖'); return; }
+                    const blob = item.getAsFile();
+                    if (!blob) continue;
+                    const data = await new Promise((resolve, reject) => {
+                        const r = new FileReader();
+                        r.onload = () => resolve(String(r.result).split(',')[1] || '');
+                        r.onerror = reject;
+                        r.readAsDataURL(blob);
+                    });
+                    repairPastedPhotos.push({ name: 'paste-' + Date.now() + '.jpg', mimeType: item.type || 'image/jpeg', data });
+                    renderRepairPhotoPreview();
+                    break;
+                }
+            };
+            renderRepairPhotoPreview();
+        }
+        async function uploadAllRepairPhotos() {
+            const el = document.getElementById('r-photos');
+            const fromFiles = el && el.files && el.files.length ? await readRepairPhotoFiles(el.files) : [];
+            const combined = [...repairPastedPhotos, ...fromFiles].slice(0, 3);
+            if (!combined.length) { resetRepairPastedPhotos(); return ''; }
+            const res = await API.uploadRepairPhotos(combined);
             if (res.status !== 'success') throw new Error(res.msg || '照片上傳失敗');
+            resetRepairPastedPhotos();
             return (res.urls || []).join(',');
         }
-        const REPAIR_EXTRA_HTML = '<textarea id="r-notes" class="swal2-textarea" placeholder="備註（選填）" rows="2"></textarea><label class="block text-left text-xs text-slate-400 mt-2 mb-1 px-2">維修照片（最多3張，選填）</label><input id="r-photos" type="file" accept="image/*" multiple class="swal2-input text-sm">';
+        const REPAIR_EXTRA_HTML = '<textarea id="r-notes" class="swal2-textarea" placeholder="備註（選填）" rows="2"></textarea><label class="block text-left text-xs text-slate-400 mt-2 mb-1 px-2">圖（最多3張，可貼上或選檔案）</label><div id="r-photo-paste" tabindex="0" class="swal2-input text-sm min-h-[52px] flex items-center justify-center text-center text-slate-400 cursor-pointer outline-none focus:border-yellow-500"></div><div id="r-photo-preview" class="px-2 flex flex-wrap"></div><input id="r-photos" type="file" accept="image/*" multiple class="swal2-input text-sm">';
         function renderReport() {
             let stats = { cash:0, pending:0, profit:0, pot:0, exp:0, gift:0 };
             const div = document.getElementById('today-list');
@@ -2121,11 +2160,12 @@
                 // 庫存電池維修：顯示維修登記表單（型號、序號、更換物品、客戶、價格），然後寫入維修紀錄
                 const { value: v } = await Swal.fire({ 
                     title: '維修登記 - 庫存電池',
-                    html: '<input id="r1" class="swal2-input" placeholder="型號"><input id="r2" class="swal2-input" placeholder="序號（IMEI）"><input id="r3" class="swal2-input" placeholder="更換物品"><input id="r4" class="swal2-input" placeholder="客戶名稱"><input id="r5" class="swal2-input" placeholder="客戶電話"><input id="r6" class="swal2-input" type="number" placeholder="價格（成本已帶入庫存）">' + REPAIR_EXTRA_HTML, 
+                    html: '<input id="r1" class="swal2-input" placeholder="型號"><input id="r2" class="swal2-input" placeholder="序號"><input id="r3" class="swal2-input" placeholder="故障原因／更換物品"><input id="r4" class="swal2-input" placeholder="客戶"><input id="r5" class="swal2-input" placeholder="電話"><input id="r6" class="swal2-input" type="number" placeholder="初步維修報價（成本已帶入庫存）">' + REPAIR_EXTRA_HTML, 
                     background: '#1e293b', 
-                    color: 'white', 
+                    color: 'white',
+                    didOpen: () => { initRepairPhotoPaste(); },
                     preConfirm: async () => {
-                        const photoUrls = await uploadRepairPhotosFromInput('r-photos');
+                        const photoUrls = await uploadAllRepairPhotos();
                         return [
                         document.getElementById('r1').value,
                         document.getElementById('r2').value,
@@ -2162,11 +2202,12 @@
             } else {
                 // 一般維修：輸入型號、序號（IMEI）、更換物品、客戶、成本、價格
                 const { value: v } = await Swal.fire({ 
-                    html: '<input id="r1" class="swal2-input" placeholder="型號"><input id="r2" class="swal2-input" placeholder="序號（IMEI）"><input id="r3" class="swal2-input" placeholder="更換物品"><input id="r4" class="swal2-input" placeholder="客戶名稱"><input id="r5" class="swal2-input" placeholder="客戶電話"><input id="r6" class="swal2-input" type="number" placeholder="成本"><input id="r7" class="swal2-input" type="number" placeholder="價格">' + REPAIR_EXTRA_HTML, 
+                    html: '<input id="r1" class="swal2-input" placeholder="型號"><input id="r2" class="swal2-input" placeholder="序號"><input id="r3" class="swal2-input" placeholder="故障原因／更換物品"><input id="r4" class="swal2-input" placeholder="客戶"><input id="r5" class="swal2-input" placeholder="電話"><input id="r6" class="swal2-input" type="number" placeholder="維修成本"><input id="r7" class="swal2-input" type="number" placeholder="初步維修報價">' + REPAIR_EXTRA_HTML, 
                     background: '#1e293b', 
-                    color: 'white', 
+                    color: 'white',
+                    didOpen: () => { initRepairPhotoPaste(); },
                     preConfirm: async () => {
-                        const photoUrls = await uploadRepairPhotosFromInput('r-photos');
+                        const photoUrls = await uploadAllRepairPhotos();
                         return [
                         document.getElementById('r1').value,
                         document.getElementById('r2').value,
