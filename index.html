@@ -1271,7 +1271,7 @@
                 if (!items) return;
                 for (const item of items) {
                     if (!item.type.startsWith('image/')) continue;
-                    if (repairPastedPhotos.length >= 3) { Swal.showValidationMessage('最多 3 張圖'); return; }
+                    if (repairPastedPhotos.length >= 6) { Swal.showValidationMessage('最多 6 張圖'); return; }
                     const blob = item.getAsFile();
                     if (!blob) continue;
                     const data = await new Promise((resolve, reject) => {
@@ -1290,14 +1290,14 @@
         async function uploadAllRepairPhotos() {
             const el = document.getElementById('r-photos');
             const fromFiles = el && el.files && el.files.length ? await readRepairPhotoFiles(el.files) : [];
-            const combined = [...repairPastedPhotos, ...fromFiles].slice(0, 3);
+            const combined = [...repairPastedPhotos, ...fromFiles].slice(0, 6);
             if (!combined.length) { resetRepairPastedPhotos(); return ''; }
             const res = await API.uploadRepairPhotos(combined);
             if (res.status !== 'success') throw new Error(res.msg || '照片上傳失敗');
             resetRepairPastedPhotos();
             return (res.urls || []).join(',');
         }
-        const REPAIR_EXTRA_HTML = '<textarea id="r-notes" class="swal2-textarea" placeholder="備註（選填）" rows="2"></textarea><label class="block text-left text-xs text-slate-400 mt-2 mb-1 px-2">圖（最多3張，可貼上或選檔案）</label><div id="r-photo-paste" tabindex="0" class="swal2-input text-sm min-h-[52px] flex items-center justify-center text-center text-slate-400 cursor-pointer outline-none focus:border-yellow-500"></div><div id="r-photo-preview" class="px-2 flex flex-wrap"></div><input id="r-photos" type="file" accept="image/*" multiple class="swal2-input text-sm">';
+        const REPAIR_EXTRA_HTML = '<textarea id="r-notes" class="swal2-textarea" placeholder="備註（選填）" rows="2"></textarea><label class="block text-left text-xs text-slate-400 mt-2 mb-1 px-2">圖（最多6張，可貼上或選檔案）</label><div id="r-photo-paste" tabindex="0" class="swal2-input text-sm min-h-[52px] flex items-center justify-center text-center text-slate-400 cursor-pointer outline-none focus:border-yellow-500"></div><div id="r-photo-preview" class="px-2 flex flex-wrap"></div><input id="r-photos" type="file" accept="image/*" multiple class="swal2-input text-sm">';
         function renderReport() {
             let stats = { cash:0, pending:0, profit:0, pot:0, exp:0, gift:0 };
             const div = document.getElementById('today-list');
