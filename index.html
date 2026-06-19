@@ -1010,18 +1010,23 @@
             return { key: type || 'other', label: '(\u5176)', order: 99 };
         }
         function fmtMoney(v) { return (Number(v) || 0).toLocaleString(); }
+        function isMultiPhoneExtraLine(it) {
+            const sale = Number(it.salePrice) || 0;
+            return it.type === 'phone' && sale === 0 && (it.itemName || '').includes(' + ');
+        }
         function buildLedgerFormulaHtml(items) {
             const byType = {};
+            const giftNormalized = [];
             (items || []).forEach(it => {
                 if (BlackList.items.includes(it.orderId + '_' + it.itemId)) return;
                 const sale = Number(it.salePrice) || 0;
                 const cost = Number(it.cost) || 0;
                 const qty = Math.max(1, Number(it.quantity) || 1);
-                const isMultiExtra = it.type === 'phone' && sale === 0 && (it.itemName || '').includes(' + ');
-                if (isMultiExtra) return;
+                const isMultiExtra = isMultiPhoneExtraLine(it);
+                if (!isMultiExtra) giftNormalized.push(it);
                 const m = mapLedgerType(it.type);
-                if (!byType[m.key]) byType[m.key] = { label: m.label, order: m.order, sale: 0, cost: 0, costTerms: {} };
-                byType[m.key].sale += sale;
+                if (!byType[m.key]) byType[m.key] = { key: m.key, label: m.label, order: m.order, sale: 0, cost: 0, costTerms: {} };
+                if (!isMultiExtra) byType[m.key].sale += sale;
                 byType[m.key].cost += cost;
                 let unitCost = qty > 0 ? (cost / qty) : cost;
                 if (!isFinite(unitCost)) unitCost = cost;
@@ -1029,6 +1034,7 @@
                 if (!byType[m.key].costTerms[bucketKey]) byType[m.key].costTerms[bucketKey] = 0;
                 byType[m.key].costTerms[bucketKey] += qty;
             });
+            const giftAlloc = calcGiftAllocation(giftNormalized);
             const sections = Object.values(byType)
                 .filter(x => (Math.abs(x.sale) > 0 || Math.abs(x.cost) > 0))
                 .sort((a, b) => a.order - b.order)
@@ -1040,7 +1046,12 @@
                     });
                     const costExpr = terms.length ? terms.join('+') : '0';
                     const profit = x.sale - x.cost;
-                    return `<div class="text-[11px] leading-5 text-slate-300"><div><span class="text-slate-200 font-bold">${x.label}</span> 本 ${costExpr}=${fmtMoney(x.cost)}</div><div class="pl-4 text-slate-400">利 ${fmtMoney(x.sale)}-${fmtMoney(x.cost)}=${fmtMoney(profit)}</div></div>`;
+                    let extra = '';
+                    const deduct = x.key === 'used' ? giftAlloc.used : (x.key === 'new' ? giftAlloc.new : 0);
+                    if (deduct > 0) {
+                        extra = `<div class="pl-4 text-slate-500">扣贈 ${fmtMoney(deduct)} → 純利 ${fmtMoney(profit - deduct)}</div>`;
+                    }
+                    return `<div class="text-[11px] leading-5 text-slate-300"><div><span class="text-slate-200 font-bold">${x.label}</span> 本 ${costExpr}=${fmtMoney(x.cost)}</div><div class="pl-4 text-slate-400">利 ${fmtMoney(x.sale)}-${fmtMoney(x.cost)}=${fmtMoney(profit)}</div>${extra}</div>`;
                 });
             if (sections.length === 0) return '<div class="text-[11px] text-slate-500">無可計算資料</div>';
             return sections.join('');
