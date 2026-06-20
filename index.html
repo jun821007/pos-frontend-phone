@@ -2251,8 +2251,8 @@
                     if(item.type !== 'accessory' && item.type !== 'direct_transfer') finalName = prefix + item.name.replace('(贈)', '').trim() + suffix; 
                     else finalName = item.name.replace('(贈)', '').trim();
                     if (item.type === 'repair') {
-                        const detail = String(item.description || item.reason || '').trim();
-                        if (detail && !finalName.includes(detail)) finalName += '｜' + detail;
+                        const reason = String(item.reason || '').trim();
+                        if (reason && !finalName.includes(reason)) finalName += '｜' + reason;
                     }
                     let safePrice = Number(item.price) || 0, safeCost = Number(item.cost) || 0, safeQty = Number(item.quantity) || 1;
                     if(item.type === 'phone') { let i = DB.inv.find(x => x.id === item.itemId); if(i) i.status_label = '已售出'; }
