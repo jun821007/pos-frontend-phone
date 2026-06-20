@@ -864,6 +864,23 @@
         }
         function formatCardCopyLabel(it) { return formatCopyLabelWithQty(it); }
         function formatAccessoryCopyLabel(it) { return formatCopyLabelWithQty(it); }
+        function parseRepairLedgerParts(name) {
+            const raw = stripLedgerName(name || '');
+            const sep = raw.indexOf('｜');
+            if (sep === -1) return { main: raw, issue: '' };
+            return { main: raw.slice(0, sep).trim(), issue: raw.slice(sep + 1).trim() };
+        }
+        function formatRepairCopyLabel(it) {
+            const { main, issue } = parseRepairLedgerParts(it.itemName || it.name || '');
+            if (issue) return `${main} ${issue}`;
+            return main;
+        }
+        function formatRepairDisplayHtml(itemName) {
+            const { main, issue } = parseRepairLedgerParts(itemName);
+            let html = main;
+            if (issue) html += `<div class="text-[10px] text-purple-300 font-normal mt-0.5">${issue}</div>`;
+            return html;
+        }
         function calcCopyProfit(it) {
             const sale = Number(it.salePrice) || 0;
             const cost = Number(it.cost) || 0;
@@ -1015,7 +1032,7 @@
                 const repairItems = normalized.filter(it => it.type === 'repair');
                 const repairProfit = repairItems.reduce((s, it) => s + calcCopyProfit(it), 0);
                 const pure = repairProfit - giftAlloc.repair;
-                const names = repairItems.map((it, idx) => `${idx + 1}. ${stripLedgerName(it.itemName || it.name || '')}`);
+                const names = repairItems.map((it, idx) => `${idx + 1}. ${formatRepairCopyLabel(it)}`);
                 const text = `${customer} $${pure.toLocaleString()}\n${names.join('\n')}`.trim();
                 const ok = await copyTextToClipboard(text);
                 if (ok) Swal.fire({ icon:'success', title:'已複製維修內容', toast:true, position:'top', timer:1500, showConfirmButton:false, background:'#1e293b', color:'white' });
@@ -1121,6 +1138,10 @@
                 else if(it.type === 'direct_transfer') prefix = '(\u8abf)';
                 else if(it.type === 'shipping') prefix = '(\u904b)';
                 if(prefix) { const cM={'(\u4e8c)':'text-red-400','(\u914d)':'text-green-400','(\u65b0)':'text-yellow-400','(\u7dad)':'text-purple-400','(\u8edf)':'text-cyan-400','(\u904b)':'text-blue-400'}; const cls=cM[prefix]||'text-slate-400'; if(!dName.includes(prefix)) dName='<span class="'+cls+'">'+prefix+'</span> '+dName; }
+                if (it.type === 'repair') {
+                    const repairMain = formatRepairDisplayHtml(stripLedgerName(it.itemName || ''));
+                    dName = '<span class="text-purple-400">(\u7dad)</span> ' + repairMain;
+                }
                 // 二手機類型：顯示編號（優先使用 stock_id，如果沒有則使用 itemId）
                 if((it.type === 'phone' || it.type === 'new_phone' || it.type === 'peer_phone' || it.type === 'software_phone') && !dName.includes('#')) {
                     const stockId = it.stock_id || it.itemId || '';
@@ -1426,6 +1447,7 @@
                     expenseRows.push(i);
                 } else {
                     if(!groups[i.orderId]) groups[i.orderId] = { ...i, items:[], total:0, net:0 };
+                    if (!groups[i.orderId].customer && i.customer) groups[i.orderId].customer = i.customer;
                     if (isOrderPeerMarked(i.orderId)) groups[i.orderId].peerMark = true;
                     groups[i.orderId].items.push(i);
                     let sale = Number(i.salePrice) || 0;
@@ -1583,6 +1605,7 @@
                 if(BlackList.items.includes(i.orderId + '_' + i.itemId)) return;
                 if(i.status === 'Returned' || i.status === 'Deleted') return;
                 if(!groups[i.orderId]) groups[i.orderId] = { ...i, items:[], total:0, net:0 };
+                if (!groups[i.orderId].customer && i.customer) groups[i.orderId].customer = i.customer;
                 let sale = Number(i.salePrice) || 0;
                 let cost = Number(i.cost) || 0;
                 const iPendingProfit = (i.profit !== undefined && i.profit !== null && i.profit !== '') ? Number(i.profit) : (sale - cost);
@@ -1699,6 +1722,7 @@
                     expenseRows.push(i);
                 } else {
                     if(!groups[i.orderId]) groups[i.orderId] = { ...i, items:[], total:0, net:0 };
+                    if (!groups[i.orderId].customer && i.customer) groups[i.orderId].customer = i.customer;
                     if (isOrderPeerMarked(i.orderId)) groups[i.orderId].peerMark = true;
                     groups[i.orderId].items.push(i);
                     let sale = i.salePrice || 0;
@@ -2226,6 +2250,10 @@
                     let suffix = ''; if(item.type === 'phone' && item.stock_id) { suffix = ` #${item.stock_id}`; }
                     if(item.type !== 'accessory' && item.type !== 'direct_transfer') finalName = prefix + item.name.replace('(贈)', '').trim() + suffix; 
                     else finalName = item.name.replace('(贈)', '').trim();
+                    if (item.type === 'repair') {
+                        const reason = String(item.reason || '').trim();
+                        if (reason && !finalName.includes(reason)) finalName += '｜' + reason;
+                    }
                     let safePrice = Number(item.price) || 0, safeCost = Number(item.cost) || 0, safeQty = Number(item.quantity) || 1;
                     if(item.type === 'phone') { let i = DB.inv.find(x => x.id === item.itemId); if(i) i.status_label = '已售出'; }
                     return { 
