@@ -906,7 +906,7 @@
         }
         function calcGiftAllocation(normalized) {
             const G = normalized.reduce((s, it) => isGiftDeduction(it) ? s + (Number(it.cost) || 0) : s, 0);
-            const alloc = { used: 0, new: 0, repair: 0, acc: 0, card: 0 };
+            const alloc = { used: 0, new: 0, repair: 0, acc: 0, card: 0, soft: 0 };
             if (G <= 0) return alloc;
             const hasUsed = normalized.some(it => it.type === 'phone' || it.type === 'peer_phone');
             const hasNew = normalized.some(it => it.type === 'new_phone');
@@ -932,6 +932,10 @@
             }
             if (normalized.some(it => it.type === 'repair')) {
                 alloc.repair = G;
+                return alloc;
+            }
+            if (normalized.some(it => it.type === 'software' || it.type === 'software_phone')) {
+                alloc.soft = G;
                 return alloc;
             }
             return alloc;
@@ -1003,13 +1007,8 @@
             }
             if (kind === 'soft') {
                 const softItems = normalized.filter(it => it.type === 'software' || it.type === 'software_phone');
-                const orderTotal = normalized.reduce((sum, it) => sum + (Number(it.salePrice) || 0), 0);
-                const handsetCost = normalized.reduce((sum, it) => {
-                    if (it.type === 'phone' || it.type === 'peer_phone' || it.type === 'software_phone') return sum + (Number(it.cost) || 0);
-                    return sum;
-                }, 0);
-                const accCost = normalized.reduce((sum, it) => it.type === 'accessory' ? sum + (Number(it.cost) || 0) : sum, 0);
-                const pure = orderTotal - handsetCost - accCost;
+                const softProfit = softItems.reduce((s, it) => s + calcCopyProfit(it), 0);
+                const pure = softProfit - (giftAlloc.soft || 0);
                 const names = softItems.map((it, idx) => `${idx + 1}. ${stripLedgerName(it.itemName || it.name || '')}`);
                 const text = `${customer} $${pure.toLocaleString()}\n${names.join('\n')}`.trim();
                 const ok = await copyTextToClipboard(text);
