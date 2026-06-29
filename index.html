@@ -1122,6 +1122,8 @@
                 }
             }
             let netColor = g.net >= 0 ? 'text-green-400' : 'text-red-400';
+            const oidEsc = String(g.orderId || '').replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+            const editablePending = !!opts.editablePending && g.status === 'Pending';
             let details = g.items.map(it => {
                 if (BlackList.items.includes(it.orderId + '_' + it.itemId)) return ''; 
                 const isMultiExtra = it.type === 'phone' && Number(it.salePrice) === 0 && (it.itemName||'').includes(' + ');
@@ -1153,13 +1155,22 @@
                 let itemKey = `RET_${it.orderId}_${it.itemId}`;
                 ItemRegistry[itemKey] = { ...it, customer: g.customer };
                 let safeCost = Number(it.cost) || 0;
+                const iidEsc = String(it.itemId || '').replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+                const isIncludedLine = it.type === 'phone' && Number(it.salePrice) === 0 && (it.itemName || '').includes(' + ');
+                const saleNum = Number(it.salePrice) || 0;
+                const priceHtml = isIncludedLine
+                    ? '<span class="text-slate-500 text-[10px]">含於上筆</span>'
+                    : editablePending
+                        ? `<button type="button" onclick="event.stopPropagation(); editPendingItemAmount('${oidEsc}', '${iidEsc}', ${saleNum}, ${safeCost})" class="text-yellow-500 hover:text-yellow-300 underline decoration-dotted decoration-yellow-600/50" title="點擊修改金額">$${saleNum.toLocaleString()}</button>`
+                        : `$${saleNum.toLocaleString()}`;
+                const priceCls = isIncludedLine ? 'text-slate-500 text-[10px]' : 'text-yellow-500';
                 return `
                 <div id="item-row-${it.itemId}" class="p-3 bg-slate-900 border-b border-slate-800 last:border-0 grid grid-cols-12 gap-2 items-center text-xs">
                     <div class="col-span-5">
                         <div class="text-slate-200 font-bold">${dName}</div>
                         <div class="text-[10px] text-slate-500 mt-0.5">${formatDate(it.time)}</div>
                     </div>
-                    <div class="col-span-3 text-right font-mono ${(it.type==='phone'&&Number(it.salePrice)===0&&dName.includes(' + '))?'text-slate-500 text-[10px]':'text-yellow-500'}">${(it.type==='phone'&&Number(it.salePrice)===0&&dName.includes(' + '))?'含於上筆':'$'+(Number(it.salePrice)||0).toLocaleString()}</div>
+                    <div class="col-span-3 text-right font-mono ${priceCls}">${priceHtml}</div>
                     <div class="col-span-2 cp-box">
                         <span class="cp-cost">本 ${safeCost.toLocaleString()}</span>
                         <span class="${pc} font-bold">利 ${p.toLocaleString()}</span>
@@ -1177,7 +1188,6 @@
             const hasRepairItems = (g.items || []).some(it => it.type === 'repair');
             const hasSoftItems = (g.items || []).some(it => it.type === 'software' || it.type === 'software_phone');
             const hasCardItems = (g.items || []).some(it => { const n=(it.itemName || it.name || '').toLowerCase(); return n.includes('\u6cf0\u570b\u8a3b\u518a\u5361') || n.includes('\u7db2\u5361') || n.includes('esim'); });
-            const oidEsc = String(g.orderId || '').replace(/\\/g, '\\\\').replace(/'/g, "\\'");
             const markBadge = (g.peerMark || isOrderPeerMarked(g.orderId)) ? '<span class="text-[10px] text-cyan-400 ml-1" title="同事案">✓</span>' : '';
             const statusHtml = g.status === 'Pending'
                 ? '<span class="text-red-400">未結</span>'
@@ -1678,7 +1688,7 @@
                         </div>
                     </div>
                     <div class="accordion-content open bg-slate-900/30">
-                        ${bucket.orders.map(g => renderOrderRow(g, { compact: true, selectable: true, idPrefix: 'group-pending' })).join('')}
+                        ${bucket.orders.map(g => renderOrderRow(g, { compact: true, selectable: true, idPrefix: 'group-pending', editablePending: true })).join('')}
                     </div>
                 </div>`;
             });
@@ -1989,7 +1999,67 @@
             }
         }
 
-        async function settle(oid, amt) { 
+        async function editPendingItemAmount(orderId, itemId, currentSale, cost) {
+            const item = (OrderRegistry[orderId]?.items || []).find(it => String(it.itemId) === String(itemId));
+            const name = stripLedgerName(item?.itemName || item?.name || '品項');
+            const costNum = Number(cost) || 0;
+            const { value: newSale, isConfirmed } = await Swal.fire({
+                title: '修改金額',
+                html: `<div class="text-left text-sm"><div class="text-slate-300 mb-3 font-bold">${name}</div>
+                    <label class="text-xs text-slate-500 block text-left mb-1">售價</label>
+                    <input id="sw-pending-sale" type="number" min="0" step="1" class="swal2-input" value="${Number(currentSale) || 0}">
+                    <div class="text-xs text-slate-500 mt-3">成本 ${costNum.toLocaleString()} · 利潤 <span id="sw-pending-profit" class="text-green-400">${((Number(currentSale) || 0) - costNum).toLocaleString()}</span></div></div>`,
+                didOpen: () => {
+                    const inp = document.getElementById('sw-pending-sale');
+                    const profitEl = document.getElementById('sw-pending-profit');
+                    if (inp && profitEl) {
+                        inp.addEventListener('input', () => {
+                            const p = (Number(inp.value) || 0) - costNum;
+                            profitEl.textContent = p.toLocaleString();
+                            profitEl.className = p >= 0 ? 'text-green-400' : 'text-red-400';
+                        });
+                    }
+                },
+                showCancelButton: true,
+                confirmButtonText: '儲存',
+                cancelButtonText: '取消',
+                background: '#1e293b',
+                color: 'white',
+                preConfirm: () => {
+                    const v = document.getElementById('sw-pending-sale')?.value;
+                    if (v === '' || v === null || isNaN(Number(v)) || Number(v) < 0) {
+                        Swal.showValidationMessage('請輸入有效金額');
+                        return false;
+                    }
+                    return Math.round(Number(v));
+                }
+            });
+            if (!isConfirmed || newSale === undefined) return;
+            if (newSale === Number(currentSale)) return;
+            try {
+                Swal.fire({ title: '更新中...', allowOutsideClick: false, didOpen: () => { Swal.showLoading(); } });
+                const res = await API.handleTransaction({
+                    action: 'update_amount',
+                    orderId,
+                    itemId,
+                    salePrice: newSale,
+                    person: User.name
+                });
+                Swal.close();
+                if (res && res.status === 'error') {
+                    Swal.fire({ icon: 'error', title: '更新失敗', text: res.msg || '請重試', background: '#1e293b', color: 'white' });
+                    return;
+                }
+                await loadPending();
+                fetchData();
+                Swal.fire({ icon: 'success', title: '金額已更新', toast: true, position: 'top', timer: 1500, showConfirmButton: false, background: '#1e293b', color: 'white' });
+            } catch (e) {
+                console.error('修改金額失敗:', e);
+                Swal.fire({ icon: 'error', title: '更新失敗', text: e.message || '請重試', background: '#1e293b', color: 'white' });
+            }
+        }
+
+        async function settle(oid, amt) {
             const r = await Swal.fire({
                 title:'確認入帳',
                 text:`此筆訂單將整筆入帳：$${(Number(amt)||0).toLocaleString()}`,
