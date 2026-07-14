@@ -948,27 +948,40 @@
         function formatSettlementCustomerLabel(it) {
             let name = stripLedgerName(it.itemName || it.name || '');
             name = name.replace(/#\S+/g, ' ').replace(/\s*x\d+\s*$/i, ' ').replace(/\s+/g, ' ').trim();
-            // 拿掉同行名稱
+            // 拿掉「同行 xxx」
             name = name.replace(/^同行\s+\S+\s*/i, '').replace(/^同行\s*/i, '').trim();
             const dealer = String(it.dealerName || '').trim();
             if (dealer) {
                 const esc = dealer.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
                 name = name.replace(new RegExp('(?:^|\\s)' + esc + '(?=\\s|$)', 'i'), ' ').replace(/\s+/g, ' ').trim();
             }
-            const colors = '黑色|白色|紫色|金色|銀色|藍色|紅色|綠色|灰色|粉色|白|黑|紫|金|銀|藍|紅|綠|灰|粉|彩鈦色|彩鈦|沙漠鈦|自然鈦|原色鈦|鈦色|星光色|午夜色';
-            name = name.replace(new RegExp('(?:^|\\s)(?:' + colors + ')(?=\\s|$)', 'g'), ' ').replace(/\s+/g, ' ').trim();
             const t = it.type || '';
+            // 容量寫法：256g → 256；保留 5G（避免被誤砍）
+            const normalizeStorage = (s) => s.replace(/\b(64|128|256|512|1024|1)\s*[gG]\b/g, '$1');
+            const stripLeadingPeerName = (s) => {
+                const parts = String(s || '').trim().split(/\s+/).filter(Boolean);
+                if (parts.length < 2) return s;
+                const first = parts[0];
+                // 有數字或常見品牌 → 當型號保留；否則當同行名稱去掉
+                if (/\d/.test(first)) return parts.join(' ');
+                if (/^(iphone|ipad|galaxy|pixel|samsung|三星|vivo|oppo|小米|紅米|華為|榮耀|realme|nokia|sony|asus|a|y|c|note|tab)/i.test(first)) {
+                    return parts.join(' ');
+                }
+                return parts.slice(1).join(' ');
+            };
             if (t === 'new_phone') {
                 name = name.replace(/^新機\s*/i, '').trim();
-                name = name.replace(/^(太古|僑信|聯強|神腦|捷元|燦坤|全國電子)\s+/i, '').trim();
-                name = name.replace(/\b(\d+)\s*[gG]\b/g, '$1');
+                name = stripLeadingPeerName(name);
+                name = normalizeStorage(name);
                 name = ('新機 ' + name).replace(/\s+/g, ' ').trim();
             } else if (t === 'phone' || t === 'peer_phone' || t === 'software_phone') {
                 name = name.replace(/^二手(?:機)?\s*/i, '').trim();
-                name = name.replace(/\b(\d+)\s*[gG]\b/g, '$1');
+                name = stripLeadingPeerName(name);
+                name = normalizeStorage(name);
                 name = ('二手 ' + name).replace(/\s+/g, ' ').trim();
             } else if (t === 'direct_transfer') {
                 name = name.replace(/^調貨[：:]\s*/i, '').replace(/^同行\s+\S+\s*/i, '').trim();
+                name = stripLeadingPeerName(name);
             } else if (t === 'repair') {
                 const { main, issue } = parseRepairLedgerParts(it.itemName || it.name || '');
                 name = issue ? `${main} ${issue}` : main;
