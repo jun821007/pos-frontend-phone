@@ -785,33 +785,83 @@
             return grid ? grid.scrollTop : 0;
         }
         function restoreItemGridScroll(top) {
+            const apply = () => {
+                const grid = document.getElementById('item-grid');
+                if (grid && grid.scrollTop !== top) grid.scrollTop = top;
+            };
+            apply();
+            requestAnimationFrame(apply);
+            [0, 50, 120, 250, 400].forEach(ms => setTimeout(apply, ms));
+        }
+        async function withPreservedItemGridScroll(fn) {
+            const scrollTop = saveItemGridScroll();
             const grid = document.getElementById('item-grid');
-            if (!grid) return;
-            requestAnimationFrame(() => { grid.scrollTop = top; });
+            const lock = () => { if (grid) grid.scrollTop = scrollTop; };
+            let lockTimer = null;
+            if (grid) {
+                lockTimer = setInterval(lock, 50);
+                grid.addEventListener('scroll', lock);
+            }
+            try {
+                return await fn({
+                    heightAuto: false,
+                    scrollbarPadding: false,
+                    returnFocus: false,
+                    willClose: () => { lock(); restoreItemGridScroll(scrollTop); },
+                    didClose: () => { restoreItemGridScroll(scrollTop); }
+                });
+            } finally {
+                if (lockTimer) clearInterval(lockTimer);
+                if (grid) grid.removeEventListener('scroll', lock);
+                restoreItemGridScroll(scrollTop);
+            }
         }
         async function triggerAddToCart(id) {
             if (UI.multiSelect && UI.tab === 'phone') { togglePhoneSelect(id); return; }
             const i = DB.inv.find(x => String(x.id) === String(id));
             if(!i) { Swal.fire({icon:'error', title:'找不到商品', text:`ID: ${id}`, background:'#1e293b', color:'white'}); return; }
-            const scrollTop = saveItemGridScroll();
             let p = i.price, q = 1;
             let defPrice = i.defaultPrice > 0 ? i.defaultPrice : (i.price > 0 ? i.price : '');
             if (i.type === 'phone') {
-                const { value } = await Swal.fire({ title: i.name, html: `<input id="sw-p" type="number" class="swal2-input" placeholder="單價" value="${defPrice}">`, background: '#1e293b', color: 'white', returnFocus: false, preConfirm: () => document.getElementById('sw-p').value });
-                restoreItemGridScroll(scrollTop);
+                const { value } = await withPreservedItemGridScroll((swalOpts) => Swal.fire({
+                    title: i.name,
+                    html: `<input id="sw-p" type="number" class="swal2-input" placeholder="單價" value="${defPrice}">`,
+                    background: '#1e293b', color: 'white',
+                    ...swalOpts,
+                    preConfirm: () => document.getElementById('sw-p').value
+                }));
                 if(!value) return;
                 p = parseInt(value); q = 1;
                 Cart.push({ ...i, price: p, quantity: 1, itemId: i.id, originalPrice: p, isGift: false }); renderCart(); return;
             } else if (i.type === 'accessory' || i.price === 0) {
-                const { value } = await Swal.fire({ title: i.name, html: `<input id="sw-p" type="number" class="swal2-input" placeholder="單價" value="${defPrice}"><div class="flex items-center justify-center gap-2 mt-2"><button type="button" id="sw-gift-btn" class="px-3 py-2 rounded bg-red-900/50 text-red-400 border border-red-700 text-sm">贈</button><div style="display:flex;align-items:center;justify-content:center;gap:12px"><button type="button" onclick="var el=document.getElementById('sw-q');el.value=Math.max(1,parseInt(el.value||1)-1)" style="width:52px;height:52px;font-size:26px;border-radius:12px;background:#334155;color:white;border:none;cursor:pointer">-</button><input id="sw-q" type="number" value="1" min="1" style="width:72px;height:52px;font-size:22px;text-align:center;background:#1e293b;color:white;border:2px solid #475569;border-radius:12px;outline:none"><button type="button" onclick="var el=document.getElementById('sw-q');el.value=parseInt(el.value||1)+1" style="width:52px;height:52px;font-size:26px;border-radius:12px;background:#334155;color:white;border:none;cursor:pointer">+</button></div>`, background: '#1e293b', color: 'white', returnFocus: false, didOpen: () => { document.getElementById('sw-gift-btn').onclick = () => { window._swGift = true; Swal.clickConfirm(); }; }, preConfirm: () => { if(window._swGift) { window._swGift = false; var _gq=parseInt(String(document.getElementById('sw-q').value||'1'),10); if(isNaN(_gq)||_gq<1)_gq=1; return [0,_gq,true]; } return [document.getElementById('sw-p').value, document.getElementById('sw-q').value, false]; } });
-                restoreItemGridScroll(scrollTop);
+                const { value } = await withPreservedItemGridScroll((swalOpts) => Swal.fire({
+                    title: i.name,
+                    html: `<input id="sw-p" type="number" class="swal2-input" placeholder="單價" value="${defPrice}"><div class="flex items-center justify-center gap-2 mt-2"><button type="button" id="sw-gift-btn" class="px-3 py-2 rounded bg-red-900/50 text-red-400 border border-red-700 text-sm">贈</button><div style="display:flex;align-items:center;justify-content:center;gap:12px"><button type="button" onclick="var el=document.getElementById('sw-q');el.value=Math.max(1,parseInt(el.value||1)-1)" style="width:52px;height:52px;font-size:26px;border-radius:12px;background:#334155;color:white;border:none;cursor:pointer">-</button><input id="sw-q" type="number" value="1" min="1" style="width:72px;height:52px;font-size:22px;text-align:center;background:#1e293b;color:white;border:2px solid #475569;border-radius:12px;outline:none"><button type="button" onclick="var el=document.getElementById('sw-q');el.value=parseInt(el.value||1)+1" style="width:52px;height:52px;font-size:26px;border-radius:12px;background:#334155;color:white;border:none;cursor:pointer">+</button></div>`,
+                    background: '#1e293b', color: 'white',
+                    ...swalOpts,
+                    didOpen: () => { document.getElementById('sw-gift-btn').onclick = () => { window._swGift = true; Swal.clickConfirm(); }; },
+                    preConfirm: () => {
+                        if(window._swGift) {
+                            window._swGift = false;
+                            var _gq=parseInt(String(document.getElementById('sw-q').value||'1'),10);
+                            if(isNaN(_gq)||_gq<1)_gq=1;
+                            return [0,_gq,true];
+                        }
+                        return [document.getElementById('sw-p').value, document.getElementById('sw-q').value, false];
+                    }
+                }));
                 if(!value) return;
-                if(value[2]) { var _gq2=parseInt(String(value[1]),10); if(isNaN(_gq2)||_gq2<1)_gq2=1; Cart.push({ ...i, name: i.name + ' (贈)', price: 0, quantity: _gq2, itemId: i.id, originalPrice: defPrice||0, isGift: true }); renderCart(); return; }
+                if(value[2]) {
+                    var _gq2=parseInt(String(value[1]),10);
+                    if(isNaN(_gq2)||_gq2<1)_gq2=1;
+                    Cart.push({ ...i, name: i.name + ' (贈)', price: 0, quantity: _gq2, itemId: i.id, originalPrice: defPrice||0, isGift: true });
+                    renderCart();
+                    return;
+                }
                 p = parseInt(value[0]); q = parseInt(value[1]);
             }
             Cart.push({ ...i, price: p, quantity: q, itemId: i.id, originalPrice: p, isGift: false });
             renderCart();
-            restoreItemGridScroll(scrollTop);
         }
 
         function parseDate(dateValue) {
@@ -2140,7 +2190,19 @@
             const grid=document.getElementById('item-grid');
             grid.innerHTML='';
             const fav=getFavAccessories();
-            const list=DB.inv.filter(i=>i.type==='accessory'&&fav.includes(String(i.id))&&!i.isHidden);
+            const catOrder=getOrderedCategories();
+            const catIndex=new Map(catOrder.map((c, idx)=>[c, idx]));
+            const list=DB.inv
+                .filter(i=>i.type==='accessory'&&fav.includes(String(i.id))&&!i.isHidden)
+                .sort((a,b)=>{
+                    const ia=catIndex.has(a.category)?catIndex.get(a.category):9999;
+                    const ib=catIndex.has(b.category)?catIndex.get(b.category):9999;
+                    if(ia!==ib) return ia-ib;
+                    const ca=String(a.category||'');
+                    const cb=String(b.category||'');
+                    if(ca!==cb) return ca.localeCompare(cb,'zh-TW');
+                    return String(a.name||'').localeCompare(String(b.name||''),'zh-TW');
+                });
             if(list.length===0){
                 grid.innerHTML='<div class="col-span-full text-center text-slate-500 mt-10">尚無常用品，在各分類中點擊配件旁的 ⭐ 可加入</div>';
                 return;
