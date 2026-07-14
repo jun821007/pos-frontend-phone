@@ -927,6 +927,48 @@
         }
         function formatCardCopyLabel(it) { return formatCopyLabelWithQty(it); }
         function formatAccessoryCopyLabel(it) { return formatCopyLabelWithQty(it); }
+        function isSettlementGiftItem(it) {
+            const sale = Number(it.salePrice) || 0;
+            const name = String(it.itemName || it.name || '');
+            if (sale <= 0) return true;
+            if (it.isGift) return true;
+            if (/\(贈\)/.test(name)) return true;
+            if (isMultiPhoneExtraLine(it)) return true;
+            return false;
+        }
+        function formatSettlementCustomerLabel(it) {
+            let name = stripLedgerName(it.itemName || it.name || '');
+            name = name.replace(/#\S+/g, ' ').replace(/\s+/g, ' ').trim();
+            const colors = '黑色|白色|紫色|金色|銀色|藍色|紅色|綠色|灰色|粉色|黑色|白|黑|紫|金|銀|藍|紅|綠|灰|粉|彩鈦色|彩鈦|沙漠鈦|自然鈦|原色鈦|鈦色|星光色|午夜色';
+            name = name.replace(new RegExp('(?:^|\\s)(?:' + colors + ')(?=\\s|$)', 'g'), ' ').replace(/\s+/g, ' ').trim();
+            const t = it.type || '';
+            if (t === 'new_phone') {
+                name = name.replace(/^新機\s*/i, '').replace(/^太古\s*/i, '').trim();
+                name = ('新機 ' + name).replace(/\s+/g, ' ').trim();
+            } else if (t === 'phone' || t === 'peer_phone' || t === 'software_phone') {
+                name = name.replace(/^二手(?:機)?\s*/i, '').trim();
+                name = ('二手 ' + name).replace(/\s+/g, ' ').trim();
+            } else if (t === 'direct_transfer') {
+                name = name.replace(/^調貨[：:]\s*/i, '').trim();
+            } else if (t === 'repair') {
+                const { main, issue } = parseRepairLedgerParts(it.itemName || it.name || '');
+                name = issue ? `${main} ${issue}` : main;
+            }
+            return name || '品項';
+        }
+        function buildSettlementCopyText(items) {
+            const parts = [];
+            let total = 0;
+            (items || []).forEach(it => {
+                if (isSettlementGiftItem(it)) return;
+                const sale = Math.round(Number(it.salePrice) || 0);
+                if (sale <= 0) return;
+                total += sale;
+                parts.push(`${formatSettlementCustomerLabel(it)} $${sale}`);
+            });
+            if (!parts.length) return '';
+            return `${parts.join('+')}=$${total}`;
+        }
         function parseRepairLedgerParts(name) {
             const raw = stripLedgerName(name || '');
             const sep = raw.indexOf('｜');
@@ -1110,6 +1152,17 @@
                 const ok = await copyTextToClipboard(text);
                 if (ok) Swal.fire({ icon:'success', title:'已複製新機內容', toast:true, position:'top', timer:1500, showConfirmButton:false, background:'#1e293b', color:'white' });
                 else Swal.fire({ icon:'error', title:'複製失敗', text:'請手動複製', background:'#1e293b', color:'white' });
+                return;
+            }
+            if (kind === 'settle') {
+                const text = buildSettlementCopyText(normalized);
+                if (!text) {
+                    Swal.fire({ icon:'warning', title:'無可複製明細', text:'沒有非贈品且售價大於 0 的品項', background:'#1e293b', color:'white' });
+                    return;
+                }
+                const ok = await copyTextToClipboard(text);
+                if (ok) Swal.fire({ icon:'success', title:'已複製結算明細', toast:true, position:'top', timer:1500, showConfirmButton:false, background:'#1e293b', color:'white' });
+                else Swal.fire({ icon:'error', title:'複製失敗', text:'請手動複製', background:'#1e293b', color:'white' });
             }
         }
         function mapLedgerType(type) {
@@ -1251,6 +1304,7 @@
             const hasRepairItems = (g.items || []).some(it => it.type === 'repair');
             const hasSoftItems = (g.items || []).some(it => it.type === 'software' || it.type === 'software_phone');
             const hasCardItems = (g.items || []).some(it => { const n=(it.itemName || it.name || '').toLowerCase(); return n.includes('\u6cf0\u570b\u8a3b\u518a\u5361') || n.includes('\u7db2\u5361') || n.includes('esim'); });
+            const hasSettleItems = (g.items || []).some(it => !isSettlementGiftItem(it) && (Number(it.salePrice) || 0) > 0);
             const markBadge = (g.peerMark || isOrderPeerMarked(g.orderId)) ? '<span class="text-[10px] text-cyan-400 ml-1" title="同事案">✓</span>' : '';
             const statusHtml = g.status === 'Pending'
                 ? '<span class="text-red-400">未結</span>'
@@ -1279,7 +1333,7 @@
                         <button onclick="event.stopPropagation(); confirmDeleteOrder('${g.orderId}')" class="text-[10px] bg-red-900 text-red-200 px-1.5 rounded border border-red-700 hover:bg-red-800">刪單</button>
                     </div>
                 </div>
-                <div class="order-accordion-content accordion-content shadow-inner">${details}<div class="border-t border-slate-800 bg-slate-950/30"><div class="px-3 pt-2 flex flex-wrap gap-2">${hasUsedItems ? `<button onclick="event.stopPropagation(); copyOrderSummary('used', '${oidEsc}')" class="text-[11px] bg-indigo-900/50 text-indigo-200 px-2 py-1 rounded border border-indigo-700 hover:bg-indigo-800/50">複製二手機</button>` : ''}${hasNewItems ? `<button onclick="event.stopPropagation(); copyOrderSummary('new', '${oidEsc}')" class="text-[11px] bg-amber-900/50 text-amber-200 px-2 py-1 rounded border border-amber-700 hover:bg-amber-800/50">複製新機</button>` : ''}${hasAccItems ? `<button onclick="event.stopPropagation(); copyOrderSummary('acc', '${oidEsc}')" class="text-[11px] bg-emerald-900/50 text-emerald-200 px-2 py-1 rounded border border-emerald-700 hover:bg-emerald-800/50">複製配件</button>` : ''}${hasRepairItems ? `<button onclick="event.stopPropagation(); copyOrderSummary('repair', '${oidEsc}')" class="text-[11px] bg-purple-900/50 text-purple-200 px-2 py-1 rounded border border-purple-700 hover:bg-purple-800/50">複製維修</button>` : ''}${hasSoftItems ? `<button onclick="event.stopPropagation(); copyOrderSummary('soft', '${oidEsc}')" class="text-[11px] bg-violet-900/50 text-violet-200 px-2 py-1 rounded border border-violet-700 hover:bg-violet-800/50">\u8907\u88fd\u8edf\u9ad4</button>` : ''}${hasCardItems ? `<button onclick="event.stopPropagation(); copyOrderSummary('card', '${oidEsc}')" class="text-[11px] bg-sky-900/50 text-sky-200 px-2 py-1 rounded border border-sky-700 hover:bg-sky-800/50">\u8907\u88fd\u5361\u7247</button>` : ''}</div><button onclick="event.stopPropagation(); this.nextElementSibling.classList.toggle('hidden')" class="w-full text-left px-3 py-2 text-[11px] text-slate-400 hover:text-slate-200">記帳算式 ▾</button><div class="hidden px-3 pb-3 space-y-1">${ledgerFormula}</div></div></div>
+                <div class="order-accordion-content accordion-content shadow-inner">${details}<div class="border-t border-slate-800 bg-slate-950/30"><div class="px-3 pt-2 flex flex-wrap gap-2">${hasSettleItems ? `<button onclick="event.stopPropagation(); copyOrderSummary('settle', '${oidEsc}')" class="text-[11px] bg-yellow-900/50 text-yellow-200 px-2 py-1 rounded border border-yellow-700 hover:bg-yellow-800/50" title="給客人的明細">複製結算</button>` : ''}${hasUsedItems ? `<button onclick="event.stopPropagation(); copyOrderSummary('used', '${oidEsc}')" class="text-[11px] bg-indigo-900/50 text-indigo-200 px-2 py-1 rounded border border-indigo-700 hover:bg-indigo-800/50">複製二手機</button>` : ''}${hasNewItems ? `<button onclick="event.stopPropagation(); copyOrderSummary('new', '${oidEsc}')" class="text-[11px] bg-amber-900/50 text-amber-200 px-2 py-1 rounded border border-amber-700 hover:bg-amber-800/50">複製新機</button>` : ''}${hasAccItems ? `<button onclick="event.stopPropagation(); copyOrderSummary('acc', '${oidEsc}')" class="text-[11px] bg-emerald-900/50 text-emerald-200 px-2 py-1 rounded border border-emerald-700 hover:bg-emerald-800/50">複製配件</button>` : ''}${hasRepairItems ? `<button onclick="event.stopPropagation(); copyOrderSummary('repair', '${oidEsc}')" class="text-[11px] bg-purple-900/50 text-purple-200 px-2 py-1 rounded border border-purple-700 hover:bg-purple-800/50">複製維修</button>` : ''}${hasSoftItems ? `<button onclick="event.stopPropagation(); copyOrderSummary('soft', '${oidEsc}')" class="text-[11px] bg-violet-900/50 text-violet-200 px-2 py-1 rounded border border-violet-700 hover:bg-violet-800/50">\u8907\u88fd\u8edf\u9ad4</button>` : ''}${hasCardItems ? `<button onclick="event.stopPropagation(); copyOrderSummary('card', '${oidEsc}')" class="text-[11px] bg-sky-900/50 text-sky-200 px-2 py-1 rounded border border-sky-700 hover:bg-sky-800/50">\u8907\u88fd\u5361\u7247</button>` : ''}</div><button onclick="event.stopPropagation(); this.nextElementSibling.classList.toggle('hidden')" class="w-full text-left px-3 py-2 text-[11px] text-slate-400 hover:text-slate-200">記帳算式 ▾</button><div class="hidden px-3 pb-3 space-y-1">${ledgerFormula}</div></div></div>
             </div>`;
         }
 
