@@ -780,25 +780,38 @@
             list.forEach(i => { let color = i.type==='phone' ? 'border-blue-500' : 'border-green-500'; let price = i.price > 0 ? `$${i.price.toLocaleString()}` : (i.defaultPrice > 0 ? `$${i.defaultPrice.toLocaleString()}` : ''); let idBadge = i.type==='phone' ? `<span class="text-[10px] bg-slate-800 px-1 rounded text-slate-400">#${i.stock_id}</span>` : ''; let specs = ''; if(i.type === 'phone') { if(i.battery) specs += `<span class="spec-tag"><i class="fa-solid fa-battery-half mr-1"></i>${i.battery}%</span>`; if(i.ios) specs += `<span class="spec-tag">iOS ${i.ios}</span>`; } let switchBtn = ''; let favStar = ''; if(i.type === 'accessory') { const isFav = fav.includes(String(i.id)); favStar = `<button onclick="event.stopPropagation();toggleFavAccessory('${i.id}')" class="absolute bottom-2 right-2 w-8 h-8 rounded-full ${isFav?'bg-amber-500/30 text-amber-400':'bg-slate-800 text-slate-500 hover:text-amber-400'} flex items-center justify-center transition"><i class="fa-${isFav?'solid':'regular'} fa-star text-xs"></i></button>`; } let selOverlay = i.type==='phone' ? `<div id="sel-${i.id}" class="hidden absolute inset-0 rounded-xl bg-yellow-500/20 border-2 border-yellow-400 pointer-events-none flex items-center justify-center"><i class="fa-solid fa-check-circle text-yellow-400 text-3xl"></i></div>` : ""; grid.innerHTML += `<div onclick="triggerAddToCart('${i.id}')" class="glass p-3 rounded-xl border-l-4 ${color} relative group active:scale-95 transition" id="card-${i.id}">${selOverlay}${switchBtn}${favStar}<div class="flex justify-between mb-1">${idBadge}<span class="text-xs font-bold text-slate-400">庫: ${i.stock}</span></div><div class="font-bold text-sm text-slate-200 line-clamp-2 leading-tight h-9">${i.name}</div><div class="mt-1 flex flex-wrap gap-1">${specs}</div><div class="mt-2 text-right font-bold text-yellow-500">${price}</div></div>`; }); 
         }
 
+        function saveItemGridScroll() {
+            const grid = document.getElementById('item-grid');
+            return grid ? grid.scrollTop : 0;
+        }
+        function restoreItemGridScroll(top) {
+            const grid = document.getElementById('item-grid');
+            if (!grid) return;
+            requestAnimationFrame(() => { grid.scrollTop = top; });
+        }
         async function triggerAddToCart(id) {
             if (UI.multiSelect && UI.tab === 'phone') { togglePhoneSelect(id); return; }
             const i = DB.inv.find(x => String(x.id) === String(id));
             if(!i) { Swal.fire({icon:'error', title:'找不到商品', text:`ID: ${id}`, background:'#1e293b', color:'white'}); return; }
+            const scrollTop = saveItemGridScroll();
             let p = i.price, q = 1;
             let defPrice = i.defaultPrice > 0 ? i.defaultPrice : (i.price > 0 ? i.price : '');
             if (i.type === 'phone') {
-                const { value } = await Swal.fire({ title: i.name, html: `<input id="sw-p" type="number" class="swal2-input" placeholder="單價" value="${defPrice}">`, background: '#1e293b', color: 'white', preConfirm: () => document.getElementById('sw-p').value });
+                const { value } = await Swal.fire({ title: i.name, html: `<input id="sw-p" type="number" class="swal2-input" placeholder="單價" value="${defPrice}">`, background: '#1e293b', color: 'white', returnFocus: false, preConfirm: () => document.getElementById('sw-p').value });
+                restoreItemGridScroll(scrollTop);
                 if(!value) return;
                 p = parseInt(value); q = 1;
                 Cart.push({ ...i, price: p, quantity: 1, itemId: i.id, originalPrice: p, isGift: false }); renderCart(); return;
             } else if (i.type === 'accessory' || i.price === 0) {
-                const { value } = await Swal.fire({ title: i.name, html: `<input id="sw-p" type="number" class="swal2-input" placeholder="單價" value="${defPrice}"><div class="flex items-center justify-center gap-2 mt-2"><button type="button" id="sw-gift-btn" class="px-3 py-2 rounded bg-red-900/50 text-red-400 border border-red-700 text-sm">贈</button><div style="display:flex;align-items:center;justify-content:center;gap:12px"><button type="button" onclick="var el=document.getElementById('sw-q');el.value=Math.max(1,parseInt(el.value||1)-1)" style="width:52px;height:52px;font-size:26px;border-radius:12px;background:#334155;color:white;border:none;cursor:pointer">-</button><input id="sw-q" type="number" value="1" min="1" style="width:72px;height:52px;font-size:22px;text-align:center;background:#1e293b;color:white;border:2px solid #475569;border-radius:12px;outline:none"><button type="button" onclick="var el=document.getElementById('sw-q');el.value=parseInt(el.value||1)+1" style="width:52px;height:52px;font-size:26px;border-radius:12px;background:#334155;color:white;border:none;cursor:pointer">+</button></div>`, background: '#1e293b', color: 'white', didOpen: () => { document.getElementById('sw-gift-btn').onclick = () => { window._swGift = true; Swal.clickConfirm(); }; }, preConfirm: () => { if(window._swGift) { window._swGift = false; var _gq=parseInt(String(document.getElementById('sw-q').value||'1'),10); if(isNaN(_gq)||_gq<1)_gq=1; return [0,_gq,true]; } return [document.getElementById('sw-p').value, document.getElementById('sw-q').value, false]; } });
+                const { value } = await Swal.fire({ title: i.name, html: `<input id="sw-p" type="number" class="swal2-input" placeholder="單價" value="${defPrice}"><div class="flex items-center justify-center gap-2 mt-2"><button type="button" id="sw-gift-btn" class="px-3 py-2 rounded bg-red-900/50 text-red-400 border border-red-700 text-sm">贈</button><div style="display:flex;align-items:center;justify-content:center;gap:12px"><button type="button" onclick="var el=document.getElementById('sw-q');el.value=Math.max(1,parseInt(el.value||1)-1)" style="width:52px;height:52px;font-size:26px;border-radius:12px;background:#334155;color:white;border:none;cursor:pointer">-</button><input id="sw-q" type="number" value="1" min="1" style="width:72px;height:52px;font-size:22px;text-align:center;background:#1e293b;color:white;border:2px solid #475569;border-radius:12px;outline:none"><button type="button" onclick="var el=document.getElementById('sw-q');el.value=parseInt(el.value||1)+1" style="width:52px;height:52px;font-size:26px;border-radius:12px;background:#334155;color:white;border:none;cursor:pointer">+</button></div>`, background: '#1e293b', color: 'white', returnFocus: false, didOpen: () => { document.getElementById('sw-gift-btn').onclick = () => { window._swGift = true; Swal.clickConfirm(); }; }, preConfirm: () => { if(window._swGift) { window._swGift = false; var _gq=parseInt(String(document.getElementById('sw-q').value||'1'),10); if(isNaN(_gq)||_gq<1)_gq=1; return [0,_gq,true]; } return [document.getElementById('sw-p').value, document.getElementById('sw-q').value, false]; } });
+                restoreItemGridScroll(scrollTop);
                 if(!value) return;
                 if(value[2]) { var _gq2=parseInt(String(value[1]),10); if(isNaN(_gq2)||_gq2<1)_gq2=1; Cart.push({ ...i, name: i.name + ' (贈)', price: 0, quantity: _gq2, itemId: i.id, originalPrice: defPrice||0, isGift: true }); renderCart(); return; }
                 p = parseInt(value[0]); q = parseInt(value[1]);
             }
             Cart.push({ ...i, price: p, quantity: q, itemId: i.id, originalPrice: p, isGift: false });
             renderCart();
+            restoreItemGridScroll(scrollTop);
         }
 
         function parseDate(dateValue) {
@@ -922,7 +935,7 @@
                 if (hasNew && remaining > 0) alloc.new = remaining;
                 return alloc;
             }
-            if (normalized.some(it => it.type === 'accessory' && !isGiftAccessory(it) && !isCardCopyItem(it))) {
+            if (normalized.some(it => (it.type === 'accessory' || it.type === 'direct_transfer') && !isGiftAccessory(it) && !isCardCopyItem(it))) {
                 alloc.acc = G;
                 return alloc;
             }
@@ -995,7 +1008,7 @@
                 return;
             }
             if (kind === 'acc') {
-                const accItems = normalized.filter(it => it.type === 'accessory');
+                const accItems = normalized.filter(it => it.type === 'accessory' || it.type === 'direct_transfer');
                 const nonGiftAcc = accItems.filter(it => !isGiftAccessory(it));
                 const pure = nonGiftAcc.reduce((s, it) => s + calcCopyProfit(it), 0) - giftAlloc.acc;
                 const names = nonGiftAcc.map((it, idx) => `${idx + 1}. ${formatAccessoryCopyLabel(it)}`);
@@ -1184,7 +1197,7 @@
             const ledgerFormula = buildLedgerFormulaHtml(g.items || []);
             const hasUsedItems = (g.items || []).some(it => it.type === 'phone' || it.type === 'peer_phone');
             const hasNewItems = (g.items || []).some(it => it.type === 'new_phone');
-            const hasAccItems = (g.items || []).some(it => it.type === 'accessory');
+            const hasAccItems = (g.items || []).some(it => it.type === 'accessory' || it.type === 'direct_transfer');
             const hasRepairItems = (g.items || []).some(it => it.type === 'repair');
             const hasSoftItems = (g.items || []).some(it => it.type === 'software' || it.type === 'software_phone');
             const hasCardItems = (g.items || []).some(it => { const n=(it.itemName || it.name || '').toLowerCase(); return n.includes('\u6cf0\u570b\u8a3b\u518a\u5361') || n.includes('\u7db2\u5361') || n.includes('esim'); });
@@ -2082,7 +2095,63 @@
             }
         }
         
-        function getFavAccessories(){try{const j=localStorage.getItem('pos_fav_accessories');return j?JSON.parse(j):[];}catch(e){return[];}} function setFavAccessories(ids){localStorage.setItem('pos_fav_accessories',JSON.stringify(ids));} function toggleFavAccessory(id){event.stopPropagation();const fav=getFavAccessories();const idx=fav.indexOf(String(id));if(idx>=0)fav.splice(idx,1);else fav.push(String(id));setFavAccessories(fav);const a=document.querySelector('.pill-btn.active');if(a&&a.innerText.includes('常用'))renderFavAccessoryGrid();else if(UI.tab==='accessory')filterItems(null,document.querySelector('.pill-btn.active').innerText);} function renderFavAccessoryGrid(){const grid=document.getElementById('item-grid');grid.innerHTML='';const fav=getFavAccessories();const list=DB.inv.filter(i=>i.type==='accessory'&&fav.includes(String(i.id))&&!i.isHidden);if(list.length===0){grid.innerHTML='<div class="col-span-full text-center text-slate-500 mt-10">尚無常用品，在各分類中點擊配件旁的 ⭐ 可加入</div>';return;}list.forEach(i=>{const price=i.price>0?`$${i.price.toLocaleString()}`:(i.defaultPrice>0?`$${i.defaultPrice.toLocaleString()}`:'');const isFav=fav.includes(String(i.id));grid.innerHTML+=`<div onclick="triggerAddToCart('${i.id}')" class="glass p-3 rounded-xl border-l-4 border-green-500 relative group active:scale-95 transition"><button onclick="toggleFavAccessory('${i.id}')" class="absolute bottom-2 right-2 w-8 h-8 rounded-full ${isFav?'bg-amber-500/30 text-amber-400':'bg-slate-800 text-slate-500 hover:text-amber-400'} flex items-center justify-center transition"><i class="fa-${isFav?'solid':'regular'} fa-star text-xs"></i></button><div class="flex justify-between mb-1"><span class="text-xs font-bold text-slate-400">${i.category||''}</span><span class="text-xs text-slate-400">庫: ${i.stock}</span></div><div class="font-bold text-sm text-slate-200 line-clamp-2 leading-tight h-9">${i.name}</div><div class="mt-2 text-right font-bold text-yellow-500">${price}</div></div>`;});}
+        function getAccessoryCategoryBorder(category) {
+            const cat = String(category || '').trim();
+            const known = {
+                '三王玻16系列': 'border-purple-500',
+                '三王玻17系列': 'border-violet-500',
+                '空壓殼': 'border-red-500',
+                '充電線頭': 'border-cyan-500',
+                '普通款': 'border-emerald-500',
+                '鏡頭貼': 'border-pink-500',
+                '網卡': 'border-sky-500',
+                '平板皮套': 'border-amber-500',
+                '公司貨': 'border-blue-400'
+            };
+            if (known[cat]) return known[cat];
+            if (/三王玻/.test(cat)) return 'border-purple-500';
+            if (/空壓殼/.test(cat)) return 'border-red-500';
+            if (/充電|線頭|線/.test(cat)) return 'border-cyan-500';
+            if (/鏡頭/.test(cat)) return 'border-pink-500';
+            if (/網卡|esim/i.test(cat)) return 'border-sky-500';
+            if (/皮套|保護套/.test(cat)) return 'border-amber-500';
+            const palette = [
+                'border-fuchsia-500', 'border-orange-500', 'border-lime-500',
+                'border-teal-500', 'border-rose-500', 'border-indigo-500',
+                'border-yellow-500', 'border-blue-500'
+            ];
+            let h = 0;
+            for (let i = 0; i < cat.length; i++) h = ((h << 5) - h) + cat.charCodeAt(i);
+            return palette[Math.abs(h) % palette.length] || 'border-green-500';
+        }
+        function getFavAccessories(){try{const j=localStorage.getItem('pos_fav_accessories');return j?JSON.parse(j):[];}catch(e){return[];}}
+        function setFavAccessories(ids){localStorage.setItem('pos_fav_accessories',JSON.stringify(ids));}
+        function toggleFavAccessory(id){
+            event.stopPropagation();
+            const fav=getFavAccessories();
+            const idx=fav.indexOf(String(id));
+            if(idx>=0)fav.splice(idx,1);else fav.push(String(id));
+            setFavAccessories(fav);
+            const a=document.querySelector('.pill-btn.active');
+            if(a&&a.innerText.includes('常用'))renderFavAccessoryGrid();
+            else if(UI.tab==='accessory')filterItems(null,document.querySelector('.pill-btn.active').innerText);
+        }
+        function renderFavAccessoryGrid(){
+            const grid=document.getElementById('item-grid');
+            grid.innerHTML='';
+            const fav=getFavAccessories();
+            const list=DB.inv.filter(i=>i.type==='accessory'&&fav.includes(String(i.id))&&!i.isHidden);
+            if(list.length===0){
+                grid.innerHTML='<div class="col-span-full text-center text-slate-500 mt-10">尚無常用品，在各分類中點擊配件旁的 ⭐ 可加入</div>';
+                return;
+            }
+            list.forEach(i=>{
+                const price=i.price>0?`$${i.price.toLocaleString()}`:(i.defaultPrice>0?`$${i.defaultPrice.toLocaleString()}`:'');
+                const isFav=fav.includes(String(i.id));
+                const border=getAccessoryCategoryBorder(i.category);
+                grid.innerHTML+=`<div onclick="triggerAddToCart('${i.id}')" class="glass p-3 rounded-xl border-l-4 ${border} relative group active:scale-95 transition"><button onclick="toggleFavAccessory('${i.id}')" class="absolute bottom-2 right-2 w-8 h-8 rounded-full ${isFav?'bg-amber-500/30 text-amber-400':'bg-slate-800 text-slate-500 hover:text-amber-400'} flex items-center justify-center transition"><i class="fa-${isFav?'solid':'regular'} fa-star text-xs"></i></button><div class="flex justify-between mb-1"><span class="text-xs font-bold text-slate-400">${i.category||''}</span><span class="text-xs text-slate-400">庫: ${i.stock}</span></div><div class="font-bold text-sm text-slate-200 line-clamp-2 leading-tight h-9">${i.name}</div><div class="mt-2 text-right font-bold text-yellow-500">${price}</div></div>`;
+            });
+        }
         function renderCompanyAccessoryGrid() { const grid = document.getElementById('item-grid'); grid.innerHTML = ''; if(DB.companyTemplates.length === 0) { grid.innerHTML = '<div class="col-span-full text-center text-slate-500 mt-10">尚無公司配件模板，請至設定新增</div>'; return; } DB.companyTemplates.forEach(t => { grid.innerHTML += `<div onclick="addCompanyTemplateToCart('${t.name}', ${t.cost}, ${t.price})" class="glass p-3 rounded-xl border-l-4 border-blue-400 cursor-pointer active:scale-95 transition group"><div class="flex justify-between mb-1"><span class="text-xs font-bold text-blue-400">公司貨</span></div><div class="font-bold text-sm text-slate-200 line-clamp-2 leading-tight h-9">${t.name}</div><div class="mt-2 text-right font-bold text-yellow-500">$${t.price.toLocaleString()}</div></div>`; }); }
         function updateCategoryNumbers(list) {
             Array.from(list.children).forEach((child, i) => {
