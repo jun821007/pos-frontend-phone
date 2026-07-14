@@ -936,20 +936,39 @@
             if (isMultiPhoneExtraLine(it)) return true;
             return false;
         }
+        function getSettlementQty(it) {
+            let q = parseInt(String(it.quantity != null && it.quantity !== '' ? it.quantity : ''), 10);
+            if (!isFinite(q) || q < 1) {
+                const raw = String(it.itemName || it.name || '');
+                const m = raw.match(/\s*x(\d+)\s*$/i);
+                q = m ? parseInt(m[1], 10) : 1;
+            }
+            return (!isFinite(q) || q < 1) ? 1 : q;
+        }
         function formatSettlementCustomerLabel(it) {
             let name = stripLedgerName(it.itemName || it.name || '');
-            name = name.replace(/#\S+/g, ' ').replace(/\s+/g, ' ').trim();
-            const colors = '黑色|白色|紫色|金色|銀色|藍色|紅色|綠色|灰色|粉色|黑色|白|黑|紫|金|銀|藍|紅|綠|灰|粉|彩鈦色|彩鈦|沙漠鈦|自然鈦|原色鈦|鈦色|星光色|午夜色';
+            name = name.replace(/#\S+/g, ' ').replace(/\s*x\d+\s*$/i, ' ').replace(/\s+/g, ' ').trim();
+            // 拿掉同行名稱
+            name = name.replace(/^同行\s+\S+\s*/i, '').replace(/^同行\s*/i, '').trim();
+            const dealer = String(it.dealerName || '').trim();
+            if (dealer) {
+                const esc = dealer.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+                name = name.replace(new RegExp('(?:^|\\s)' + esc + '(?=\\s|$)', 'i'), ' ').replace(/\s+/g, ' ').trim();
+            }
+            const colors = '黑色|白色|紫色|金色|銀色|藍色|紅色|綠色|灰色|粉色|白|黑|紫|金|銀|藍|紅|綠|灰|粉|彩鈦色|彩鈦|沙漠鈦|自然鈦|原色鈦|鈦色|星光色|午夜色';
             name = name.replace(new RegExp('(?:^|\\s)(?:' + colors + ')(?=\\s|$)', 'g'), ' ').replace(/\s+/g, ' ').trim();
             const t = it.type || '';
             if (t === 'new_phone') {
-                name = name.replace(/^新機\s*/i, '').replace(/^太古\s*/i, '').trim();
+                name = name.replace(/^新機\s*/i, '').trim();
+                name = name.replace(/^(太古|僑信|聯強|神腦|捷元|燦坤|全國電子)\s+/i, '').trim();
+                name = name.replace(/\b(\d+)\s*[gG]\b/g, '$1');
                 name = ('新機 ' + name).replace(/\s+/g, ' ').trim();
             } else if (t === 'phone' || t === 'peer_phone' || t === 'software_phone') {
                 name = name.replace(/^二手(?:機)?\s*/i, '').trim();
+                name = name.replace(/\b(\d+)\s*[gG]\b/g, '$1');
                 name = ('二手 ' + name).replace(/\s+/g, ' ').trim();
             } else if (t === 'direct_transfer') {
-                name = name.replace(/^調貨[：:]\s*/i, '').trim();
+                name = name.replace(/^調貨[：:]\s*/i, '').replace(/^同行\s+\S+\s*/i, '').trim();
             } else if (t === 'repair') {
                 const { main, issue } = parseRepairLedgerParts(it.itemName || it.name || '');
                 name = issue ? `${main} ${issue}` : main;
@@ -957,17 +976,28 @@
             return name || '品項';
         }
         function buildSettlementCopyText(items) {
-            const parts = [];
+            const lines = [];
+            const sumParts = [];
             let total = 0;
             (items || []).forEach(it => {
                 if (isSettlementGiftItem(it)) return;
-                const sale = Math.round(Number(it.salePrice) || 0);
-                if (sale <= 0) return;
-                total += sale;
-                parts.push(`${formatSettlementCustomerLabel(it)} $${sale}`);
+                const lineTotal = Math.round(Number(it.salePrice) || 0);
+                if (lineTotal <= 0) return;
+                const qty = getSettlementQty(it);
+                const unit = qty > 1 ? Math.round(lineTotal / qty) : lineTotal;
+                let label = formatSettlementCustomerLabel(it);
+                total += lineTotal;
+                sumParts.push(String(lineTotal));
+                if (qty > 1) {
+                    // 避免品名已帶 xN
+                    label = label.replace(/\s*x\d+\s*$/i, '').trim();
+                    lines.push(`${label}x${qty} $${unit}*${qty}=${lineTotal}`);
+                } else {
+                    lines.push(`${label} $${lineTotal}`);
+                }
             });
-            if (!parts.length) return '';
-            return `${parts.join('+')}=$${total}`;
+            if (!lines.length) return '';
+            return `${lines.join('\n')}\n總金額\n${sumParts.join('+')}=${total}`;
         }
         function parseRepairLedgerParts(name) {
             const raw = stripLedgerName(name || '');
