@@ -303,6 +303,12 @@
                     <i class="fa-solid fa-chevron-right text-slate-400"></i>
                 </button>
                 <p class="px-4 pb-3 text-xs text-slate-500">點擊進入排序頁面</p>
+                <div class="px-4 pb-4">
+                    <button type="button" onclick="forceUploadLocalPosPrefs()" class="w-full py-2.5 rounded-lg bg-sky-900/50 text-sky-200 border border-sky-700 text-sm font-bold hover:bg-sky-800/50">
+                        上傳本機分類／常用到雲端
+                    </button>
+                    <p class="mt-1.5 text-[11px] text-slate-500">若其他裝置沒跟上，用「已排好／有星號」的那台按這個</p>
+                </div>
             </div>
             
             <!-- 版本與登出 -->
@@ -781,36 +787,40 @@
                 if (res && res.status === 'error') throw new Error(res.msg || '讀取偏好失敗');
                 let categoryOrder = Array.isArray(res.categoryOrder) ? res.categoryOrder.map(String) : [];
                 let favAccessoryIds = Array.isArray(res.favAccessoryIds) ? res.favAccessoryIds.map(String) : [];
-                // 雲端為空時，把本機舊資料上傳一次
-                if (categoryOrder.length === 0 && favAccessoryIds.length === 0) {
-                    let localCat = null, localFav = [];
-                    try {
-                        const rawCat = localStorage.getItem('pos_category_order_v1');
-                        if (rawCat) localCat = JSON.parse(rawCat);
-                    } catch (e) {}
-                    try {
-                        const rawFav = localStorage.getItem('pos_fav_accessories');
-                        if (rawFav) localFav = JSON.parse(rawFav);
-                    } catch (e) {}
-                    const hasLocal = (Array.isArray(localCat) && localCat.length > 0) || (Array.isArray(localFav) && localFav.length > 0);
-                    if (hasLocal) {
-                        const payload = {};
-                        if (Array.isArray(localCat) && localCat.length) payload.categoryOrder = localCat.map(String);
-                        if (Array.isArray(localFav) && localFav.length) payload.favAccessoryIds = localFav.map(String);
-                        const saved = await API.savePosPrefs(payload);
-                        if (saved && saved.status !== 'error') {
-                            categoryOrder = Array.isArray(saved.categoryOrder) ? saved.categoryOrder.map(String) : (payload.categoryOrder || []);
-                            favAccessoryIds = Array.isArray(saved.favAccessoryIds) ? saved.favAccessoryIds.map(String) : (payload.favAccessoryIds || []);
-                        } else {
-                            categoryOrder = payload.categoryOrder || [];
-                            favAccessoryIds = payload.favAccessoryIds || [];
-                        }
+                let localCat = null, localFav = [];
+                try {
+                    const rawCat = localStorage.getItem('pos_category_order_v1');
+                    if (rawCat) localCat = JSON.parse(rawCat);
+                } catch (e) {}
+                try {
+                    const rawFav = localStorage.getItem('pos_fav_accessories');
+                    if (rawFav) localFav = JSON.parse(rawFav);
+                } catch (e) {}
+                // 分類／常用分開遷移：雲端該項為空才補本機（避免只缺一邊就失敗）
+                const payload = {};
+                if (categoryOrder.length === 0 && Array.isArray(localCat) && localCat.length > 0) {
+                    payload.categoryOrder = localCat.map(String);
+                }
+                if (favAccessoryIds.length === 0 && Array.isArray(localFav) && localFav.length > 0) {
+                    payload.favAccessoryIds = localFav.map(String);
+                }
+                if (Object.keys(payload).length > 0) {
+                    const saved = await API.savePosPrefs(payload);
+                    if (saved && saved.status !== 'error') {
+                        if (Array.isArray(saved.categoryOrder)) categoryOrder = saved.categoryOrder.map(String);
+                        else if (payload.categoryOrder) categoryOrder = payload.categoryOrder;
+                        if (Array.isArray(saved.favAccessoryIds)) favAccessoryIds = saved.favAccessoryIds.map(String);
+                        else if (payload.favAccessoryIds) favAccessoryIds = payload.favAccessoryIds;
+                    } else {
+                        if (payload.categoryOrder) categoryOrder = payload.categoryOrder;
+                        if (payload.favAccessoryIds) favAccessoryIds = payload.favAccessoryIds;
                     }
                 }
                 UI.categoryOrder = categoryOrder;
                 UI.favAccessoryIds = favAccessoryIds;
                 UI.posPrefsLoaded = true;
                 cachePosPrefsLocally();
+                console.log('[pos-prefs] loaded', { categoryOrder: UI.categoryOrder.length, favs: UI.favAccessoryIds.length });
             } catch (e) {
                 console.error('loadPosPrefs failed:', e);
                 // 離線 fallback
@@ -823,6 +833,45 @@
                     UI.favAccessoryIds = rawFav ? JSON.parse(rawFav) : [];
                 } catch (err) { UI.favAccessoryIds = []; }
                 UI.posPrefsLoaded = false;
+            }
+        }
+        async function forceUploadLocalPosPrefs() {
+            let localCat = [], localFav = [];
+            try {
+                const rawCat = localStorage.getItem('pos_category_order_v1');
+                if (rawCat) localCat = JSON.parse(rawCat) || [];
+            } catch (e) {}
+            try {
+                const rawFav = localStorage.getItem('pos_fav_accessories');
+                if (rawFav) localFav = JSON.parse(rawFav) || [];
+            } catch (e) {}
+            if (Array.isArray(UI.categoryOrder) && UI.categoryOrder.length) localCat = UI.categoryOrder;
+            if (Array.isArray(UI.favAccessoryIds) && UI.favAccessoryIds.length) localFav = UI.favAccessoryIds;
+            if ((!localCat || !localCat.length) && (!localFav || !localFav.length)) {
+                Swal.fire({ icon:'warning', title:'本機沒有可上傳的設定', background:'#1e293b', color:'white' });
+                return;
+            }
+            try {
+                Swal.fire({ title: '上傳中...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
+                const res = await API.savePosPrefs({
+                    categoryOrder: (localCat || []).map(String),
+                    favAccessoryIds: (localFav || []).map(String)
+                });
+                Swal.close();
+                if (res && res.status === 'error') throw new Error(res.msg || '上傳失敗');
+                UI.categoryOrder = Array.isArray(res.categoryOrder) ? res.categoryOrder.map(String) : (localCat || []);
+                UI.favAccessoryIds = Array.isArray(res.favAccessoryIds) ? res.favAccessoryIds.map(String) : (localFav || []);
+                cachePosPrefsLocally();
+                if (UI.tab === 'accessory') switchMainTab('accessory');
+                Swal.fire({
+                    icon:'success',
+                    title:'已上傳到雲端',
+                    text:`分類 ${UI.categoryOrder.length}　常用 ${UI.favAccessoryIds.length}`,
+                    background:'#1e293b', color:'white'
+                });
+            } catch (e) {
+                Swal.close();
+                Swal.fire({ icon:'error', title:'上傳失敗', text: e.message || '', background:'#1e293b', color:'white' });
             }
         }
         function getOrderedCategories() {
