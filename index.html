@@ -434,6 +434,18 @@
             });
             return await res.json();
           },
+          getPosPrefs: async () => {
+            const res = await fetch(`${API_BASE_URL}/pos-prefs`);
+            return await res.json();
+          },
+          savePosPrefs: async (data) => {
+            const res = await fetch(`${API_BASE_URL}/pos-prefs`, {
+              method: 'PUT',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(data || {})
+            });
+            return await res.json();
+          },
           uploadRepairPhotos: async (files) => {
             const res = await fetch(`${API_BASE_URL}/repair-upload`, {
               method: 'POST',
@@ -467,7 +479,7 @@
         let ItemRegistry = {};
         let OrderRegistry = {};
         let User = { name: '', isAdmin: false };
-        let UI = { tab: 'phone', sub: '', rsMode: 'inventory', rsCat: 'all', multiSelect: false, selectedPhones: new Set(), selectedPendingOrders: new Set(), pendingOrderMeta: {}, pendingOrdersByCustomer: {}, allPendingOrderIds: [], pendingTab: 'unpaid', statsCollapsed: { report: true, history: true } };
+        let UI = { tab: 'phone', sub: '', rsMode: 'inventory', rsCat: 'all', multiSelect: false, selectedPhones: new Set(), selectedPendingOrders: new Set(), pendingOrderMeta: {}, pendingOrdersByCustomer: {}, allPendingOrderIds: [], pendingTab: 'unpaid', statsCollapsed: { report: true, history: true }, categoryOrder: null, favAccessoryIds: null, posPrefsLoaded: false };
         let cartFooterTranslateY = 0;
         const CART_FOOTER_DRAG_MAX_UP = 360;
         const CART_FOOTER_DRAG_MAX_DOWN = 0;
@@ -644,6 +656,7 @@
                 DB.inv = d.inventory || []; 
                 DB.sales = d.todaySales || []; 
                 DB.companyTemplates = d.companyTemplates || []; 
+                await loadPosPrefs();
                 console.log('庫存資料筆數:', DB.inv.length);
                 console.log('手機資料:', DB.inv.filter(i => i.type === 'phone').length);
                 console.log('配件資料:', DB.inv.filter(i => i.type === 'accessory').length);
@@ -737,11 +750,12 @@
             document.getElementById('view-category-sort').classList.add('hidden');
             document.getElementById('view-setting').classList.remove('hidden');
         }
-        function saveCategoryOrderAndClose() {
-            saveCategoryOrder();
+        async function saveCategoryOrderAndClose() {
+            await saveCategoryOrder();
             closeCategorySortPage();
         }
         function getCategoryOrder() {
+            if (Array.isArray(UI.categoryOrder)) return UI.categoryOrder.slice();
             try {
                 const saved = localStorage.getItem('pos_category_order_v1');
                 if (saved) return JSON.parse(saved);
@@ -753,6 +767,62 @@
                 localStorage.setItem('pos_category_order_v1', JSON.stringify(order));
             } catch(e) {
                 console.error('Save category order fail', e);
+            }
+        }
+        function cachePosPrefsLocally() {
+            if (Array.isArray(UI.categoryOrder)) saveCategoryOrderToStorage(UI.categoryOrder);
+            if (Array.isArray(UI.favAccessoryIds)) {
+                try { localStorage.setItem('pos_fav_accessories', JSON.stringify(UI.favAccessoryIds)); } catch (e) {}
+            }
+        }
+        async function loadPosPrefs() {
+            try {
+                const res = await API.getPosPrefs();
+                if (res && res.status === 'error') throw new Error(res.msg || '讀取偏好失敗');
+                let categoryOrder = Array.isArray(res.categoryOrder) ? res.categoryOrder.map(String) : [];
+                let favAccessoryIds = Array.isArray(res.favAccessoryIds) ? res.favAccessoryIds.map(String) : [];
+                // 雲端為空時，把本機舊資料上傳一次
+                if (categoryOrder.length === 0 && favAccessoryIds.length === 0) {
+                    let localCat = null, localFav = [];
+                    try {
+                        const rawCat = localStorage.getItem('pos_category_order_v1');
+                        if (rawCat) localCat = JSON.parse(rawCat);
+                    } catch (e) {}
+                    try {
+                        const rawFav = localStorage.getItem('pos_fav_accessories');
+                        if (rawFav) localFav = JSON.parse(rawFav);
+                    } catch (e) {}
+                    const hasLocal = (Array.isArray(localCat) && localCat.length > 0) || (Array.isArray(localFav) && localFav.length > 0);
+                    if (hasLocal) {
+                        const payload = {};
+                        if (Array.isArray(localCat) && localCat.length) payload.categoryOrder = localCat.map(String);
+                        if (Array.isArray(localFav) && localFav.length) payload.favAccessoryIds = localFav.map(String);
+                        const saved = await API.savePosPrefs(payload);
+                        if (saved && saved.status !== 'error') {
+                            categoryOrder = Array.isArray(saved.categoryOrder) ? saved.categoryOrder.map(String) : (payload.categoryOrder || []);
+                            favAccessoryIds = Array.isArray(saved.favAccessoryIds) ? saved.favAccessoryIds.map(String) : (payload.favAccessoryIds || []);
+                        } else {
+                            categoryOrder = payload.categoryOrder || [];
+                            favAccessoryIds = payload.favAccessoryIds || [];
+                        }
+                    }
+                }
+                UI.categoryOrder = categoryOrder;
+                UI.favAccessoryIds = favAccessoryIds;
+                UI.posPrefsLoaded = true;
+                cachePosPrefsLocally();
+            } catch (e) {
+                console.error('loadPosPrefs failed:', e);
+                // 離線 fallback
+                try {
+                    const rawCat = localStorage.getItem('pos_category_order_v1');
+                    UI.categoryOrder = rawCat ? JSON.parse(rawCat) : [];
+                } catch (err) { UI.categoryOrder = []; }
+                try {
+                    const rawFav = localStorage.getItem('pos_fav_accessories');
+                    UI.favAccessoryIds = rawFav ? JSON.parse(rawFav) : [];
+                } catch (err) { UI.favAccessoryIds = []; }
+                UI.posPrefsLoaded = false;
             }
         }
         function getOrderedCategories() {
@@ -2271,17 +2341,36 @@
             for (let i = 0; i < cat.length; i++) h = ((h << 5) - h) + cat.charCodeAt(i);
             return palette[Math.abs(h) % palette.length] || 'border-green-500';
         }
-        function getFavAccessories(){try{const j=localStorage.getItem('pos_fav_accessories');return j?JSON.parse(j):[];}catch(e){return[];}}
-        function setFavAccessories(ids){localStorage.setItem('pos_fav_accessories',JSON.stringify(ids));}
-        function toggleFavAccessory(id){
-            event.stopPropagation();
-            const fav=getFavAccessories();
-            const idx=fav.indexOf(String(id));
-            if(idx>=0)fav.splice(idx,1);else fav.push(String(id));
+        function getFavAccessories(){
+            if (Array.isArray(UI.favAccessoryIds)) return UI.favAccessoryIds.slice();
+            try{
+                const j=localStorage.getItem('pos_fav_accessories');
+                return j?JSON.parse(j):[];
+            }catch(e){return[];}
+        }
+        function setFavAccessories(ids){
+            UI.favAccessoryIds = (ids || []).map(String);
+            try{localStorage.setItem('pos_fav_accessories',JSON.stringify(UI.favAccessoryIds));}catch(e){}
+        }
+        async function toggleFavAccessory(id){
+            if (event) event.stopPropagation();
+            const fav = getFavAccessories();
+            const sid = String(id);
+            const idx = fav.indexOf(sid);
+            if (idx >= 0) fav.splice(idx, 1); else fav.push(sid);
             setFavAccessories(fav);
-            const a=document.querySelector('.pill-btn.active');
-            if(a&&a.innerText.includes('常用'))renderFavAccessoryGrid();
-            else if(UI.tab==='accessory')filterItems(null,document.querySelector('.pill-btn.active').innerText);
+            const a = document.querySelector('.pill-btn.active');
+            if (a && a.innerText.includes('常用')) renderFavAccessoryGrid();
+            else if (UI.tab === 'accessory' && a) filterItems(null, a.innerText);
+            try {
+                const res = await API.savePosPrefs({ favAccessoryIds: fav });
+                if (res && res.status === 'error') throw new Error(res.msg || '同步失敗');
+                if (Array.isArray(res.favAccessoryIds)) setFavAccessories(res.favAccessoryIds);
+                Swal.fire({ icon:'success', title:'常用已同步', toast:true, position:'top', timer:1000, showConfirmButton:false, background:'#1e293b', color:'white' });
+            } catch (e) {
+                console.error('toggleFavAccessory sync fail:', e);
+                Swal.fire({ icon:'warning', title:'常用已暫存在本機', text: e.message || '雲端同步失敗，稍後再試', toast:true, position:'top', timer:2000, showConfirmButton:false, background:'#1e293b', color:'white' });
+            }
         }
         function renderFavAccessoryGrid(){
             const grid=document.getElementById('item-grid');
@@ -2444,13 +2533,24 @@
                 list.appendChild(item);
             });
         }
-        function saveCategoryOrder() {
+        async function saveCategoryOrder() {
             const list = document.getElementById('category-sort-list');
             if (!list) return;
             const order = Array.from(list.children).map(item => item.dataset.category).filter(Boolean);
+            UI.categoryOrder = order;
             saveCategoryOrderToStorage(order);
-            Swal.fire({icon:'success', title:'已儲存', text:'分類順序已更新', timer:1500, background:'#1e293b'});
-            // 如果當前在配件頁面，重新渲染分類
+            try {
+                const res = await API.savePosPrefs({ categoryOrder: order });
+                if (res && res.status === 'error') throw new Error(res.msg || '同步失敗');
+                if (Array.isArray(res.categoryOrder)) {
+                    UI.categoryOrder = res.categoryOrder.map(String);
+                    saveCategoryOrderToStorage(UI.categoryOrder);
+                }
+                Swal.fire({icon:'success', title:'已同步', text:'分類順序已更新到雲端', timer:1500, background:'#1e293b'});
+            } catch (e) {
+                console.error('saveCategoryOrder sync fail:', e);
+                Swal.fire({icon:'warning', title:'已暫存在本機', text: e.message || '雲端同步失敗，稍後再試', background:'#1e293b'});
+            }
             if (UI.tab === 'accessory') {
                 switchMainTab('accessory');
             }
