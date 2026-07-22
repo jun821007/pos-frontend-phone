@@ -2818,7 +2818,37 @@
                 if(btn){ btn.disabled=false; btn.textContent='確認送出'; }
             }
         }
-        async function modalNewPhone() { const {value:v}=await Swal.fire({title:'新機',html:'<input id="n1" class="swal2-input" placeholder="同行名稱"><input id="n2" class="swal2-input" type="number" placeholder="成本"><input id="n3" class="swal2-input" placeholder="IMEI"><input id="n4" class="swal2-input" type="number" placeholder="銷售金額"><input id="n5" class="swal2-input" placeholder="客戶名稱"><input id="n6" class="swal2-input" placeholder="型號（流水用）"><input id="n7" class="swal2-input" placeholder="容量（流水用）"><input id="n8" class="swal2-input" placeholder="顏色（流水用）">',background:'#1e293b', color:'white', preConfirm:()=>[document.getElementById('n1').value,document.getElementById('n2').value,document.getElementById('n3').value,document.getElementById('n4').value,document.getElementById('n5').value,document.getElementById('n6').value,document.getElementById('n7').value,document.getElementById('n8').value]}); if(v&&v[1]&&v[4]){const spec=[v[5],v[6],v[7]].filter(Boolean).join(' '); Cart.push({type:'new_phone',name:'新機 '+v[0]+(spec?' '+spec:''),dealerName:v[0],cost:Number(v[1]),price:Number(v[3]),imei:v[2],customer:v[4],quantity:1,itemId:'NP-'+Date.now()});renderCart();}}
+        async function modalNewPhone(keepDealer, keepCustomer) {
+            const gn = id => document.getElementById(id);
+            const html = `<input id="n1" class="swal2-input" placeholder="同行名稱" value="${(keepDealer||'').replace(/"/g,'&quot;')}"><input id="n2" class="swal2-input" type="number" placeholder="成本"><input id="n3" class="swal2-input" placeholder="IMEI"><input id="n4" class="swal2-input" type="number" placeholder="銷售金額"><input id="n5" class="swal2-input" placeholder="客戶名稱" value="${(keepCustomer||'').replace(/"/g,'&quot;')}"><input id="n6" class="swal2-input" placeholder="型號（流水用）"><input id="n7" class="swal2-input" placeholder="容量（流水用）"><input id="n8" class="swal2-input" placeholder="顏色（流水用）"><div id="n-err" class="text-red-400 text-xs mt-1 min-h-[1rem]"></div><button type="button" id="n-add-btn" class="mt-2 w-full py-2 rounded bg-slate-600 text-white text-sm">＋ 新增（加入此筆並繼續填）</button>`;
+            const addOne = (v) => {
+                const spec = [v[5],v[6],v[7]].filter(Boolean).join(' ');
+                Cart.push({type:'new_phone',name:'新機 '+v[0]+(spec?' '+spec:''),dealerName:v[0],cost:Number(v[1]),price:Number(v[3]),imei:v[2],customer:v[4],quantity:1,itemId:'NP-'+Date.now()+'-'+Math.random().toString(36).slice(2,9)});
+                renderCart();
+            };
+            const getV = () => [gn('n1'),gn('n2'),gn('n3'),gn('n4'),gn('n5'),gn('n6'),gn('n7'),gn('n8')].map(el=>el?el.value:'').map(s=>typeof s==='string'?s.trim():'');
+            const { value: v } = await Swal.fire({
+                title: '新機',
+                html,
+                background: '#1e293b',
+                color: 'white',
+                showCancelButton: true,
+                confirmButtonText: 'OK',
+                cancelButtonText: '取消',
+                didOpen: () => {
+                    gn('n-add-btn').onclick = () => {
+                        const vals = getV();
+                        if (vals[1] && vals[4]) {
+                            addOne(vals);
+                            if (gn('n-err')) gn('n-err').textContent = '已加入';
+                            gn('n2').value = ''; gn('n3').value = ''; gn('n4').value = ''; gn('n6').value = ''; gn('n7').value = ''; gn('n8').value = '';
+                        } else { if (gn('n-err')) gn('n-err').textContent = '請填寫成本、客戶名稱'; }
+                    };
+                },
+                preConfirm: () => getV()
+            });
+            if (v && v[1] && v[4]) { addOne(v); }
+        }
         async function modalPeerTransfer(keepDealer, keepCustomer) {
             const gp = id => document.getElementById(id);
             const html = `<input id="p1" class="swal2-input" placeholder="同行名稱" value="${(keepDealer||'').replace(/"/g,'&quot;')}"><input id="p2" class="swal2-input" type="number" placeholder="成本"><input id="p3" class="swal2-input" placeholder="IMEI"><input id="p4" class="swal2-input" type="number" placeholder="銷售金額"><input id="p5" class="swal2-input" placeholder="客戶名稱" value="${(keepCustomer||'').replace(/"/g,'&quot;')}"><input id="p6" class="swal2-input" placeholder="型號（流水用）"><input id="p7" class="swal2-input" placeholder="容量（流水用）"><input id="p8" class="swal2-input" placeholder="顏色（流水用）"><div id="p-err" class="text-red-400 text-xs mt-1 min-h-[1rem]"></div><button type="button" id="p-add-btn" class="mt-2 w-full py-2 rounded bg-slate-600 text-white text-sm">＋ 新增（加入此筆並繼續填）</button>`;
