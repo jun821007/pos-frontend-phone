@@ -984,21 +984,38 @@
         }
 
         function parseDate(dateValue) {
-            if (!dateValue) return null;
-            if (typeof dateValue === 'string' && dateValue.includes('/')) {
-                try {
-                    return new Date(dateValue.replace(/\s*下午\s*/, ' ').replace(/\s*上午\s*/, ' '));
-                } catch (e) {
-                    return null;
-                }
+            if (dateValue == null || dateValue === '') return null;
+            if (dateValue instanceof Date) return isNaN(dateValue.getTime()) ? null : dateValue;
+            let s = String(dateValue).trim();
+            const isPM = /下午/.test(s);
+            const isAM = /上午/.test(s);
+            s = s.replace(/\s*下午\s*/g, ' ').replace(/\s*上午\s*/g, ' ').replace(/\s+/g, ' ').trim();
+            const m = s.match(/^(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})(?:[ T](\d{1,2}):(\d{1,2})(?::(\d{1,2}))?)?/);
+            if (m) {
+                let hour = Number(m[4] || 0);
+                if (isPM && hour < 12) hour += 12;
+                if (isAM && hour === 12) hour = 0;
+                const y = Number(m[1]), mo = String(Number(m[2])).padStart(2,'0'), day = String(Number(m[3])).padStart(2,'0');
+                const hh = String(hour).padStart(2,'0'), mm = String(Number(m[5]||0)).padStart(2,'0'), ss = String(Number(m[6]||0)).padStart(2,'0');
+                const d = new Date(`${y}-${mo}-${day}T${hh}:${mm}:${ss}+08:00`);
+                return isNaN(d.getTime()) ? null : d;
             }
-            return new Date(dateValue);
+            const d = new Date(s);
+            return isNaN(d.getTime()) ? null : d;
         }
         
         function formatDate(dateValue) {
             const d = parseDate(dateValue);
             if (!d || isNaN(d.getTime())) return 'Invalid Date';
-            return d.toLocaleString('zh-TW');
+            return d.toLocaleString('zh-TW', { timeZone: 'Asia/Taipei' });
+        }
+
+        function ymdTaipei(date = new Date()) {
+            const parts = new Intl.DateTimeFormat('en-CA', {
+                timeZone: 'Asia/Taipei', year: 'numeric', month: '2-digit', day: '2-digit'
+            }).formatToParts(date instanceof Date ? date : new Date(date));
+            const get = t => parts.find(p => p.type === t)?.value;
+            return `${get('year')}-${get('month')}-${get('day')}`;
         }
 
         function ledgerFilterTokens(q) {
@@ -1525,10 +1542,7 @@
         }
 
         function parseLedgerDate(v) {
-            if (!v) return null;
-            const s = typeof v === 'string' ? v.replace(/\s*下午\s*/, ' ').replace(/\s*上午\s*/, ' ') : v;
-            const d = new Date(s);
-            return isNaN(d.getTime()) ? null : d;
+            return parseDate(v);
         }
         function isDeferredPayMethod(pm) { return pm === 'linepay' || pm === 'credit'; }
         function ledgerTodayRange() {
@@ -1988,7 +2002,17 @@
         }
 
         function openHistory() { switchView('history'); applyStatsPanelState('history'); setQuickDate('month'); }
-        function setQuickDate(m) { const n = new Date(); const t = d => d.toISOString().split('T')[0]; const s = new Date(); if(m==='month') s.setDate(1); document.getElementById('h-end').value = t(n); document.getElementById('h-start').value = t(s); doHistorySearch(); }
+        function setQuickDate(m) {
+            const end = ymdTaipei(new Date());
+            let start = end;
+            if (m === 'month') {
+                const [y, mo] = end.split('-');
+                start = `${y}-${mo}-01`;
+            }
+            document.getElementById('h-end').value = end;
+            document.getElementById('h-start').value = start;
+            doHistorySearch();
+        }
         async function doHistorySearch() { 
             const s = document.getElementById('h-start').value; 
             const e = document.getElementById('h-end').value; 
