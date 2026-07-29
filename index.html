@@ -2907,6 +2907,8 @@
         async function modalRepair() {
             const { value: t } = await Swal.fire({ input: 'select', inputOptions: { 'gen': '一般', 'stock': '庫存電池' }, background: '#1e293b', color: 'white' });
             if (!t) return;
+            const checkoutCust = (document.getElementById('cust-name')?.value || '').trim();
+            const custValAttr = checkoutCust.replace(/"/g, '&quot;');
             if (t === 'stock') {
                 // 電池維修：選擇庫存電池，然後顯示維修登記表單
                 const BATTERY_CATS = ['已加工成品電池', '成品大容量電池', '原廠拆機電池0循環'];
@@ -2919,7 +2921,7 @@
                 // 庫存電池維修：顯示維修登記表單（型號、序號、更換物品、客戶、價格），然後寫入維修紀錄
                 const { value: v } = await Swal.fire({ 
                     title: '維修登記 - 庫存電池',
-                    html: '<input id="r1" class="swal2-input" placeholder="型號"><input id="r2" class="swal2-input" placeholder="序號"><input id="r3" class="swal2-input" placeholder="故障原因／更換物品"><input id="r4" class="swal2-input" placeholder="客戶"><input id="r5" class="swal2-input" placeholder="電話" type="tel" inputmode="tel"><input id="r6" class="swal2-input" type="number" placeholder="維修報價（成本已帶入庫存）">' + REPAIR_EXTRA_HTML, 
+                    html: `<input id="r1" class="swal2-input" placeholder="型號"><input id="r2" class="swal2-input" placeholder="序號"><input id="r3" class="swal2-input" placeholder="故障原因／更換物品"><input id="r4" class="swal2-input" placeholder="客戶" value="${custValAttr}"><input id="r5" class="swal2-input" placeholder="電話" type="tel" inputmode="tel"><input id="r6" class="swal2-input" type="number" placeholder="維修報價（成本已帶入庫存）">` + REPAIR_EXTRA_HTML, 
                     background: '#1e293b', 
                     color: 'white',
                     didOpen: () => { initRepairPhotoPaste(); },
@@ -2970,7 +2972,7 @@
             } else {
                 // 一般維修：輸入型號、序號（IMEI）、更換物品、客戶、成本、價格
                 const { value: v } = await Swal.fire({ 
-                    html: '<input id="r1" class="swal2-input" placeholder="型號"><input id="r2" class="swal2-input" placeholder="序號"><input id="r3" class="swal2-input" placeholder="故障原因／更換物品"><input id="r4" class="swal2-input" placeholder="客戶"><input id="r5" class="swal2-input" placeholder="電話" type="tel" inputmode="tel"><input id="r6" class="swal2-input" type="number" placeholder="維修成本"><input id="r7" class="swal2-input" type="number" placeholder="維修報價">' + REPAIR_EXTRA_HTML, 
+                    html: `<input id="r1" class="swal2-input" placeholder="型號"><input id="r2" class="swal2-input" placeholder="序號"><input id="r3" class="swal2-input" placeholder="故障原因／更換物品"><input id="r4" class="swal2-input" placeholder="客戶" value="${custValAttr}"><input id="r5" class="swal2-input" placeholder="電話" type="tel" inputmode="tel"><input id="r6" class="swal2-input" type="number" placeholder="維修成本"><input id="r7" class="swal2-input" type="number" placeholder="維修報價">` + REPAIR_EXTRA_HTML, 
                     background: '#1e293b', 
                     color: 'white',
                     didOpen: () => { initRepairPhotoPaste(); },
