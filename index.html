@@ -2848,6 +2848,7 @@
             const addOne = (v) => {
                 const spec = [v[5],v[6],v[7]].filter(Boolean).join(' ');
                 Cart.push({type:'new_phone',name:'新機 '+v[0]+(spec?' '+spec:''),dealerName:v[0],cost:Number(v[1]),price:Number(v[3]),imei:v[2],customer:v[4],quantity:1,itemId:'NP-'+Date.now()+'-'+Math.random().toString(36).slice(2,9)});
+                applyFormCustomerToCheckout(v[4]);
                 renderCart();
             };
             const getV = () => [gn('n1'),gn('n2'),gn('n3'),gn('n4'),gn('n5'),gn('n6'),gn('n7'),gn('n8')].map(el=>el?el.value:'').map(s=>typeof s==='string'?s.trim():'');
@@ -2879,6 +2880,7 @@
             const addOne = (v) => {
                 const spec = [v[5],v[6],v[7]].filter(Boolean).join(' ');
                 Cart.push({type:'peer_phone',name:'同行 '+v[0]+(spec?' '+spec:''),dealerName:v[0],cost:Number(v[1]),price:Number(v[3]),imei:v[2],customer:v[4],quantity:1,itemId:'PP-'+Date.now()+'-'+Math.random().toString(36).slice(2,9)});
+                applyFormCustomerToCheckout(v[4]);
                 renderCart();
             };
             const getV = () => [gp('p1'),gp('p2'),gp('p3'),gp('p4'),gp('p5'),gp('p6'),gp('p7'),gp('p8')].map(el=>el?el.value:'').map(s=>typeof s==='string'?s.trim():'');
@@ -2904,7 +2906,8 @@
             });
             if (v && v[0] && v[1] && v[4]) { addOne(v); }
         }
-        function applyRepairCustomerToCheckout(name) {
+        /** 表單客戶有填就覆寫結帳區（A：不論結帳區是否已有名稱） */
+        function applyFormCustomerToCheckout(name) {
             const n = String(name || '').trim();
             if (!n) return;
             const el = document.getElementById('cust-name');
@@ -2971,7 +2974,7 @@
                         batteryCat: item.category || '電池',
                         batteryName: item.name           // 電池名稱
                     }); 
-                    applyRepairCustomerToCheckout(v[3]);
+                    applyFormCustomerToCheckout(v[3]);
                     renderCart(); 
                 }
             } else {
@@ -3022,7 +3025,7 @@
                         itemId: 'REP-' + Date.now(),
                         isStockBattery: false       // 一般維修，不是庫存電池
                     }); 
-                    applyRepairCustomerToCheckout(v[3]);
+                    applyFormCustomerToCheckout(v[3]);
                     renderCart(); 
                 }
             }
