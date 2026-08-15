@@ -282,6 +282,7 @@
                         <button type="button" onclick="pickBooksExpense('buy_new')">收購新機</button>
                     </div>
                 </div>
+                <span class="text-[11px] text-slate-500">進貨入庫不進本表。台灣叫貨用手填「維修料件」，不必選庫存。</span>
             </div>
             <div class="flex flex-wrap items-center gap-3 shrink-0 mb-3">
                 <label class="inline-flex items-center gap-2 text-sm text-slate-300 cursor-pointer">
@@ -1678,7 +1679,7 @@
         }
         function ledgerCountsCompletedForBooks(i, rangeStart, rangeEnd) {
             if (i.status !== 'Completed') return false;
-            if (i.type === 'expense' || i.type === 'restock' || i.type === 'salary' || i.type === 'buy_used' || i.type === 'buy_new' || i.type === 'loss') return false;
+            if (isBooksOutflowType(i)) return false;
             if (isDeferredPayMethod(i.payMethod)) {
                 const settled = parseLedgerDate(i.settledAt) || parseLedgerDate(i.time);
                 return settled && settled >= rangeStart && settled <= rangeEnd;
@@ -1755,12 +1756,19 @@
             if (t === 'buy_used' || /收購二手/.test(name)) return '收購二手機';
             if (t === 'buy_new' || /收購新機/.test(name)) return '收購新機';
             if (t === 'salary' || /薪資|抽成/.test(name)) return '薪資';
-            if (t === 'restock' || t === 'inventory') return '配件進貨';
+            if (t === 'repair_parts' || /維修料件/.test(name)) return '維修料件';
+            if (t === 'transfer_acc' || /調貨配件/.test(name)) return '調貨配件';
             if (t === 'loss' || /虧損/.test(name)) return '虧損';
             if (t === 'expense') return '雜支';
             return '其他支出';
         }
-        const BOOKS_EXPENSE_KEYS = ['配件進貨', '收購二手機', '收購新機', '雜支', '薪資', '虧損', '其他支出'];
+        function isBooksManualExpense(i) {
+            return ['expense', 'salary', 'loss', 'buy_used', 'buy_new', 'repair_parts', 'transfer_acc'].includes(i.type);
+        }
+        function isBooksOutflowType(i) {
+            return isBooksManualExpense(i) || i.type === 'restock' || i.type === 'inventory';
+        }
+        const BOOKS_EXPENSE_KEYS = ['維修料件', '調貨配件', '收購二手機', '收購新機', '雜支', '薪資', '虧損', '其他支出'];
         const BOOKS_PROFIT_KEYS = [
             { key: 'used', label: '二手機' },
             { key: 'new', label: '新機' },
@@ -1786,7 +1794,7 @@
         }
         function buildBooksReport(rows, rangeStart, rangeEnd, periodLabel) {
             const profit = emptyBooksProfit();
-            const expense = { '配件進貨': 0, '收購二手機': 0, '收購新機': 0, '雜支': 0, '薪資': 0, '虧損': 0, '其他支出': 0 };
+            const expense = { '維修料件': 0, '調貨配件': 0, '收購二手機': 0, '收購新機': 0, '雜支': 0, '薪資': 0, '虧損': 0, '其他支出': 0 };
             const incomeDetails = [];
             const expenseDetails = [];
             let pendingPot = 0;
@@ -1795,7 +1803,7 @@
                 if (BlackList.orders.includes(i.orderId)) return;
                 if (BlackList.items.includes(i.orderId + '_' + i.itemId)) return;
                 if (i.status === 'Returned' || i.status === 'Deleted') return;
-                if (i.type === 'expense' || i.type === 'restock' || i.type === 'salary' || i.type === 'buy_used' || i.type === 'buy_new' || i.type === 'loss') {
+                if (isBooksManualExpense(i)) {
                     const when = parseLedgerDate(i.time);
                     if (!when || when < rangeStart || when > rangeEnd) return;
                     if (i.status && i.status !== 'Completed') return;
@@ -2101,14 +2109,12 @@
             const n = UI.booksSessionCount || 0;
             const titles = { misc: '新增雜支', salary: '新增薪支', loss: '新增虧損', repair: '新增維修料件', transfer: '新增調貨配件', buy_used: '收購二手機', buy_new: '收購新機' };
             const title = (titles[kind] || '新增支出') + (looping ? `　·　連續 ${n} 筆` : '');
-            const parts = (kind === 'repair') ? (DB.inv || []).filter(i => i.type === 'accessory' && i.isHidden) : [];
-            const opts = parts.map(p => `<option value="${booksEscape(p.name)}"></option>`).join('');
             let html = booksDateFieldHtml();
             if (kind === 'misc') html += '<input id="bk-n" class="swal2-input" placeholder="摘要（如：便當）"><input id="bk-a" type="number" class="swal2-input" placeholder="金額">';
             else if (kind === 'salary') html += '<input id="bk-n" class="swal2-input" placeholder="摘要（如：抽成／薪水）"><input id="bk-a" type="number" class="swal2-input" placeholder="金額">';
             else if (kind === 'loss') html += '<input id="bk-n" class="swal2-input" placeholder="摘要（如：拆壞螢幕）"><input id="bk-a" type="number" class="swal2-input" placeholder="損失金額">';
             else if (kind === 'buy_used' || kind === 'buy_new') html += '<input id="bk-v" class="swal2-input" placeholder="來源／同行"><input id="bk-n" class="swal2-input" placeholder="型號／摘要"><input id="bk-a" type="number" class="swal2-input" placeholder="金額">';
-            else if (kind === 'repair') html += `<input id="bk-n" class="swal2-input" list="bk-repair-list" placeholder="品名"><datalist id="bk-repair-list">${opts}</datalist><input id="bk-c" type="number" class="swal2-input" placeholder="成本"><input id="bk-q" type="number" class="swal2-input" placeholder="數量" value="1">`;
+            else if (kind === 'repair') html += '<div style="font-size:12px;color:#fbbf24;text-align:left;padding:4px 8px 0">不必選庫存。該筆維修單已打料成本者勿再登，以免雙扣。</div><input id="bk-v" class="swal2-input" placeholder="料商（選填）"><input id="bk-n" class="swal2-input" placeholder="品名（台灣叫貨，不必在庫）"><input id="bk-c" type="number" class="swal2-input" placeholder="成本"><input id="bk-q" type="number" class="swal2-input" placeholder="數量" value="1">';
             else html += `<input id="bk-v" class="swal2-input" placeholder="廠商" value="${booksEscape(UI.lastBooksVendor || '')}"><input id="bk-n" class="swal2-input" placeholder="品名"><input id="bk-c" type="number" class="swal2-input" placeholder="成本"><input id="bk-q" type="number" class="swal2-input" placeholder="數量" value="1">`;
             const result = await Swal.fire({
                 title,
@@ -2123,16 +2129,6 @@
                 allowOutsideClick: !looping,
                 allowEscapeKey: true,
                 didOpen: () => {
-                    if (kind === 'repair') {
-                        const nEl = document.getElementById('bk-n');
-                        const cEl = document.getElementById('bk-c');
-                        const fill = () => {
-                            const hit = parts.find(p => p.name === nEl.value.trim());
-                            if (hit) cEl.value = hit.cost || cEl.value;
-                        };
-                        nEl.addEventListener('change', fill);
-                        nEl.addEventListener('blur', fill);
-                    }
                     const f = document.getElementById('bk-n');
                     if (f) f.focus();
                 },
@@ -2142,6 +2138,7 @@
                     if (kind === 'misc' || kind === 'salary' || kind === 'loss' || kind === 'buy_used' || kind === 'buy_new') {
                         const name = (document.getElementById('bk-n').value || '').trim();
                         const a = parseInt(document.getElementById('bk-a').value, 10);
+                        if (!name) { Swal.showValidationMessage('請填摘要'); return false; }
                         if (!a || a <= 0) { Swal.showValidationMessage('請填金額'); return false; }
                         const vendor = document.getElementById('bk-v') ? (document.getElementById('bk-v').value || '').trim() : '';
                         return { d, name, a, vendor };
@@ -2152,11 +2149,7 @@
                     if (!name) { Swal.showValidationMessage('請填品名'); return false; }
                     if (!c || c <= 0) { Swal.showValidationMessage('請填成本'); return false; }
                     if (q <= 0) { Swal.showValidationMessage('數量需大於 0'); return false; }
-                    if (kind === 'repair') {
-                        const hit = parts.find(p => p.name === name);
-                        return { d, name, c, q, category: hit ? hit.category : '維修料件' };
-                    }
-                    return { d, name, c, q, vendor: (document.getElementById('bk-v').value || '').trim() };
+                    return { d, name, c, q, vendor: (document.getElementById('bk-v')?.value || '').trim() };
                 }
             });
             if (result.isDenied) return { action: 'end' };
@@ -2191,13 +2184,13 @@
                     vendor = v.vendor || '收購';
                 }
                 else if (kind === 'repair') {
-                    items = [{ type: 'restock', name: v.name, category: v.category, cost: v.c, quantity: v.q }];
-                    vendor = '維修料件';
+                    items = [{ type: 'repair_parts', name: `[維修料件] ${v.name}`, cost: v.c, quantity: v.q }];
+                    vendor = v.vendor || '台灣料商';
                 }
                 else {
                     vendor = v.vendor || '調貨';
                     UI.lastBooksVendor = v.vendor || UI.lastBooksVendor || '';
-                    items = [{ type: 'restock', name: v.name, category: '調貨配件', cost: v.c, quantity: v.q }];
+                    items = [{ type: 'transfer_acc', name: `[調貨配件] ${v.name}`, cost: v.c, quantity: v.q }];
                 }
                 const ok = await submitBooksLedger(items, vendor, v.d, { quiet: !!UI.booksContinuous });
                 if (!ok) {
@@ -2605,7 +2598,7 @@
                 if(BlackList.items.includes(i.orderId + '_' + i.itemId)) return;
                 if(i.status === 'Returned' || i.status === 'Deleted') return; 
                 if(i.category === '調整入庫') return; 
-                if(i.type === 'expense' || i.type === 'restock' || i.type === 'salary' || i.type === 'buy_used' || i.type === 'buy_new' || i.type === 'loss') {
+                if(isBooksOutflowType(i)) {
                     let cost = Number(i.cost) || 0;
                     stats.exp += Math.abs(cost); 
                     stats.cash -= Math.abs(cost);
@@ -2903,7 +2896,7 @@
                 if(BlackList.items.includes(i.orderId + '_' + i.itemId)) return;
                 if(i.status === 'Returned' || i.status === 'Deleted') return; 
                 if(i.category === '調整入庫') return; 
-                if(i.type === 'expense' || i.type === 'restock' || i.type === 'salary' || i.type === 'buy_used' || i.type === 'buy_new' || i.type === 'loss') {
+                if(isBooksOutflowType(i)) {
                     let cost = Number(i.cost) || 0;
                     stats.exp += Math.abs(cost);
                     stats.cash -= Math.abs(cost);
@@ -3701,7 +3694,7 @@
 
         async function submitRestock() { 
             if(RestockCart.length===0) return; 
-            const confirm = await Swal.fire({ title: '確定要送出進貨清單？', text: '送出後無法撤回', showCancelButton: true, confirmButtonText: '確定送出', cancelButtonText: '取消', background: '#1e293b', color: 'white' });
+            const confirm = await Swal.fire({ title: '確定要送出進貨清單？', text: '送出後無法撤回。進貨只入庫，不會進帳目支出。', showCancelButton: true, confirmButtonText: '確定送出', cancelButtonText: '取消', background: '#1e293b', color: 'white' });
             if (!confirm.isConfirmed) return;
             const btn = document.getElementById('btn-submit-restock');
             if(btn){ btn.disabled=true; btn.textContent='送出中...'; }
