@@ -37,6 +37,18 @@
         .mobile-nav-item.active { color: #eab308; }
         /* 桌機左欄：文字標籤跟隨按鈕目前文字色 */
         .nav-btn .nav-label { color: inherit; }
+        .books-sheet { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; background: #0b1220; }
+        .books-sheet th, .books-sheet td { border: 1px solid #334155; padding: 7px 10px; font-size: 12px; color: #e2e8f0; }
+        .books-sheet th { background: #0f172a; color: #94a3b8; font-weight: 600; letter-spacing: .04em; }
+        .books-sheet td.num, .books-sheet th.num { text-align: right; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; white-space: nowrap; }
+        .books-sheet .sec td { background: #1e293b; color: #cbd5e1; font-weight: 700; }
+        .books-sheet .tot td { background: #111827; font-weight: 700; }
+        .books-sheet .inc { color: #facc15; }
+        .books-sheet .exp { color: #f87171; }
+        .books-sheet .net { color: #4ade80; }
+        .books-sheet .mute { color: #64748b; }
+        .books-sheet tbody tr:nth-child(even):not(.sec):not(.tot) { background: rgba(15, 23, 42, 0.55); }
+        .books-entry-btn { flex: 1 1 auto; min-width: 7.5rem; padding: 8px 12px; border-radius: 8px; border: 1px solid #475569; background: #1e293b; color: #e2e8f0; font-size: 12px; font-weight: 700; }
         .accordion-content { max-height: 0; overflow: hidden; transition: max-height 0.3s ease-out; background: #020617; border-bottom: 1px solid #1e293b; }
         .accordion-content.open { max-height: 5000px; transition: max-height 0.5s ease-in; }
         .list-row { border-bottom: 1px solid #334155; padding: 12px 8px; cursor: pointer; transition: background 0.2s; }
@@ -230,9 +242,7 @@
         <div id="view-restock" class="hidden view-section flex-1 flex flex-col md:flex-row overflow-hidden relative">
             <div class="flex-1 flex flex-col h-full overflow-hidden">
                 <div class="p-3 flex flex-col gap-3 shrink-0 bg-slate-900/50">
-                    <div class="flex gap-4 border-b border-slate-700 pb-2"><button onclick="setRestockMode('inventory')" id="rm-inv" class="pill-btn active">🔌 配件進貨</button><button onclick="setRestockMode('expense')" id="rm-exp" class="pill-btn">💸 雜項與薪資</button></div>
                     <div id="rs-toolbar-inv" class="flex flex-col gap-2"><div class="relative"><i class="fa-solid fa-search absolute left-3 top-3 text-slate-500"></i><input type="text" id="rs-search" onkeyup="renderRestockGrid()" placeholder="搜尋庫存品項..." class="w-full pl-10 pr-4 py-2 rounded-xl input-dark text-sm"></div><div id="rs-cat-scroll" class="flex gap-2 overflow-x-auto no-scrollbar py-1 items-center"></div></div>
-                    <div id="rs-toolbar-exp" class="hidden flex gap-2"><button onclick="addExpItem('營運雜支')" class="flex-1 bg-slate-800 p-3 rounded-lg border border-slate-700 text-xs font-bold text-yellow-500">新增雜支</button><button onclick="addExpItem('薪資/抽成')" class="flex-1 bg-slate-800 p-3 rounded-lg border border-slate-700 text-xs font-bold text-pink-500">新增薪資</button></div>
                 </div>
                 <div id="rs-grid" class="flex-1 overflow-y-auto p-3 grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-3 content-start pb-24 md:pb-4"></div>
             </div>
@@ -244,23 +254,25 @@
             <div id="mobile-float-bar-restock" onclick="toggleMobileCart('restock', true)" class="md:hidden fixed bottom-16 left-4 right-4 bg-red-600 text-white p-3 rounded-xl shadow-2xl flex justify-between items-center z-40 transform translate-y-24 transition-transform duration-300 hidden"><div class="font-bold flex items-center gap-2"><div class="bg-white text-red-600 w-6 h-6 rounded-full flex items-center justify-center text-xs" id="rs-mob-count">0</div> 待入庫</div><div class="font-mono font-bold text-lg" id="rs-mob-total">0</div></div>
         </div>
 
-        <div id="view-books" class="hidden view-section flex-1 flex flex-col overflow-hidden p-4">
-            <h2 class="text-xl font-bold text-white mb-1">記帳</h2>
-            <p class="text-xs text-slate-500 mb-3">由每日流水匯入。純毛利與「複製二手機／新機…」相同（扣贈品）；未結／掛帳未入帳不列入。包膜、eSIM／網卡、運費歸其他。</p>
-            <div class="flex flex-wrap items-center gap-2 mb-3">
-                <button type="button" id="books-mode-month" onclick="setBooksMode('month')" class="pill-btn active">一個月</button>
-                <button type="button" id="books-mode-bimonth" onclick="setBooksMode('bimonth')" class="pill-btn">雙月</button>
-                <input type="month" id="books-month" class="input-dark p-2 rounded text-sm">
-                <button type="button" onclick="loadBooksReport()" class="bg-yellow-600 text-black font-bold px-3 py-2 rounded-lg text-sm">載入</button>
-                <button type="button" onclick="exportBooksCsv()" class="bg-slate-800 border border-slate-600 text-slate-200 px-3 py-2 rounded-lg text-sm">匯出 CSV</button>
+        <div id="view-books" class="hidden view-section flex-1 flex flex-col overflow-hidden p-3 md:p-4">
+            <div class="flex flex-wrap items-center justify-between gap-2 shrink-0 mb-2">
+                <h2 class="text-lg font-bold text-white tracking-widest">帳目</h2>
+                <div class="flex flex-wrap items-center gap-2">
+                    <button type="button" id="books-mode-month" onclick="setBooksMode('month')" class="pill-btn active">一個月</button>
+                    <button type="button" id="books-mode-bimonth" onclick="setBooksMode('bimonth')" class="pill-btn">雙月</button>
+                    <input type="month" id="books-month" class="input-dark p-2 rounded text-sm">
+                    <button type="button" onclick="loadBooksReport()" class="bg-yellow-600 text-black font-bold px-3 py-2 rounded-lg text-sm">載入</button>
+                    <button type="button" onclick="exportBooksCsv()" class="bg-slate-800 border border-slate-600 text-slate-200 px-3 py-2 rounded-lg text-sm">匯出 CSV</button>
+                </div>
             </div>
-            <div id="books-period-label" class="text-xs text-yellow-500/90 mb-3"></div>
-            <div id="books-summary" class="grid grid-cols-2 md:grid-cols-3 gap-3 mb-3"></div>
-            <div class="flex text-xs text-slate-400 px-3 pb-2 border-b border-slate-700">
-                <div class="flex-1">明細（收入純毛利／支出）</div>
-                <div class="w-24 text-right">金額</div>
+            <div class="flex flex-wrap gap-2 shrink-0 mb-3">
+                <button type="button" onclick="addBooksMisc()" class="books-entry-btn">新增雜支</button>
+                <button type="button" onclick="addBooksSalary()" class="books-entry-btn">新增薪支</button>
+                <button type="button" onclick="addBooksRepairPart()" class="books-entry-btn">新增維修料件</button>
+                <button type="button" onclick="addBooksTransferAcc()" class="books-entry-btn">新增調貨配件</button>
             </div>
-            <div id="books-detail" class="flex-1 overflow-y-auto pb-20 text-sm"></div>
+            <div id="books-period-label" class="text-xs text-slate-400 mb-2 shrink-0"></div>
+            <div id="books-tables" class="flex-1 overflow-auto pb-20 min-h-0"></div>
         </div>
 
         <div id="view-setting" class="hidden view-section flex-1 p-6 flex flex-col gap-4 overflow-y-auto pb-20">
@@ -728,6 +740,7 @@
                 if (fp) fp.classList.add('translate-y-24');
                 if (fr) fr.classList.add('translate-y-24');
             }
+            if (v === 'restock') setRestockMode('inventory');
             if (v === 'setting') {
                 // 設定頁面打開時，不自動展開任何區塊
             }
@@ -1711,6 +1724,13 @@
             if (/[",\n\r]/.test(s)) return '"' + s.replace(/"/g, '""') + '"';
             return s;
         }
+        function booksEscape(s) {
+            return String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+        }
+        function formatBooksYmd(d) {
+            if (!d) return '';
+            return ymdTaipei(d).replace(/-/g, '/');
+        }
         function buildBooksReport(rows, rangeStart, rangeEnd, periodLabel) {
             const profit = emptyBooksProfit();
             const expense = { '配件進貨': 0, '雜支': 0, '薪資': 0, '其他支出': 0 };
@@ -1730,7 +1750,8 @@
                     const subj = booksExpenseSubject(i);
                     expense[subj] = (expense[subj] || 0) + amt;
                     expenseDetails.push({
-                        date: formatDate(i.time),
+                        date: formatBooksYmd(when),
+                        ts: when.getTime(),
                         orderId: i.orderId || '',
                         kind: '支出',
                         subject: subj,
@@ -1784,7 +1805,8 @@
                     profit[key] += catProfit[key];
                     if (Math.abs(catProfit[key]) < 0.005 && catNames[key].length === 0) return;
                     incomeDetails.push({
-                        date: formatDate(g.time),
+                        date: formatBooksYmd(parseLedgerDate(g.time)),
+                        ts: (parseLedgerDate(g.time) || new Date(0)).getTime(),
                         orderId: g.orderId,
                         kind: '收入',
                         subject: label + '純毛利',
@@ -1846,30 +1868,177 @@
             }
         }
         function renderBooksReport(report) {
-            const labelEl = document.getElementById('books-period-label');
-            if (labelEl) labelEl.innerText = '期間：' + (report.periodLabel || '') + '　未結未列入報表；數字為純毛利（已扣贈）';
             const money = v => Math.round(Number(v) || 0).toLocaleString();
-            const cards = [];
-            BOOKS_PROFIT_KEYS.forEach(({ key, label }) => {
-                cards.push(`<div class="glass p-3 rounded-xl border-l-4 border-yellow-500"><div class="text-[10px] text-slate-400">${label}純毛利</div><div class="text-lg font-bold text-yellow-400">${money(report.profit[key])}</div></div>`);
+            const moneyCell = v => (v === '' || v == null) ? '' : money(v);
+            const labelEl = document.getElementById('books-period-label');
+            if (labelEl) labelEl.innerText = '期間 ' + (report.periodLabel || '') + '　未結／掛帳未列入　純毛利已扣贈';
+            const box = document.getElementById('books-tables');
+            if (!box) return;
+            const sc = k => money(report.profit[k]);
+            const se = k => money(report.expense[k]);
+            const sumRows = [
+                `<tr class="sec"><td colspan="2">收入／純毛利</td></tr>`,
+                ...BOOKS_PROFIT_KEYS.map(({ key, label }) => `<tr><td>${label}純毛利</td><td class="num inc">${sc(key)}</td></tr>`),
+                `<tr class="tot"><td>純毛利合計</td><td class="num inc">${money(report.profitTotal)}</td></tr>`,
+                `<tr class="sec"><td colspan="2">支出</td></tr>`,
+                ...['配件進貨', '雜支', '薪資', '其他支出'].map(k => `<tr><td>${k}</td><td class="num exp">${se(k)}</td></tr>`),
+                `<tr class="tot"><td>支出合計</td><td class="num exp">${money(report.expenseTotal)}</td></tr>`,
+                `<tr class="tot"><td>本期淨利</td><td class="num net">${money(report.net)}</td></tr>`,
+                `<tr><td class="mute">未入帳潛在毛利（未列入）</td><td class="num mute">${money(report.pendingPot)}</td></tr>`
+            ].join('');
+            const details = [
+                ...(report.incomeDetails || []).map(r => ({ ...r, income: r.amount, outgo: '' })),
+                ...(report.expenseDetails || []).map(r => ({ ...r, income: '', outgo: r.amount }))
+            ].sort((a, b) => (a.ts || 0) - (b.ts || 0) || String(a.orderId || '').localeCompare(String(b.orderId || '')));
+            const detBody = details.length
+                ? details.map(r => `<tr>
+                    <td>${booksEscape(r.date)}</td>
+                    <td>${booksEscape(r.orderId)}</td>
+                    <td>${booksEscape(r.name)}</td>
+                    <td>${booksEscape(r.subject)}</td>
+                    <td class="num">${moneyCell(r.sale)}</td>
+                    <td class="num">${moneyCell(r.cost)}</td>
+                    <td class="num inc">${r.income === '' ? '' : money(r.income)}</td>
+                    <td class="num exp">${r.outgo === '' ? '' : money(r.outgo)}</td>
+                    <td>${booksEscape(r.person)}</td>
+                </tr>`).join('')
+                : '<tr><td colspan="9" class="mute">此期間沒有已入帳資料</td></tr>';
+            box.innerHTML = `
+                <div class="mb-5 min-w-[520px]">
+                    <div class="flex items-center justify-between mb-2"><div class="text-xs font-bold tracking-[0.2em] text-slate-400">損益彙總</div><div class="text-[11px] text-slate-500">單位：元</div></div>
+                    <table class="books-sheet"><colgroup><col><col style="width:9rem"></colgroup>
+                        <thead><tr><th>科目</th><th class="num">金額</th></tr></thead>
+                        <tbody>${sumRows}</tbody>
+                    </table>
+                </div>
+                <div class="min-w-[860px]">
+                    <div class="flex items-center justify-between mb-2"><div class="text-xs font-bold tracking-[0.2em] text-slate-400">明細帳</div><div class="text-[11px] text-slate-500">收入為純毛利　支出為成本／費用</div></div>
+                    <table class="books-sheet">
+                        <thead><tr>
+                            <th>日期</th><th>單號</th><th>摘要</th><th>科目</th>
+                            <th class="num">售價</th><th class="num">成本</th><th class="num">收入</th><th class="num">支出</th><th>經手人</th>
+                        </tr></thead>
+                        <tbody>${detBody}</tbody>
+                        <tfoot><tr class="tot">
+                            <td colspan="6">合計</td>
+                            <td class="num inc">${money(report.profitTotal)}</td>
+                            <td class="num exp">${money(report.expenseTotal)}</td>
+                            <td></td>
+                        </tr></tfoot>
+                    </table>
+                </div>`;
+        }
+        async function submitBooksLedger(items, vendorName) {
+            if (!(User && User.isAdmin)) {
+                Swal.fire({ icon: 'error', title: '僅管理員可入帳', background: '#1e293b', color: 'white' });
+                return;
+            }
+            const oid = 'EXP' + Date.now().toString().slice(-6);
+            Swal.fire({ title: '入帳中...', background: '#1e293b', color: 'white', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
+            try {
+                const r = await API.handleRestock({ items, person: User.name, orderId: oid, vendorName: vendorName || undefined });
+                if (r.status === 'error') {
+                    Swal.fire({ icon: 'error', title: '入帳失敗', text: r.msg || '請重試', background: '#1e293b', color: 'white' });
+                    return;
+                }
+                await fetchData();
+                if (document.getElementById('view-books') && !document.getElementById('view-books').classList.contains('hidden')) {
+                    await loadBooksReport();
+                }
+                Swal.fire({ icon: 'success', title: '已入帳', toast: true, position: 'top', timer: 1400, showConfirmButton: false, background: '#1e293b' });
+            } catch (err) {
+                Swal.fire({ icon: 'error', title: '入帳失敗', text: (err && err.message) || '請重試', background: '#1e293b', color: 'white' });
+            }
+        }
+        function booksRequireAdmin() {
+            if (User && User.isAdmin) return true;
+            Swal.fire({ icon: 'error', title: '僅管理員可入帳', background: '#1e293b', color: 'white' });
+            return false;
+        }
+        async function addBooksMisc() {
+            if (!booksRequireAdmin()) return;
+            const { value } = await Swal.fire({
+                title: '新增雜支',
+                html: '<input id="bk-n" class="swal2-input" placeholder="摘要（如：便當）"><input id="bk-a" type="number" class="swal2-input" placeholder="金額">',
+                background: '#1e293b', color: 'white', showCancelButton: true, confirmButtonText: '入帳',
+                preConfirm: () => {
+                    const n = (document.getElementById('bk-n').value || '').trim();
+                    const a = parseInt(document.getElementById('bk-a').value, 10);
+                    if (!a || a <= 0) { Swal.showValidationMessage('請填金額'); return false; }
+                    return { n, a };
+                }
             });
-            cards.push(`<div class="glass p-3 rounded-xl border-l-4 border-amber-400"><div class="text-[10px] text-slate-400">純毛利合計</div><div class="text-lg font-bold text-amber-300">${money(report.profitTotal)}</div></div>`);
-            ['配件進貨', '雜支', '薪資', '其他支出'].forEach(k => {
-                cards.push(`<div class="glass p-3 rounded-xl border-l-4 border-orange-500"><div class="text-[10px] text-slate-400">${k}</div><div class="text-lg font-bold text-orange-400">${money(report.expense[k])}</div></div>`);
+            if (!value) return;
+            await submitBooksLedger([{ type: 'expense', name: `[營運雜支] ${value.n}`, cost: value.a, quantity: 1 }]);
+        }
+        async function addBooksSalary() {
+            if (!booksRequireAdmin()) return;
+            const { value } = await Swal.fire({
+                title: '新增薪支',
+                html: '<input id="bk-n" class="swal2-input" placeholder="摘要（如：抽成／薪水）"><input id="bk-a" type="number" class="swal2-input" placeholder="金額">',
+                background: '#1e293b', color: 'white', showCancelButton: true, confirmButtonText: '入帳',
+                preConfirm: () => {
+                    const n = (document.getElementById('bk-n').value || '').trim();
+                    const a = parseInt(document.getElementById('bk-a').value, 10);
+                    if (!a || a <= 0) { Swal.showValidationMessage('請填金額'); return false; }
+                    return { n, a };
+                }
             });
-            cards.push(`<div class="glass p-3 rounded-xl border-l-4 border-red-500"><div class="text-[10px] text-slate-400">支出合計</div><div class="text-lg font-bold text-red-400">${money(report.expenseTotal)}</div></div>`);
-            cards.push(`<div class="glass p-3 rounded-xl border-l-4 border-green-500"><div class="text-[10px] text-slate-400">本期淨利</div><div class="text-lg font-bold text-green-400">${money(report.net)}</div></div>`);
-            cards.push(`<div class="glass p-3 rounded-xl border-l-4 border-slate-500"><div class="text-[10px] text-slate-400">未入帳潛在毛利（未列入）</div><div class="text-lg font-bold text-slate-400">${money(report.pendingPot)}</div></div>`);
-            const sumEl = document.getElementById('books-summary');
-            if (sumEl) sumEl.innerHTML = cards.join('');
-            const det = document.getElementById('books-detail');
-            if (!det) return;
-            const rowHtml = r => `<div class="flex justify-between gap-2 px-3 py-2 border-b border-slate-800"><div class="flex-1 min-w-0"><div class="text-slate-200 truncate">${r.kind} · ${r.subject}</div><div class="text-[11px] text-slate-500 truncate">${r.date}　${r.orderId || ''}　${r.name || ''}</div></div><div class="w-24 text-right font-mono ${r.kind === '支出' ? 'text-red-400' : 'text-yellow-400'}">${r.kind === '支出' ? '-' : ''}$${money(r.amount)}</div></div>`;
-            const income = (report.incomeDetails || []).map(rowHtml).join('');
-            const exp = (report.expenseDetails || []).map(rowHtml).join('');
-            det.innerHTML = (income || exp)
-                ? `<div class="text-xs text-slate-500 px-3 py-2">收入</div>${income || '<div class="text-slate-600 px-3 py-2">無</div>'}<div class="text-xs text-slate-500 px-3 py-2 mt-2">支出</div>${exp || '<div class="text-slate-600 px-3 py-2">無</div>'}`
-                : '<div class="text-slate-500 p-4">此期間沒有已入帳資料</div>';
+            if (!value) return;
+            await submitBooksLedger([{ type: 'salary', name: `[薪資/抽成] ${value.n}`, cost: value.a, quantity: 1 }]);
+        }
+        async function addBooksRepairPart() {
+            if (!booksRequireAdmin()) return;
+            const parts = (DB.inv || []).filter(i => i.type === 'accessory' && i.isHidden);
+            const opts = parts.map(p => `<option value="${booksEscape(p.name)}"></option>`).join('');
+            const { value } = await Swal.fire({
+                title: '新增維修料件',
+                html: `<input id="bk-n" class="swal2-input" list="bk-repair-list" placeholder="品名"><datalist id="bk-repair-list">${opts}</datalist><input id="bk-c" type="number" class="swal2-input" placeholder="成本"><input id="bk-q" type="number" class="swal2-input" placeholder="數量" value="1">`,
+                background: '#1e293b', color: 'white', showCancelButton: true, confirmButtonText: '入帳',
+                didOpen: () => {
+                    const nEl = document.getElementById('bk-n');
+                    const cEl = document.getElementById('bk-c');
+                    const fill = () => {
+                        const hit = parts.find(p => p.name === nEl.value.trim());
+                        if (hit && (cEl.value === '' || Number(cEl.value) === Number(hit.cost))) cEl.value = hit.cost || '';
+                        else if (hit) cEl.value = hit.cost || cEl.value;
+                    };
+                    nEl.addEventListener('change', fill);
+                    nEl.addEventListener('blur', fill);
+                },
+                preConfirm: () => {
+                    const n = (document.getElementById('bk-n').value || '').trim();
+                    const c = parseInt(document.getElementById('bk-c').value, 10);
+                    const q = parseInt(document.getElementById('bk-q').value, 10) || 1;
+                    if (!n) { Swal.showValidationMessage('請填品名'); return false; }
+                    if (!c || c <= 0) { Swal.showValidationMessage('請填成本'); return false; }
+                    if (q <= 0) { Swal.showValidationMessage('數量需大於 0'); return false; }
+                    const hit = parts.find(p => p.name === n);
+                    return { n, c, q, category: hit ? hit.category : '維修料件' };
+                }
+            });
+            if (!value) return;
+            await submitBooksLedger([{ type: 'restock', name: value.n, category: value.category, cost: value.c, quantity: value.q }], '維修料件');
+        }
+        async function addBooksTransferAcc() {
+            if (!booksRequireAdmin()) return;
+            const { value } = await Swal.fire({
+                title: '新增調貨配件',
+                html: '<input id="bk-v" class="swal2-input" placeholder="廠商"><input id="bk-n" class="swal2-input" placeholder="品名"><input id="bk-c" type="number" class="swal2-input" placeholder="成本"><input id="bk-q" type="number" class="swal2-input" placeholder="數量" value="1">',
+                background: '#1e293b', color: 'white', showCancelButton: true, confirmButtonText: '入帳',
+                preConfirm: () => {
+                    const v = (document.getElementById('bk-v').value || '').trim();
+                    const n = (document.getElementById('bk-n').value || '').trim();
+                    const c = parseInt(document.getElementById('bk-c').value, 10);
+                    const q = parseInt(document.getElementById('bk-q').value, 10) || 1;
+                    if (!n) { Swal.showValidationMessage('請填品名'); return false; }
+                    if (!c || c <= 0) { Swal.showValidationMessage('請填成本'); return false; }
+                    if (q <= 0) { Swal.showValidationMessage('數量需大於 0'); return false; }
+                    return { v, n, c, q };
+                }
+            });
+            if (!value) return;
+            await submitBooksLedger([{ type: 'restock', name: value.n, category: '調貨配件', cost: value.c, quantity: value.q }], value.v || '調貨');
         }
         function exportBooksCsv() {
             const report = UI.lastBooksReport;
@@ -3133,7 +3302,29 @@
         }
 
         function toggleMobileCart(t, s) { const p = (t==='pos') ? document.getElementById('cart-panel') : document.getElementById('rs-cart-panel'); if(s) { p.classList.remove('hidden'); p.classList.add('flex', 'fixed', 'inset-0', 'z-50'); if (t === 'pos') { p.classList.add('mobile-cart-open'); resetCartFooterDrag(); } } else { if (t === 'pos') { p.classList.remove('mobile-cart-open'); resetCartFooterDrag(); } p.classList.add('hidden'); p.classList.remove('flex', 'fixed', 'inset-0', 'z-50'); } }
-        function setRestockMode(m) { UI.rsMode = m; document.getElementById('rm-inv').className = m==='inventory' ? 'pill-btn active' : 'pill-btn'; document.getElementById('rm-exp').className = m==='expense' ? 'pill-btn active' : 'pill-btn'; if(m === 'inventory') { document.getElementById('rs-toolbar-inv').classList.remove('hidden'); document.getElementById('rs-toolbar-exp').classList.add('hidden'); document.getElementById('mobile-float-bar-restock').classList.remove('hidden'); const sub = document.getElementById('rs-cat-scroll'); sub.innerHTML = ''; sub.appendChild(createRsPill('全部', 'all')); const hiddenBtn = document.createElement('div'); hiddenBtn.className='pill-btn border-pink-500 text-pink-400'; hiddenBtn.innerText='🔧 維修料件'; hiddenBtn.onclick=()=>{ UI.rsCat='hidden_parts'; document.querySelectorAll('.rs-pill').forEach(b=>b.classList.remove('active')); hiddenBtn.classList.add('active'); renderRestockGrid(); }; sub.appendChild(hiddenBtn); const cats = new Set(DB.inv.filter(i=>i.type==='accessory' && i.category && !i.isHidden).map(i=>i.category)); Array.from(cats).sort().forEach(c => sub.appendChild(createRsPill(c, c))); renderRestockGrid(); } else { document.getElementById('rs-toolbar-inv').classList.add('hidden'); document.getElementById('rs-toolbar-exp').classList.remove('hidden'); document.getElementById('mobile-float-bar-restock').classList.add('hidden'); document.getElementById('rs-grid').innerHTML = ''; renderRestockCartList(); } }
+        function setRestockMode(m) {
+            UI.rsMode = 'inventory';
+            UI.rsCat = 'all';
+            const floatBar = document.getElementById('mobile-float-bar-restock');
+            if (floatBar) floatBar.classList.remove('hidden');
+            const sub = document.getElementById('rs-cat-scroll');
+            if (!sub) return;
+            sub.innerHTML = '';
+            sub.appendChild(createRsPill('全部', 'all'));
+            const hiddenBtn = document.createElement('div');
+            hiddenBtn.className = 'pill-btn border-pink-500 text-pink-400';
+            hiddenBtn.innerText = '🔧 維修料件';
+            hiddenBtn.onclick = () => {
+                UI.rsCat = 'hidden_parts';
+                document.querySelectorAll('.rs-pill').forEach(b => b.classList.remove('active'));
+                hiddenBtn.classList.add('active');
+                renderRestockGrid();
+            };
+            sub.appendChild(hiddenBtn);
+            const cats = new Set(DB.inv.filter(i => i.type === 'accessory' && i.category && !i.isHidden).map(i => i.category));
+            Array.from(cats).sort().forEach(c => sub.appendChild(createRsPill(c, c)));
+            renderRestockGrid();
+        }
         function createRsPill(t, v) { const d = document.createElement('div'); d.className = 'pill-btn rs-pill'; d.innerText = t; if(UI.rsCat === v) d.classList.add('active'); d.onclick = () => { UI.rsCat = v; document.querySelectorAll('.rs-pill').forEach(b=>b.classList.remove('active')); d.classList.add('active'); renderRestockGrid(); }; return d; }
         function renderRestockGrid() { if(UI.rsMode === 'expense') return; const term = document.getElementById('rs-search').value.toLowerCase(); const grid = document.getElementById('rs-grid'); grid.innerHTML = ''; let list = DB.inv.filter(i => { if (i.type !== 'accessory') return false; if (term) return i.name.toLowerCase().includes(term); if (UI.rsCat === 'hidden_parts') return i.isHidden; if (UI.rsCat === 'all') return !i.isHidden; return i.category === UI.rsCat; }); if(list.length === 0) { grid.innerHTML = '<div class="col-span-full text-center text-slate-500 mt-4">無符合商品</div>'; return; } list.forEach(i => { let border = i.isHidden ? 'border-pink-500' : 'border-blue-500'; grid.innerHTML += `<div class="glass p-3 rounded-xl border-l-4 ${border} relative group active:scale-95 transition"><button onclick="event.stopPropagation(); editAccessory('${i.id}', '${i.name}', ${i.cost}, ${i.defaultPrice})" class="absolute top-2 right-2 text-slate-500 hover:text-white p-1"><i class="fa-solid fa-pen-to-square"></i></button><div onclick="addRsItem('${i.id}')" class="cursor-pointer"><div class="flex justify-between text-xs text-slate-500"><span>${i.category}</span><span>庫: ${i.stock}</span></div><div class="font-bold text-sm text-slate-200 line-clamp-2 my-1">${i.name}</div><div class="text-right text-xs text-slate-400">成本 $${i.cost}</div></div></div>`; }); }
         async function editAccessory(id, n, c, p) { const { value: v } = await Swal.fire({ title: '編輯商品', html: `<div class="text-xs text-slate-400 mb-2">${n}</div><label class="text-xs text-slate-500 block text-left">成本</label><input id="sw-edit-c" class="swal2-input" type="number" value="${c}"><label class="text-xs text-slate-500 block text-left mt-2">建議售價</label><input id="sw-edit-p" class="swal2-input" type="number" value="${p}">`, background: '#1e293b', color: 'white', showCancelButton: true, preConfirm: () => [document.getElementById('sw-edit-c').value, document.getElementById('sw-edit-p').value] }); if (v) { let item = DB.inv.find(x => x.id == id); if(item) { item.cost = parseInt(v[0]); item.defaultPrice = parseInt(v[1]); } renderRestockGrid(); Swal.fire({title:'已更新（本機）', text:'重新整理後會恢復，完整儲存功能開發中', toast:true, position:'top', timer:2000, background:'#1e293b'}); } }
