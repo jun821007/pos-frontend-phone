@@ -90,6 +90,7 @@
         <button type="button" id="d-nav-history" onclick="openHistory()" class="nav-btn w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-slate-500 hover:text-yellow-400 transition"><i class="fa-solid fa-chart-pie w-5 text-center text-lg shrink-0"></i><span class="nav-label text-sm font-semibold">歷史</span></button>
         <button type="button" id="d-nav-pending" onclick="openPending()" class="nav-btn w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-slate-500 hover:text-yellow-400 transition"><i class="fa-solid fa-wallet w-5 text-center text-lg shrink-0"></i><span class="nav-label text-sm font-semibold">未結</span></button>
         <button type="button" id="d-nav-restock" onclick="switchView('restock')" class="nav-btn w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-slate-500 hover:text-yellow-400 transition"><i class="fa-solid fa-dolly w-5 text-center text-lg shrink-0"></i><span class="nav-label text-sm font-semibold">進貨</span></button>
+        <button type="button" id="d-nav-books" onclick="openBooks()" style="display:none" class="nav-btn w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-slate-500 hover:text-yellow-400 transition"><i class="fa-solid fa-book w-5 text-center text-lg shrink-0"></i><span class="nav-label text-sm font-semibold">記帳</span></button>
         <button type="button" id="d-nav-setting" onclick="switchView('setting')" class="nav-btn w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-slate-500 hover:text-yellow-400 transition"><i class="fa-solid fa-gear w-5 text-center text-lg shrink-0"></i><span class="nav-label text-sm font-semibold">設定</span></button>
         <div class="mt-auto pt-4 border-t border-slate-800/80">
             <button type="button" onclick="softRefresh()" title="重新同步庫存與帳務" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-blue-400 hover:bg-slate-800 transition text-left"><i class="fa-solid fa-sync w-5 text-center text-lg shrink-0"></i><span class="text-sm font-semibold">同步</span></button>
@@ -243,6 +244,25 @@
             <div id="mobile-float-bar-restock" onclick="toggleMobileCart('restock', true)" class="md:hidden fixed bottom-16 left-4 right-4 bg-red-600 text-white p-3 rounded-xl shadow-2xl flex justify-between items-center z-40 transform translate-y-24 transition-transform duration-300 hidden"><div class="font-bold flex items-center gap-2"><div class="bg-white text-red-600 w-6 h-6 rounded-full flex items-center justify-center text-xs" id="rs-mob-count">0</div> 待入庫</div><div class="font-mono font-bold text-lg" id="rs-mob-total">0</div></div>
         </div>
 
+        <div id="view-books" class="hidden view-section flex-1 flex flex-col overflow-hidden p-4">
+            <h2 class="text-xl font-bold text-white mb-1">記帳</h2>
+            <p class="text-xs text-slate-500 mb-3">由每日流水匯入。純毛利與「複製二手機／新機…」相同（扣贈品）；未結／掛帳未入帳不列入。包膜、eSIM／網卡、運費歸其他。</p>
+            <div class="flex flex-wrap items-center gap-2 mb-3">
+                <button type="button" id="books-mode-month" onclick="setBooksMode('month')" class="pill-btn active">一個月</button>
+                <button type="button" id="books-mode-bimonth" onclick="setBooksMode('bimonth')" class="pill-btn">雙月</button>
+                <input type="month" id="books-month" class="input-dark p-2 rounded text-sm">
+                <button type="button" onclick="loadBooksReport()" class="bg-yellow-600 text-black font-bold px-3 py-2 rounded-lg text-sm">載入</button>
+                <button type="button" onclick="exportBooksCsv()" class="bg-slate-800 border border-slate-600 text-slate-200 px-3 py-2 rounded-lg text-sm">匯出 CSV</button>
+            </div>
+            <div id="books-period-label" class="text-xs text-yellow-500/90 mb-3"></div>
+            <div id="books-summary" class="grid grid-cols-2 md:grid-cols-3 gap-3 mb-3"></div>
+            <div class="flex text-xs text-slate-400 px-3 pb-2 border-b border-slate-700">
+                <div class="flex-1">明細（收入純毛利／支出）</div>
+                <div class="w-24 text-right">金額</div>
+            </div>
+            <div id="books-detail" class="flex-1 overflow-y-auto pb-20 text-sm"></div>
+        </div>
+
         <div id="view-setting" class="hidden view-section flex-1 p-6 flex flex-col gap-4 overflow-y-auto pb-20">
             <h2 class="text-2xl font-bold text-white">系統設定</h2>
             
@@ -337,7 +357,7 @@
         </div>
     </main>
 
-    <nav class="md:hidden fixed bottom-0 w-full h-16 bg-slate-950 border-t border-slate-800 flex z-50"><div onclick="switchView('pos')" id="m-nav-pos" class="mobile-nav-item active"><i class="fa-solid fa-cash-register"></i>收銀</div><div onclick="openReport()" id="m-nav-report" class="mobile-nav-item"><i class="fa-solid fa-file-invoice-dollar"></i>今日</div><div onclick="openPending()" id="m-nav-pending" class="mobile-nav-item"><i class="fa-solid fa-wallet"></i>未結</div><div onclick="openHistory()" id="m-nav-history" class="mobile-nav-item"><i class="fa-solid fa-chart-pie"></i>歷史</div><div onclick="switchView('restock')" id="m-nav-restock" class="mobile-nav-item"><i class="fa-solid fa-dolly"></i>進貨</div><div onclick="switchView('setting')" id="m-nav-setting" class="mobile-nav-item"><i class="fa-solid fa-gear"></i>設定</div></nav>
+    <nav class="md:hidden fixed bottom-0 w-full h-16 bg-slate-950 border-t border-slate-800 flex z-50"><div onclick="switchView('pos')" id="m-nav-pos" class="mobile-nav-item active"><i class="fa-solid fa-cash-register"></i>收銀</div><div onclick="openReport()" id="m-nav-report" class="mobile-nav-item"><i class="fa-solid fa-file-invoice-dollar"></i>今日</div><div onclick="openPending()" id="m-nav-pending" class="mobile-nav-item"><i class="fa-solid fa-wallet"></i>未結</div><div onclick="openHistory()" id="m-nav-history" class="mobile-nav-item"><i class="fa-solid fa-chart-pie"></i>歷史</div><div onclick="switchView('restock')" id="m-nav-restock" class="mobile-nav-item"><i class="fa-solid fa-dolly"></i>進貨</div><div onclick="openBooks()" id="m-nav-books" class="mobile-nav-item" style="display:none"><i class="fa-solid fa-book"></i>記帳</div><div onclick="switchView('setting')" id="m-nav-setting" class="mobile-nav-item"><i class="fa-solid fa-gear"></i>設定</div></nav>
 
     <script>
         // 版本號：自動以日期產生（每次載入即更新）
@@ -485,7 +505,7 @@
         let ItemRegistry = {};
         let OrderRegistry = {};
         let User = { name: '', isAdmin: false };
-        let UI = { tab: 'phone', sub: '', rsMode: 'inventory', rsCat: 'all', multiSelect: false, selectedPhones: new Set(), selectedPendingOrders: new Set(), pendingOrderMeta: {}, pendingOrdersByCustomer: {}, allPendingOrderIds: [], pendingTab: 'unpaid', statsCollapsed: { report: true, history: true }, categoryOrder: null, favAccessoryIds: null, posPrefsLoaded: false };
+        let UI = { tab: 'phone', sub: '', rsMode: 'inventory', rsCat: 'all', multiSelect: false, selectedPhones: new Set(), selectedPendingOrders: new Set(), pendingOrderMeta: {}, pendingOrdersByCustomer: {}, allPendingOrderIds: [], pendingTab: 'unpaid', statsCollapsed: { report: true, history: true }, categoryOrder: null, favAccessoryIds: null, posPrefsLoaded: false, booksMode: 'month', lastBooksReport: null };
         let cartFooterTranslateY = 0;
         const CART_FOOTER_DRAG_MAX_UP = 360;
         const CART_FOOTER_DRAG_MAX_DOWN = 0;
@@ -637,6 +657,7 @@
             document.getElementById('user-badge').innerText = User.name; 
             document.getElementById('staff-name').innerText = User.name; 
             console.log('使用者權限:', User);
+            applyBooksNavVisibility();
             // 限制 a002 帳號不能使用「今日」和「未結」功能
             if(User && User.username === 'a002') {
                 ['d-nav-report','d-nav-pending','m-nav-report','m-nav-pending'].forEach(id => { 
@@ -682,6 +703,10 @@
         }
 
         function switchView(v) { 
+            if (v === 'books' && !(User && User.isAdmin)) {
+                Swal.fire({ icon: 'error', title: '僅管理員可查看記帳', background: '#1e293b', color: 'white' });
+                return;
+            }
             const ev = document.getElementById('view-'+v); if (!ev) return;
             document.querySelectorAll('.view-section').forEach(e => e.classList.add('hidden'));
             ev.classList.remove('hidden');
@@ -1589,10 +1614,302 @@
             const checkout = parseLedgerDate(i.time);
             return checkout && checkout >= rangeStart && checkout <= rangeEnd;
         }
+        function ledgerCountsCompletedForBooks(i, rangeStart, rangeEnd) {
+            if (i.status !== 'Completed') return false;
+            if (i.type === 'expense' || i.type === 'restock' || i.type === 'salary') return false;
+            if (isDeferredPayMethod(i.payMethod)) {
+                const settled = parseLedgerDate(i.settledAt) || parseLedgerDate(i.time);
+                return settled && settled >= rangeStart && settled <= rangeEnd;
+            }
+            const checkout = parseLedgerDate(i.time);
+            return checkout && checkout >= rangeStart && checkout <= rangeEnd;
+        }
         function ledgerCountsPendingPot(i, rangeStart, rangeEnd) {
             if (i.status !== 'Pending') return false;
             const checkout = parseLedgerDate(i.time);
             return checkout && checkout >= rangeStart && checkout <= rangeEnd;
+        }
+
+        function applyBooksNavVisibility() {
+            const show = !!(User && User.isAdmin);
+            const desk = document.getElementById('d-nav-books');
+            if (desk) {
+                desk.classList.toggle('hidden', !show);
+                desk.style.display = show ? 'flex' : 'none';
+            }
+            const mob = document.getElementById('m-nav-books');
+            if (mob) {
+                mob.classList.toggle('hidden', !show);
+                mob.style.display = show ? 'flex' : 'none';
+            }
+        }
+        function setBooksMode(mode) {
+            UI.booksMode = mode === 'bimonth' ? 'bimonth' : 'month';
+            const m = document.getElementById('books-mode-month');
+            const b = document.getElementById('books-mode-bimonth');
+            if (m) m.classList.toggle('active', UI.booksMode === 'month');
+            if (b) b.classList.toggle('active', UI.booksMode === 'bimonth');
+        }
+        function booksPeriodRange() {
+            const ym = (document.getElementById('books-month')?.value || '').trim();
+            if (!/^\d{4}-\d{2}$/.test(ym)) return null;
+            let y = Number(ym.slice(0, 4));
+            let m = Number(ym.slice(5, 7));
+            let y1 = y, m1 = m, y2 = y, m2 = m;
+            if (UI.booksMode === 'bimonth') {
+                if (m % 2 === 0) {
+                    m1 = m - 1;
+                    if (m1 < 1) { m1 = 12; y1 = y - 1; }
+                } else {
+                    m2 = m + 1;
+                    if (m2 > 12) { m2 = 1; y2 = y + 1; }
+                }
+            }
+            const pad = n => String(n).padStart(2, '0');
+            const startYmd = `${y1}-${pad(m1)}-01`;
+            const last = new Date(y2, m2, 0);
+            const endYmd = `${y2}-${pad(m2)}-${pad(last.getDate())}`;
+            const rangeStart = new Date(y1, m1 - 1, 1, 0, 0, 0, 0);
+            const rangeEnd = new Date(y2, m2, 0, 23, 59, 59, 999);
+            const label = UI.booksMode === 'bimonth'
+                ? `${y1}/${pad(m1)}–${y2}/${pad(m2)}`
+                : `${y1}/${pad(m1)}`;
+            return { startYmd, endYmd, rangeStart, rangeEnd, label };
+        }
+        function booksCategoryOf(it) {
+            const t = it.type;
+            if (t === 'phone' || t === 'peer_phone') return 'used';
+            if (t === 'new_phone') return 'new';
+            if (t === 'repair') return 'repair';
+            if (t === 'software' || t === 'software_phone') return 'soft';
+            if (t === 'wrap' || t === 'esim' || t === 'shipping') return 'other';
+            if (isCardCopyItem(it)) return 'other';
+            if (t === 'accessory' || t === 'direct_transfer') return 'acc';
+            return 'other';
+        }
+        function booksExpenseSubject(it) {
+            const t = it.type;
+            const name = String(it.itemName || it.name || '');
+            if (t === 'salary' || /薪資|抽成/.test(name)) return '薪資';
+            if (t === 'restock' || t === 'inventory') return '配件進貨';
+            if (t === 'expense') return '雜支';
+            return '其他支出';
+        }
+        const BOOKS_PROFIT_KEYS = [
+            { key: 'used', label: '二手機' },
+            { key: 'new', label: '新機' },
+            { key: 'acc', label: '配件' },
+            { key: 'repair', label: '維修' },
+            { key: 'soft', label: '軟體' },
+            { key: 'other', label: '其他' }
+        ];
+        function emptyBooksProfit() {
+            return { used: 0, new: 0, repair: 0, acc: 0, soft: 0, other: 0 };
+        }
+        function csvCell(v) {
+            const s = v == null ? '' : String(v);
+            if (/[",\n\r]/.test(s)) return '"' + s.replace(/"/g, '""') + '"';
+            return s;
+        }
+        function buildBooksReport(rows, rangeStart, rangeEnd, periodLabel) {
+            const profit = emptyBooksProfit();
+            const expense = { '配件進貨': 0, '雜支': 0, '薪資': 0, '其他支出': 0 };
+            const incomeDetails = [];
+            const expenseDetails = [];
+            let pendingPot = 0;
+            const groups = {};
+            (rows || []).forEach(i => {
+                if (BlackList.orders.includes(i.orderId)) return;
+                if (BlackList.items.includes(i.orderId + '_' + i.itemId)) return;
+                if (i.status === 'Returned' || i.status === 'Deleted') return;
+                if (i.type === 'expense' || i.type === 'restock' || i.type === 'salary') {
+                    const when = parseLedgerDate(i.time);
+                    if (!when || when < rangeStart || when > rangeEnd) return;
+                    if (i.status && i.status !== 'Completed') return;
+                    const amt = Math.abs(Number(i.cost) || 0);
+                    const subj = booksExpenseSubject(i);
+                    expense[subj] = (expense[subj] || 0) + amt;
+                    expenseDetails.push({
+                        date: formatDate(i.time),
+                        orderId: i.orderId || '',
+                        kind: '支出',
+                        subject: subj,
+                        name: i.itemName || i.name || '',
+                        sale: '',
+                        cost: amt,
+                        amount: amt,
+                        customer: i.customer || '',
+                        person: i.person || ''
+                    });
+                    return;
+                }
+                if (i.status === 'Pending') {
+                    if (ledgerCountsPendingPot(i, rangeStart, rangeEnd) && !isMultiPhoneExtraLine(i)) {
+                        pendingPot += calcCopyProfit(i);
+                    }
+                    return;
+                }
+                if (!ledgerCountsCompletedForBooks(i, rangeStart, rangeEnd)) return;
+                const oid = i.orderId || ('NO-' + (i.itemId || Math.random()));
+                if (!groups[oid]) groups[oid] = { orderId: oid, customer: i.customer || '', person: i.person || '', time: i.time, items: [] };
+                if (!groups[oid].customer && i.customer) groups[oid].customer = i.customer;
+                groups[oid].items.push(i);
+            });
+            Object.values(groups).forEach(g => {
+                const normalized = (g.items || []).filter(it => !isMultiPhoneExtraLine(it));
+                if (!normalized.length) return;
+                const giftAlloc = calcGiftAllocation(normalized);
+                const catProfit = emptyBooksProfit();
+                const catNames = { used: [], new: [], acc: [], repair: [], soft: [], other: [] };
+                const catSale = emptyBooksProfit();
+                const catCost = emptyBooksProfit();
+                normalized.forEach(it => {
+                    const cat = booksCategoryOf(it);
+                    const sale = Number(it.salePrice) || 0;
+                    const cost = Number(it.cost) || 0;
+                    if (!isGiftDeduction(it)) {
+                        catProfit[cat] += calcCopyProfit(it);
+                        catSale[cat] += sale;
+                        catCost[cat] += cost;
+                        catNames[cat].push(stripLedgerName(it.itemName || it.name || '') || '-');
+                    }
+                });
+                catProfit.used -= giftAlloc.used || 0;
+                catProfit.new -= giftAlloc.new || 0;
+                catProfit.acc -= giftAlloc.acc || 0;
+                catProfit.repair -= giftAlloc.repair || 0;
+                catProfit.soft -= giftAlloc.soft || 0;
+                catProfit.other -= (giftAlloc.card || 0);
+                BOOKS_PROFIT_KEYS.forEach(({ key, label }) => {
+                    profit[key] += catProfit[key];
+                    if (Math.abs(catProfit[key]) < 0.005 && catNames[key].length === 0) return;
+                    incomeDetails.push({
+                        date: formatDate(g.time),
+                        orderId: g.orderId,
+                        kind: '收入',
+                        subject: label + '純毛利',
+                        name: catNames[key].join('、') || label,
+                        sale: catSale[key],
+                        cost: catCost[key],
+                        amount: catProfit[key],
+                        customer: g.customer || '',
+                        person: g.person || ''
+                    });
+                });
+            });
+            const incomeRows = incomeDetails.filter(r => Math.abs(Number(r.amount)) >= 0.005);
+            const profitTotal = BOOKS_PROFIT_KEYS.reduce((s, x) => s + (Number(profit[x.key]) || 0), 0);
+            const expenseTotal = Object.values(expense).reduce((s, n) => s + (Number(n) || 0), 0);
+            return {
+                periodLabel,
+                profit,
+                expense,
+                profitTotal,
+                expenseTotal,
+                net: profitTotal - expenseTotal,
+                pendingPot,
+                incomeDetails: incomeRows,
+                expenseDetails
+            };
+        }
+        function openBooks() {
+            if (!(User && User.isAdmin)) {
+                Swal.fire({ icon: 'error', title: '僅管理員可查看記帳', background: '#1e293b', color: 'white' });
+                return;
+            }
+            switchView('books');
+            setBooksMode(UI.booksMode || 'month');
+            const el = document.getElementById('books-month');
+            if (el && !el.value) {
+                const ymd = ymdTaipei(new Date());
+                el.value = ymd.slice(0, 7);
+            }
+            loadBooksReport();
+        }
+        async function loadBooksReport() {
+            if (!(User && User.isAdmin)) return;
+            const period = booksPeriodRange();
+            if (!period) {
+                Swal.fire({ icon: 'warning', title: '請選擇月份', background: '#1e293b', color: 'white' });
+                return;
+            }
+            Swal.showLoading();
+            try {
+                const res = await API.getHistory(period.startYmd, period.endYmd);
+                Swal.close();
+                const report = buildBooksReport(res || [], period.rangeStart, period.rangeEnd, period.label);
+                UI.lastBooksReport = report;
+                renderBooksReport(report);
+            } catch (err) {
+                Swal.close();
+                Swal.fire({ icon: 'error', title: '載入失敗', text: err.message || '請重試', background: '#1e293b' });
+            }
+        }
+        function renderBooksReport(report) {
+            const labelEl = document.getElementById('books-period-label');
+            if (labelEl) labelEl.innerText = '期間：' + (report.periodLabel || '') + '　未結未列入報表；數字為純毛利（已扣贈）';
+            const money = v => Math.round(Number(v) || 0).toLocaleString();
+            const cards = [];
+            BOOKS_PROFIT_KEYS.forEach(({ key, label }) => {
+                cards.push(`<div class="glass p-3 rounded-xl border-l-4 border-yellow-500"><div class="text-[10px] text-slate-400">${label}純毛利</div><div class="text-lg font-bold text-yellow-400">${money(report.profit[key])}</div></div>`);
+            });
+            cards.push(`<div class="glass p-3 rounded-xl border-l-4 border-amber-400"><div class="text-[10px] text-slate-400">純毛利合計</div><div class="text-lg font-bold text-amber-300">${money(report.profitTotal)}</div></div>`);
+            ['配件進貨', '雜支', '薪資', '其他支出'].forEach(k => {
+                cards.push(`<div class="glass p-3 rounded-xl border-l-4 border-orange-500"><div class="text-[10px] text-slate-400">${k}</div><div class="text-lg font-bold text-orange-400">${money(report.expense[k])}</div></div>`);
+            });
+            cards.push(`<div class="glass p-3 rounded-xl border-l-4 border-red-500"><div class="text-[10px] text-slate-400">支出合計</div><div class="text-lg font-bold text-red-400">${money(report.expenseTotal)}</div></div>`);
+            cards.push(`<div class="glass p-3 rounded-xl border-l-4 border-green-500"><div class="text-[10px] text-slate-400">本期淨利</div><div class="text-lg font-bold text-green-400">${money(report.net)}</div></div>`);
+            cards.push(`<div class="glass p-3 rounded-xl border-l-4 border-slate-500"><div class="text-[10px] text-slate-400">未入帳潛在毛利（未列入）</div><div class="text-lg font-bold text-slate-400">${money(report.pendingPot)}</div></div>`);
+            const sumEl = document.getElementById('books-summary');
+            if (sumEl) sumEl.innerHTML = cards.join('');
+            const det = document.getElementById('books-detail');
+            if (!det) return;
+            const rowHtml = r => `<div class="flex justify-between gap-2 px-3 py-2 border-b border-slate-800"><div class="flex-1 min-w-0"><div class="text-slate-200 truncate">${r.kind} · ${r.subject}</div><div class="text-[11px] text-slate-500 truncate">${r.date}　${r.orderId || ''}　${r.name || ''}</div></div><div class="w-24 text-right font-mono ${r.kind === '支出' ? 'text-red-400' : 'text-yellow-400'}">${r.kind === '支出' ? '-' : ''}$${money(r.amount)}</div></div>`;
+            const income = (report.incomeDetails || []).map(rowHtml).join('');
+            const exp = (report.expenseDetails || []).map(rowHtml).join('');
+            det.innerHTML = (income || exp)
+                ? `<div class="text-xs text-slate-500 px-3 py-2">收入</div>${income || '<div class="text-slate-600 px-3 py-2">無</div>'}<div class="text-xs text-slate-500 px-3 py-2 mt-2">支出</div>${exp || '<div class="text-slate-600 px-3 py-2">無</div>'}`
+                : '<div class="text-slate-500 p-4">此期間沒有已入帳資料</div>';
+        }
+        function exportBooksCsv() {
+            const report = UI.lastBooksReport;
+            if (!report) {
+                Swal.fire({ icon: 'warning', title: '請先載入期間', background: '#1e293b', color: 'white' });
+                return;
+            }
+            const lines = [];
+            lines.push(['期間', '區塊', '科目', '金額'].map(csvCell).join(','));
+            BOOKS_PROFIT_KEYS.forEach(({ key, label }) => {
+                lines.push([report.periodLabel, '彙總', label + '純毛利', Math.round(report.profit[key] || 0)].map(csvCell).join(','));
+            });
+            lines.push([report.periodLabel, '彙總', '純毛利合計', Math.round(report.profitTotal || 0)].map(csvCell).join(','));
+            ['配件進貨', '雜支', '薪資', '其他支出'].forEach(k => {
+                lines.push([report.periodLabel, '彙總', k, Math.round(report.expense[k] || 0)].map(csvCell).join(','));
+            });
+            lines.push([report.periodLabel, '彙總', '支出合計', Math.round(report.expenseTotal || 0)].map(csvCell).join(','));
+            lines.push([report.periodLabel, '彙總', '本期淨利', Math.round(report.net || 0)].map(csvCell).join(','));
+            lines.push('');
+            lines.push(['日期', '單號', '收支', '科目', '品名', '售價', '成本', '金額', '經手人'].map(csvCell).join(','));
+            const pushDet = r => {
+                lines.push([
+                    r.date, r.orderId, r.kind, r.subject, r.name,
+                    r.sale === '' ? '' : Math.round(Number(r.sale) || 0),
+                    r.cost === '' ? '' : Math.round(Number(r.cost) || 0),
+                    Math.round(Number(r.amount) || 0),
+                    r.person || ''
+                ].map(csvCell).join(','));
+            };
+            (report.incomeDetails || []).forEach(pushDet);
+            (report.expenseDetails || []).forEach(pushDet);
+            const blob = new Blob(['\uFEFF' + lines.join('\r\n')], { type: 'text/csv;charset=utf-8;' });
+            const a = document.createElement('a');
+            const safe = String(report.periodLabel || 'report').replace(/[^\d\-–年月]/g, '');
+            a.href = URL.createObjectURL(blob);
+            a.download = `記帳_${safe || 'export'}.csv`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(a.href);
         }
         function normalizeTaiwanPhone(value) {
             if (value === null || value === undefined) return '';
