@@ -81,6 +81,20 @@
             #cart-panel .cart-footer-wrap .cart-total-row-mobile { gap: 10px; }
             #cart-panel .cart-footer-wrap .cart-confirm-btn-mobile { flex: 1; min-width: 0; }
         }
+        *, *::before, *::after { transition: none !important; }
+        *:not(.loader) { animation: none !important; animation-duration: 0s !important; }
+        .loader { animation: spin 0.8s linear infinite !important; }
+        .accordion-content, .accordion-content.open { transition: none !important; }
+        .swal2-container, .swal2-container.swal2-backdrop-show, .swal2-popup,
+        .swal2-show, .swal2-hide, .swal2-noanimation, .swal2-icon, .swal2-icon-show,
+        .swal2-success-circular-line-left, .swal2-success-circular-line-right,
+        .swal2-success-line-tip, .swal2-success-line-long, .swal2-success-ring,
+        .swal2-animate-success-icon, .swal2-animate-error-icon {
+            animation: none !important;
+            transition: none !important;
+        }
+        .swal2-popup.swal2-show { transform: none !important; }
+        #mobile-float-bar-pos, #mobile-float-bar-restock, #cart-footer-draggable { transition: none !important; }
     </style>
 </head>
 <body class="h-screen flex flex-col md:flex-row overflow-hidden select-none">
@@ -414,6 +428,31 @@
     <script>
         // 版本號：自動以日期產生（每次載入即更新）
         const POS_VERSION = 'v' + new Date().toISOString().slice(0,10).replace(/-/g,'.');
+        (function patchSwalNoAnim() {
+            if (typeof Swal === 'undefined' || Swal.__posNoAnim) return;
+            const origFire = Swal.fire.bind(Swal);
+            const noAnim = {
+                animation: false,
+                showClass: { popup: '', backdrop: '', icon: '' },
+                hideClass: { popup: '', backdrop: '', icon: '' }
+            };
+            Swal.fire = function (opts, text, icon) {
+                if (typeof opts === 'string') {
+                    return origFire(Object.assign({ title: opts, text: text, icon: icon }, noAnim));
+                }
+                if (!opts || typeof opts !== 'object') return origFire(opts);
+                const next = Object.assign({}, noAnim, opts, {
+                    showClass: Object.assign({}, noAnim.showClass, opts.showClass),
+                    hideClass: Object.assign({}, noAnim.hideClass, opts.hideClass)
+                });
+                if (typeof next.timer === 'number' && next.timer > 400 && (next.icon === 'success' || next.toast)) {
+                    next.showConfirmButton = false;
+                    next.timer = 400;
+                }
+                return origFire(next);
+            };
+            Swal.__posNoAnim = true;
+        })();
 
         let DB = { inv: [], sales: [], pending: [], history: [], companyTemplates: [] }; 
         let Cart = [], RestockCart = [];
