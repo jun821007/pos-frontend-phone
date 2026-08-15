@@ -2283,7 +2283,7 @@
             }
             const tables = document.getElementById('fund-tables');
             if (!tables) return;
-            const rows = (data.rows || []).slice().sort((a, b) => String(b.date).localeCompare(String(a.date)) || String(b.txId).localeCompare(String(a.txId)));
+            const rows = (data.rows || []).slice().sort((a, b) => String(b.date).localeCompare(String(a.date)) || String(b.id || '').localeCompare(String(a.id || '')));
             const body = rows.length ? rows.map(r => {
                 const amt = Number(r.amount) || 0;
                 const amtClass = amt >= 0 ? 'inc' : 'exp';
