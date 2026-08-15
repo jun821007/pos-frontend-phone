@@ -52,6 +52,58 @@
         .books-menu { position: absolute; left: 0; top: calc(100% + 4px); z-index: 40; min-width: 11rem; max-height: min(70vh, 22rem); overflow-y: auto; background: #0f172a; border: 1px solid #475569; border-radius: 8px; box-shadow: 0 12px 24px rgba(0,0,0,.35); }
         .books-menu button { display: block; width: 100%; text-align: left; padding: 9px 12px; font-size: 13px; color: #e2e8f0; background: transparent; border: 0; }
         .books-menu button:hover { background: #1e293b; color: #facc15; }
+        .books-m { display: block; }
+        .books-d { display: none; }
+        .books-page { padding: 8px 10px 5.5rem; }
+        .books-toolbar { display: flex; flex-direction: column; gap: 8px; }
+        .books-toolbar-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+        .books-toolbar-top h2 { font-size: 1.125rem; font-weight: 700; letter-spacing: .18em; color: #fff; margin: 0; }
+        .books-toolbar-actions, .books-toolbar-period, .books-toolbar-entry { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+        .books-toolbar-actions button, .books-toolbar-period button { min-height: 36px; }
+        .books-hero { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 10px; }
+        .books-hero-card { background: #0b1220; border: 1px solid #334155; border-radius: 12px; padding: 10px 12px; }
+        .books-hero-card span { display: block; font-size: 11px; color: #94a3b8; margin-bottom: 4px; }
+        .books-hero-card b { font-size: 1.25rem; font-variant-numeric: tabular-nums; font-weight: 800; letter-spacing: -.02em; }
+        .books-hero-card.net { grid-column: 1 / -1; }
+        .books-hero-card.inc b { color: #facc15; }
+        .books-hero-card.exp b { color: #f87171; }
+        .books-hero-card.net b { color: #4ade80; }
+        .books-sec { font-size: 11px; font-weight: 700; letter-spacing: .16em; color: #94a3b8; margin: 12px 0 6px; }
+        .books-kv { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; padding: 11px 4px; border-bottom: 1px solid #1e293b; font-size: 15px; }
+        .books-kv .lab { color: #e2e8f0; }
+        .books-kv .num { font-variant-numeric: tabular-nums; font-weight: 700; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; white-space: nowrap; }
+        .books-kv .num.inc, .books-card-amt.inc { color: #facc15; }
+        .books-kv .num.exp, .books-card-amt.exp { color: #f87171; }
+        .books-kv .num.mute, .books-kv .lab.mute { color: #64748b; }
+        .books-kv.tot { border-bottom-color: #334155; font-weight: 800; }
+        .books-card { background: #0b1220; border: 1px solid #334155; border-radius: 12px; padding: 12px; margin-bottom: 8px; }
+        .books-card-top { display: flex; justify-content: space-between; gap: 8px; font-size: 12px; color: #94a3b8; margin-bottom: 4px; }
+        .books-card-name { font-size: 15px; font-weight: 700; color: #f1f5f9; line-height: 1.35; margin-bottom: 6px; word-break: break-word; }
+        .books-card-amt { font-size: 1.2rem; font-weight: 800; font-variant-numeric: tabular-nums; }
+        .books-card-meta { margin-top: 6px; font-size: 12px; color: #64748b; line-height: 1.4; }
+        #books-tables, #fund-tables { -webkit-overflow-scrolling: touch; }
+        @media (min-width: 768px) {
+            .books-m { display: none; }
+            .books-d { display: block; overflow-x: auto; }
+            .books-page { padding: 1rem; }
+            .books-toolbar { gap: 10px; }
+        }
+        @media (max-width: 767px) {
+            .books-hint { display: none; }
+            .books-entry-btn { width: 100%; min-height: 44px; font-size: 15px; }
+            .books-menu { left: 0; right: 0; width: 100%; min-width: 0; max-height: min(60vh, 24rem); }
+            .books-menu button { padding: 14px 16px; font-size: 16px; min-height: 48px; }
+            .books-sheet th, .books-sheet td { padding: 10px 8px; font-size: 14px; }
+            .pill-btn { min-height: 36px; padding: 6px 12px; margin-right: 0; }
+            #books-month, #fund-month { min-height: 36px; font-size: 16px; flex: 1 1 9rem; }
+            #books-period-label, #fund-hint { font-size: 12px; line-height: 1.45; color: #94a3b8; }
+            .swal2-popup { width: calc(100vw - 12px) !important; max-width: 28rem; }
+            .swal2-title { font-size: 1.15rem !important; }
+            .swal2-html-container { font-size: 14px !important; }
+            .swal2-input, .swal2-select { width: 92% !important; font-size: 16px !important; min-height: 44px; margin: 6px auto !important; }
+            .swal2-actions { width: 100% !important; }
+            .swal2-styled { min-height: 44px; font-size: 16px !important; }
+        }
         .accordion-content { max-height: 0; overflow: hidden; transition: max-height 0.3s ease-out; background: #020617; border-bottom: 1px solid #1e293b; }
         .accordion-content.open { max-height: 5000px; transition: max-height 0.5s ease-in; }
         .list-row { border-bottom: 1px solid #334155; padding: 12px 8px; cursor: pointer; transition: background 0.2s; }
@@ -271,62 +323,68 @@
             <div id="mobile-float-bar-restock" onclick="toggleMobileCart('restock', true)" class="md:hidden fixed bottom-16 left-4 right-4 bg-red-600 text-white p-3 rounded-xl shadow-2xl flex justify-between items-center z-40 transform translate-y-24 transition-transform duration-300 hidden"><div class="font-bold flex items-center gap-2"><div class="bg-white text-red-600 w-6 h-6 rounded-full flex items-center justify-center text-xs" id="rs-mob-count">0</div> 待入庫</div><div class="font-mono font-bold text-lg" id="rs-mob-total">0</div></div>
         </div>
 
-        <div id="view-books" class="hidden view-section flex-1 flex flex-col overflow-hidden p-3 md:p-4">
-            <div class="flex flex-wrap items-center justify-between gap-2 shrink-0 mb-2">
-                <h2 class="text-lg font-bold text-white tracking-widest">帳目</h2>
-                <div class="flex flex-wrap items-center gap-2">
-                    <button type="button" onclick="openFundFlow()" class="px-3 py-2 rounded-lg bg-slate-800 border border-slate-500 text-slate-100 text-sm font-bold">資金流水</button>
+        <div id="view-books" class="hidden view-section flex-1 flex flex-col overflow-hidden books-page">
+            <div class="books-toolbar shrink-0 mb-2">
+                <div class="books-toolbar-top">
+                    <h2>帳目</h2>
+                    <div class="books-toolbar-actions">
+                        <button type="button" onclick="openFundFlow()" class="px-3 py-2 rounded-lg bg-slate-800 border border-slate-500 text-slate-100 text-sm font-bold">資金流水</button>
+                        <button type="button" onclick="exportBooksCsv()" class="px-3 py-2 rounded-lg bg-slate-800 border border-slate-600 text-slate-200 text-sm">CSV</button>
+                    </div>
+                </div>
+                <div class="books-toolbar-period">
                     <button type="button" id="books-mode-month" onclick="setBooksMode('month')" class="pill-btn active">一個月</button>
                     <button type="button" id="books-mode-bimonth" onclick="setBooksMode('bimonth')" class="pill-btn">雙月</button>
                     <input type="month" id="books-month" class="input-dark p-2 rounded text-sm">
                     <button type="button" onclick="loadBooksReport()" class="bg-yellow-600 text-black font-bold px-3 py-2 rounded-lg text-sm">載入</button>
-                    <button type="button" onclick="exportBooksCsv()" class="bg-slate-800 border border-slate-600 text-slate-200 px-3 py-2 rounded-lg text-sm">匯出 CSV</button>
                 </div>
-            </div>
-            <div class="flex flex-wrap items-center gap-2 shrink-0 mb-2">
-                <div class="relative">
-                    <button type="button" id="books-add-expense-btn" onclick="toggleBooksExpenseMenu(event)" class="books-entry-btn">新增支出 ▾</button>
-                    <div id="books-expense-menu" class="books-menu hidden" onclick="event.stopPropagation()">
-                        <button type="button" onclick="pickBooksExpense('food')">公司吃喝</button>
-                        <button type="button" onclick="pickBooksExpense('sim')">網卡</button>
-                        <button type="button" onclick="pickBooksExpense('extra_repair')">額外維修成本</button>
-                        <button type="button" onclick="pickBooksExpense('company_misc')">公司雜支</button>
-                        <button type="button" onclick="pickBooksExpense('salary')">薪支</button>
-                        <button type="button" onclick="pickBooksExpense('loss')">虧損</button>
-                        <button type="button" onclick="pickBooksExpense('repair')">維修料件</button>
-                        <button type="button" onclick="pickBooksExpense('transfer')">調貨配件</button>
-                        <button type="button" onclick="pickBooksExpense('buy_used')">收購二手機</button>
-                        <button type="button" onclick="pickBooksExpense('buy_new')">收購新機</button>
+                <div class="books-toolbar-entry">
+                    <div class="relative flex-1 min-w-0">
+                        <button type="button" id="books-add-expense-btn" onclick="toggleBooksExpenseMenu(event)" class="books-entry-btn">新增支出 ▾</button>
+                        <div id="books-expense-menu" class="books-menu hidden" onclick="event.stopPropagation()">
+                            <button type="button" onclick="pickBooksExpense('food')">公司吃喝</button>
+                            <button type="button" onclick="pickBooksExpense('sim')">網卡</button>
+                            <button type="button" onclick="pickBooksExpense('extra_repair')">額外維修成本</button>
+                            <button type="button" onclick="pickBooksExpense('company_misc')">公司雜支</button>
+                            <button type="button" onclick="pickBooksExpense('salary')">薪支</button>
+                            <button type="button" onclick="pickBooksExpense('loss')">虧損</button>
+                            <button type="button" onclick="pickBooksExpense('repair')">維修料件</button>
+                            <button type="button" onclick="pickBooksExpense('transfer')">調貨配件</button>
+                            <button type="button" onclick="pickBooksExpense('buy_used')">收購二手機</button>
+                            <button type="button" onclick="pickBooksExpense('buy_new')">收購新機</button>
+                        </div>
                     </div>
+                    <label class="inline-flex items-center gap-2 text-sm text-slate-300 cursor-pointer shrink-0 px-1">
+                        <input type="checkbox" id="books-continuous" class="accent-yellow-500 w-4 h-4" onchange="setBooksContinuous(this.checked)">
+                        連續登錄
+                    </label>
+                    <button type="button" id="books-end-session" onclick="endBooksSession()" class="hidden px-3 py-1.5 rounded-lg bg-slate-800 border border-yellow-600 text-yellow-400 text-sm font-bold">結束登錄</button>
                 </div>
-                <span class="text-[11px] text-slate-500">進貨入庫不進本表。台灣叫貨用手填「維修料件」，不必選庫存。</span>
-            </div>
-            <div class="flex flex-wrap items-center gap-3 shrink-0 mb-3">
-                <label class="inline-flex items-center gap-2 text-sm text-slate-300 cursor-pointer">
-                    <input type="checkbox" id="books-continuous" class="accent-yellow-500 w-4 h-4" onchange="setBooksContinuous(this.checked)">
-                    連續登錄
-                </label>
-                <button type="button" id="books-end-session" onclick="endBooksSession()" class="hidden px-3 py-1.5 rounded-lg bg-slate-800 border border-yellow-600 text-yellow-400 text-sm font-bold">結束登錄</button>
                 <span id="books-session-hint" class="text-xs text-yellow-500/90"></span>
+                <span class="books-hint text-[11px] text-slate-500">進貨入庫不進本表。台灣叫貨用手填「維修料件」，不必選庫存。</span>
             </div>
             <div id="books-period-label" class="text-xs text-slate-400 mb-2 shrink-0"></div>
-            <div id="books-tables" class="flex-1 overflow-auto pb-20 min-h-0"></div>
+            <div id="books-tables" class="flex-1 overflow-auto min-h-0"></div>
         </div>
 
-        <div id="view-fund" class="hidden view-section flex-1 flex flex-col overflow-hidden p-3 md:p-4">
-            <div class="flex flex-wrap items-center justify-between gap-2 shrink-0 mb-2">
-                <h2 class="text-lg font-bold text-white tracking-widest">公司資金流水</h2>
-                <div class="flex flex-wrap items-center gap-2">
-                    <button type="button" onclick="openBooks()" class="px-3 py-2 rounded-lg bg-slate-800 border border-slate-500 text-slate-100 text-sm font-bold">回帳目</button>
+        <div id="view-fund" class="hidden view-section flex-1 flex flex-col overflow-hidden books-page">
+            <div class="books-toolbar shrink-0 mb-2">
+                <div class="books-toolbar-top">
+                    <h2>公司資金流水</h2>
+                    <div class="books-toolbar-actions">
+                        <button type="button" onclick="openBooks()" class="px-3 py-2 rounded-lg bg-slate-800 border border-slate-500 text-slate-100 text-sm font-bold">回帳目</button>
+                        <button type="button" onclick="exportFundCsv()" class="px-3 py-2 rounded-lg bg-slate-800 border border-slate-600 text-slate-200 text-sm">CSV</button>
+                    </div>
+                </div>
+                <div class="books-toolbar-period">
                     <input type="month" id="fund-month" class="input-dark p-2 rounded text-sm">
                     <button type="button" onclick="loadFundFlow()" class="bg-yellow-600 text-black font-bold px-3 py-2 rounded-lg text-sm">載入</button>
-                    <button type="button" onclick="openFundEntry()" class="bg-slate-800 border border-slate-500 text-slate-100 px-3 py-2 rounded-lg text-sm font-bold">新增異動</button>
-                    <button type="button" onclick="exportFundCsv()" class="bg-slate-800 border border-slate-600 text-slate-200 px-3 py-2 rounded-lg text-sm">匯出 CSV</button>
+                    <button type="button" onclick="openFundEntry()" class="px-3 py-2 rounded-lg bg-slate-800 border border-slate-500 text-slate-100 text-sm font-bold">新增異動</button>
                 </div>
             </div>
             <div id="fund-summary" class="grid grid-cols-2 md:grid-cols-4 gap-2 shrink-0 mb-3"></div>
             <div id="fund-hint" class="text-xs text-slate-400 mb-2 shrink-0"></div>
-            <div id="fund-tables" class="flex-1 overflow-auto pb-20 min-h-0"></div>
+            <div id="fund-tables" class="flex-1 overflow-auto min-h-0"></div>
         </div>
 
         <div id="view-setting" class="hidden view-section flex-1 p-6 flex flex-col gap-4 overflow-y-auto pb-20">
@@ -1984,6 +2042,30 @@
             if (!box) return;
             const sc = k => money(report.profit[k]);
             const se = k => money(report.expense[k]);
+            const nzExp = BOOKS_EXPENSE_KEYS.filter(k => Math.abs(Number(report.expense[k]) || 0) >= 0.005);
+            const mProfit = BOOKS_PROFIT_KEYS.map(({ key, label }) => `<div class="books-kv"><span class="lab">${label}</span><span class="num inc">${sc(key)}</span></div>`).join('');
+            const mExp = (nzExp.length ? nzExp : BOOKS_EXPENSE_KEYS).map(k => `<div class="books-kv"><span class="lab">${k}</span><span class="num exp">${se(k)}</span></div>`).join('');
+            const details = [
+                ...(report.incomeDetails || []).map(r => ({ ...r, income: r.amount, outgo: '' })),
+                ...(report.expenseDetails || []).map(r => ({ ...r, income: '', outgo: r.amount }))
+            ].sort((a, b) => (a.ts || 0) - (b.ts || 0) || String(a.orderId || '').localeCompare(String(b.orderId || '')));
+            const mCards = details.length
+                ? details.map(r => {
+                    const isOut = r.outgo !== '';
+                    const amt = isOut ? r.outgo : r.income;
+                    const bits = [];
+                    if (r.sale !== '' && r.sale != null) bits.push('售 ' + money(r.sale));
+                    if (r.cost !== '' && r.cost != null) bits.push('成本 ' + money(r.cost));
+                    if (r.orderId) bits.push(r.orderId);
+                    if (r.person) bits.push(r.person);
+                    return `<article class="books-card">
+                        <div class="books-card-top"><span>${booksEscape(r.date)}　${booksEscape(r.subject)}</span></div>
+                        <div class="books-card-name">${booksEscape(r.name || r.subject)}</div>
+                        <div class="books-card-amt ${isOut ? 'exp' : 'inc'}">${isOut ? '−' : '+'}${money(amt)}</div>
+                        ${bits.length ? `<div class="books-card-meta">${booksEscape(bits.join('　'))}</div>` : ''}
+                    </article>`;
+                }).join('')
+                : '<div class="books-kv mute">此期間沒有已入帳資料</div>';
             const sumRows = [
                 `<tr class="sec"><td colspan="2">收入／純毛利</td></tr>`,
                 ...BOOKS_PROFIT_KEYS.map(({ key, label }) => `<tr><td>${label}純毛利</td><td class="num inc">${sc(key)}</td></tr>`),
@@ -1994,10 +2076,6 @@
                 `<tr class="tot"><td>本期淨利</td><td class="num net">${money(report.net)}</td></tr>`,
                 `<tr><td class="mute">未入帳潛在毛利（未列入）</td><td class="num mute">${money(report.pendingPot)}</td></tr>`
             ].join('');
-            const details = [
-                ...(report.incomeDetails || []).map(r => ({ ...r, income: r.amount, outgo: '' })),
-                ...(report.expenseDetails || []).map(r => ({ ...r, income: '', outgo: r.amount }))
-            ].sort((a, b) => (a.ts || 0) - (b.ts || 0) || String(a.orderId || '').localeCompare(String(b.orderId || '')));
             const detBody = details.length
                 ? details.map(r => `<tr>
                     <td>${booksEscape(r.date)}</td>
@@ -2012,28 +2090,46 @@
                 </tr>`).join('')
                 : '<tr><td colspan="9" class="mute">此期間沒有已入帳資料</td></tr>';
             box.innerHTML = `
-                <div class="mb-5 min-w-[520px]">
-                    <div class="flex items-center justify-between mb-2"><div class="text-xs font-bold tracking-[0.2em] text-slate-400">損益彙總</div><div class="text-[11px] text-slate-500">單位：元</div></div>
-                    <table class="books-sheet"><colgroup><col><col style="width:9rem"></colgroup>
-                        <thead><tr><th>科目</th><th class="num">金額</th></tr></thead>
-                        <tbody>${sumRows}</tbody>
-                    </table>
+                <div class="books-m">
+                    <div class="books-hero">
+                        <div class="books-hero-card inc"><span>純毛利</span><b>${money(report.profitTotal)}</b></div>
+                        <div class="books-hero-card exp"><span>支出</span><b>${money(report.expenseTotal)}</b></div>
+                        <div class="books-hero-card net"><span>本期淨利</span><b>${money(report.net)}</b></div>
+                    </div>
+                    <div class="books-sec">收入</div>
+                    ${mProfit}
+                    <div class="books-kv tot"><span class="lab">純毛利合計</span><span class="num inc">${money(report.profitTotal)}</span></div>
+                    <div class="books-sec">支出</div>
+                    ${mExp}
+                    <div class="books-kv tot"><span class="lab">支出合計</span><span class="num exp">${money(report.expenseTotal)}</span></div>
+                    <div class="books-kv"><span class="lab mute">未入帳潛在毛利</span><span class="num mute">${money(report.pendingPot)}</span></div>
+                    <div class="books-sec">明細　收入為純毛利　支出為成本／費用</div>
+                    ${mCards}
                 </div>
-                <div class="min-w-[860px]">
-                    <div class="flex items-center justify-between mb-2"><div class="text-xs font-bold tracking-[0.2em] text-slate-400">明細帳</div><div class="text-[11px] text-slate-500">收入為純毛利　支出為成本／費用</div></div>
-                    <table class="books-sheet">
-                        <thead><tr>
-                            <th>日期</th><th>單號</th><th>摘要</th><th>科目</th>
-                            <th class="num">售價</th><th class="num">成本</th><th class="num">收入</th><th class="num">支出</th><th>經手人</th>
-                        </tr></thead>
-                        <tbody>${detBody}</tbody>
-                        <tfoot><tr class="tot">
-                            <td colspan="6">合計</td>
-                            <td class="num inc">${money(report.profitTotal)}</td>
-                            <td class="num exp">${money(report.expenseTotal)}</td>
-                            <td></td>
-                        </tr></tfoot>
-                    </table>
+                <div class="books-d">
+                    <div class="mb-5">
+                        <div class="flex items-center justify-between mb-2"><div class="text-xs font-bold tracking-[0.2em] text-slate-400">損益彙總</div><div class="text-[11px] text-slate-500">單位：元</div></div>
+                        <table class="books-sheet"><colgroup><col><col style="width:9rem"></colgroup>
+                            <thead><tr><th>科目</th><th class="num">金額</th></tr></thead>
+                            <tbody>${sumRows}</tbody>
+                        </table>
+                    </div>
+                    <div>
+                        <div class="flex items-center justify-between mb-2"><div class="text-xs font-bold tracking-[0.2em] text-slate-400">明細帳</div><div class="text-[11px] text-slate-500">收入為純毛利　支出為成本／費用</div></div>
+                        <table class="books-sheet">
+                            <thead><tr>
+                                <th>日期</th><th>單號</th><th>摘要</th><th>科目</th>
+                                <th class="num">售價</th><th class="num">成本</th><th class="num">收入</th><th class="num">支出</th><th>經手人</th>
+                            </tr></thead>
+                            <tbody>${detBody}</tbody>
+                            <tfoot><tr class="tot">
+                                <td colspan="6">合計</td>
+                                <td class="num inc">${money(report.profitTotal)}</td>
+                                <td class="num exp">${money(report.expenseTotal)}</td>
+                                <td></td>
+                            </tr></tfoot>
+                        </table>
+                    </div>
                 </div>`;
         }
         async function submitBooksLedger(items, vendorName, entryDate, opts) {
@@ -2348,16 +2444,30 @@
                     <td>${booksEscape(r.person)}</td>
                 </tr>`;
             }).join('') : '<tr><td colspan="9" class="mute">此月沒有資金異動</td></tr>';
-            tables.innerHTML = `<div class="min-w-[920px]">
-                <div class="flex items-center justify-between mb-2"><div class="text-xs font-bold tracking-[0.2em] text-slate-400">資金流水明細</div><div class="text-[11px] text-slate-500">單位：元</div></div>
-                <table class="books-sheet">
-                    <thead><tr>
-                        <th>日期</th><th>資金帳戶</th><th>收支</th><th>科目</th>
-                        <th class="num">異動金額</th><th class="num">異動後餘額</th><th>關聯單號</th><th>備註</th><th>經手人</th>
-                    </tr></thead>
-                    <tbody>${body}</tbody>
-                </table>
-            </div>`;
+            tables.innerHTML = `
+                <div class="books-m">
+                    ${rows.length ? rows.map(r => {
+                        const amt = Number(r.amount) || 0;
+                        const amtClass = amt >= 0 ? 'inc' : 'exp';
+                        const bits = [r.accountType, r.flowType, r.relatedId, r.person].filter(Boolean);
+                        return `<article class="books-card">
+                            <div class="books-card-top"><span>${booksEscape(r.date)}　${booksEscape(r.category || r.flowType)}</span></div>
+                            <div class="books-card-name">${booksEscape(r.note || r.category || '資金異動')}</div>
+                            <div class="books-card-amt ${amtClass}">${amt >= 0 ? '+' : '−'}${money(Math.abs(amt))}</div>
+                            <div class="books-card-meta">餘額 ${money(r.balanceAfter)}${bits.length ? '　' + booksEscape(bits.join('　')) : ''}</div>
+                        </article>`;
+                    }).join('') : '<div class="books-kv mute">此月沒有資金異動</div>'}
+                </div>
+                <div class="books-d" style="overflow-x:auto">
+                    <div class="flex items-center justify-between mb-2"><div class="text-xs font-bold tracking-[0.2em] text-slate-400">資金流水明細</div><div class="text-[11px] text-slate-500">單位：元</div></div>
+                    <table class="books-sheet">
+                        <thead><tr>
+                            <th>日期</th><th>資金帳戶</th><th>收支</th><th>科目</th>
+                            <th class="num">異動金額</th><th class="num">異動後餘額</th><th>關聯單號</th><th>備註</th><th>經手人</th>
+                        </tr></thead>
+                        <tbody>${body}</tbody>
+                    </table>
+                </div>`;
         }
         async function openFundEntry() {
             if (!booksRequireAdmin()) return;
