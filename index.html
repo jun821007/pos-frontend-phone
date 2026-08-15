@@ -49,6 +49,9 @@
         .books-sheet .mute { color: #64748b; }
         .books-sheet tbody tr:nth-child(even):not(.sec):not(.tot) { background: rgba(15, 23, 42, 0.55); }
         .books-entry-btn { flex: 1 1 auto; min-width: 7.5rem; padding: 8px 12px; border-radius: 8px; border: 1px solid #475569; background: #1e293b; color: #e2e8f0; font-size: 12px; font-weight: 700; }
+        .books-menu { position: absolute; left: 0; top: calc(100% + 4px); z-index: 40; min-width: 11rem; background: #0f172a; border: 1px solid #475569; border-radius: 8px; overflow: hidden; box-shadow: 0 12px 24px rgba(0,0,0,.35); }
+        .books-menu button { display: block; width: 100%; text-align: left; padding: 9px 12px; font-size: 13px; color: #e2e8f0; background: transparent; border: 0; }
+        .books-menu button:hover { background: #1e293b; color: #facc15; }
         .accordion-content { max-height: 0; overflow: hidden; transition: max-height 0.3s ease-out; background: #020617; border-bottom: 1px solid #1e293b; }
         .accordion-content.open { max-height: 5000px; transition: max-height 0.5s ease-in; }
         .list-row { border-bottom: 1px solid #334155; padding: 12px 8px; cursor: pointer; transition: background 0.2s; }
@@ -258,6 +261,7 @@
             <div class="flex flex-wrap items-center justify-between gap-2 shrink-0 mb-2">
                 <h2 class="text-lg font-bold text-white tracking-widest">帳目</h2>
                 <div class="flex flex-wrap items-center gap-2">
+                    <button type="button" onclick="openFundFlow()" class="px-3 py-2 rounded-lg bg-slate-800 border border-slate-500 text-slate-100 text-sm font-bold">資金流水</button>
                     <button type="button" id="books-mode-month" onclick="setBooksMode('month')" class="pill-btn active">一個月</button>
                     <button type="button" id="books-mode-bimonth" onclick="setBooksMode('bimonth')" class="pill-btn">雙月</button>
                     <input type="month" id="books-month" class="input-dark p-2 rounded text-sm">
@@ -265,11 +269,18 @@
                     <button type="button" onclick="exportBooksCsv()" class="bg-slate-800 border border-slate-600 text-slate-200 px-3 py-2 rounded-lg text-sm">匯出 CSV</button>
                 </div>
             </div>
-            <div class="flex flex-wrap gap-2 shrink-0 mb-2">
-                <button type="button" onclick="addBooksMisc()" class="books-entry-btn">新增雜支</button>
-                <button type="button" onclick="addBooksSalary()" class="books-entry-btn">新增薪支</button>
-                <button type="button" onclick="addBooksRepairPart()" class="books-entry-btn">新增維修料件</button>
-                <button type="button" onclick="addBooksTransferAcc()" class="books-entry-btn">新增調貨配件</button>
+            <div class="flex flex-wrap items-center gap-2 shrink-0 mb-2">
+                <div class="relative">
+                    <button type="button" id="books-add-expense-btn" onclick="toggleBooksExpenseMenu(event)" class="books-entry-btn">新增支出 ▾</button>
+                    <div id="books-expense-menu" class="books-menu hidden" onclick="event.stopPropagation()">
+                        <button type="button" onclick="pickBooksExpense('misc')">雜支</button>
+                        <button type="button" onclick="pickBooksExpense('salary')">薪支</button>
+                        <button type="button" onclick="pickBooksExpense('repair')">維修料件</button>
+                        <button type="button" onclick="pickBooksExpense('transfer')">調貨配件</button>
+                        <button type="button" onclick="pickBooksExpense('buy_used')">收購二手機</button>
+                        <button type="button" onclick="pickBooksExpense('buy_new')">收購新機</button>
+                    </div>
+                </div>
             </div>
             <div class="flex flex-wrap items-center gap-3 shrink-0 mb-3">
                 <label class="inline-flex items-center gap-2 text-sm text-slate-300 cursor-pointer">
@@ -281,6 +292,22 @@
             </div>
             <div id="books-period-label" class="text-xs text-slate-400 mb-2 shrink-0"></div>
             <div id="books-tables" class="flex-1 overflow-auto pb-20 min-h-0"></div>
+        </div>
+
+        <div id="view-fund" class="hidden view-section flex-1 flex flex-col overflow-hidden p-3 md:p-4">
+            <div class="flex flex-wrap items-center justify-between gap-2 shrink-0 mb-2">
+                <h2 class="text-lg font-bold text-white tracking-widest">公司資金流水</h2>
+                <div class="flex flex-wrap items-center gap-2">
+                    <button type="button" onclick="openBooks()" class="px-3 py-2 rounded-lg bg-slate-800 border border-slate-500 text-slate-100 text-sm font-bold">回帳目</button>
+                    <input type="month" id="fund-month" class="input-dark p-2 rounded text-sm">
+                    <button type="button" onclick="loadFundFlow()" class="bg-yellow-600 text-black font-bold px-3 py-2 rounded-lg text-sm">載入</button>
+                    <button type="button" onclick="openFundEntry()" class="bg-slate-800 border border-slate-500 text-slate-100 px-3 py-2 rounded-lg text-sm font-bold">新增異動</button>
+                    <button type="button" onclick="exportFundCsv()" class="bg-slate-800 border border-slate-600 text-slate-200 px-3 py-2 rounded-lg text-sm">匯出 CSV</button>
+                </div>
+            </div>
+            <div id="fund-summary" class="grid grid-cols-2 md:grid-cols-4 gap-2 shrink-0 mb-3"></div>
+            <div id="fund-hint" class="text-xs text-slate-400 mb-2 shrink-0"></div>
+            <div id="fund-tables" class="flex-1 overflow-auto pb-20 min-h-0"></div>
         </div>
 
         <div id="view-setting" class="hidden view-section flex-1 p-6 flex flex-col gap-4 overflow-y-auto pb-20">
@@ -440,6 +467,19 @@
             });
             return await res.json();
           },
+          getCompanyFund: async (month) => {
+            const q = month ? `?month=${encodeURIComponent(month)}` : '';
+            const res = await fetch(`${API_BASE_URL}/company-fund${q}`);
+            return await res.json();
+          },
+          addCompanyFund: async (data) => {
+            const res = await fetch(`${API_BASE_URL}/company-fund`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(data)
+            });
+            return await res.json();
+          },
           getTodaySalesOnly: async () => {
             const res = await fetch(`${API_BASE_URL}/today-sales`);
             return await res.json();
@@ -525,7 +565,7 @@
         let ItemRegistry = {};
         let OrderRegistry = {};
         let User = { name: '', isAdmin: false };
-        let UI = { tab: 'phone', sub: '', rsMode: 'inventory', rsCat: 'all', multiSelect: false, selectedPhones: new Set(), selectedPendingOrders: new Set(), pendingOrderMeta: {}, pendingOrdersByCustomer: {}, allPendingOrderIds: [], pendingTab: 'unpaid', statsCollapsed: { report: true, history: true }, categoryOrder: null, favAccessoryIds: null, posPrefsLoaded: false, booksMode: 'month', lastBooksReport: null, booksContinuous: false, booksLooping: false, lastBooksEntryYmd: null, lastBooksVendor: '', booksSessionCount: 0 };
+        let UI = { tab: 'phone', sub: '', rsMode: 'inventory', rsCat: 'all', multiSelect: false, selectedPhones: new Set(), selectedPendingOrders: new Set(), pendingOrderMeta: {}, pendingOrdersByCustomer: {}, allPendingOrderIds: [], pendingTab: 'unpaid', statsCollapsed: { report: true, history: true }, categoryOrder: null, favAccessoryIds: null, posPrefsLoaded: false, booksMode: 'month', lastBooksReport: null, lastFundData: null, booksContinuous: false, booksLooping: false, lastBooksEntryYmd: null, lastBooksVendor: '', booksSessionCount: 0 };
         let cartFooterTranslateY = 0;
         const CART_FOOTER_DRAG_MAX_UP = 360;
         const CART_FOOTER_DRAG_MAX_DOWN = 0;
@@ -723,7 +763,7 @@
         }
 
         function switchView(v) { 
-            if (v === 'books' && !(User && User.isAdmin)) {
+            if ((v === 'books' || v === 'fund') && !(User && User.isAdmin)) {
                 Swal.fire({ icon: 'error', title: '僅管理員可查看記帳', background: '#1e293b', color: 'white' });
                 return;
             }
@@ -735,13 +775,13 @@
                 b.classList.remove('text-yellow-400', 'bg-slate-800');
                 b.classList.add('text-slate-500');
             });
-            const d = document.getElementById('d-nav-'+v);
+            const d = document.getElementById('d-nav-'+v) || (v === 'fund' ? document.getElementById('d-nav-books') : null);
             if (d) {
                 d.classList.remove('text-slate-500');
                 d.classList.add('text-yellow-400', 'bg-slate-800');
             }
             document.querySelectorAll('.mobile-nav-item').forEach(b => b.classList.remove('active'));
-            const m = document.getElementById('m-nav-'+v); if (m) m.classList.add('active');
+            const m = document.getElementById('m-nav-'+v) || (v === 'fund' ? document.getElementById('m-nav-books') : null); if (m) m.classList.add('active');
             if (window.innerWidth < 768) {
                 const fp = document.getElementById('mobile-float-bar-pos');
                 const fr = document.getElementById('mobile-float-bar-restock');
@@ -1637,7 +1677,7 @@
         }
         function ledgerCountsCompletedForBooks(i, rangeStart, rangeEnd) {
             if (i.status !== 'Completed') return false;
-            if (i.type === 'expense' || i.type === 'restock' || i.type === 'salary') return false;
+            if (i.type === 'expense' || i.type === 'restock' || i.type === 'salary' || i.type === 'buy_used' || i.type === 'buy_new') return false;
             if (isDeferredPayMethod(i.payMethod)) {
                 const settled = parseLedgerDate(i.settledAt) || parseLedgerDate(i.time);
                 return settled && settled >= rangeStart && settled <= rangeEnd;
@@ -1711,11 +1751,14 @@
         function booksExpenseSubject(it) {
             const t = it.type;
             const name = String(it.itemName || it.name || '');
+            if (t === 'buy_used' || /收購二手/.test(name)) return '收購二手機';
+            if (t === 'buy_new' || /收購新機/.test(name)) return '收購新機';
             if (t === 'salary' || /薪資|抽成/.test(name)) return '薪資';
             if (t === 'restock' || t === 'inventory') return '配件進貨';
             if (t === 'expense') return '雜支';
             return '其他支出';
         }
+        const BOOKS_EXPENSE_KEYS = ['配件進貨', '收購二手機', '收購新機', '雜支', '薪資', '其他支出'];
         const BOOKS_PROFIT_KEYS = [
             { key: 'used', label: '二手機' },
             { key: 'new', label: '新機' },
@@ -1741,7 +1784,7 @@
         }
         function buildBooksReport(rows, rangeStart, rangeEnd, periodLabel) {
             const profit = emptyBooksProfit();
-            const expense = { '配件進貨': 0, '雜支': 0, '薪資': 0, '其他支出': 0 };
+            const expense = { '配件進貨': 0, '收購二手機': 0, '收購新機': 0, '雜支': 0, '薪資': 0, '其他支出': 0 };
             const incomeDetails = [];
             const expenseDetails = [];
             let pendingPot = 0;
@@ -1750,7 +1793,7 @@
                 if (BlackList.orders.includes(i.orderId)) return;
                 if (BlackList.items.includes(i.orderId + '_' + i.itemId)) return;
                 if (i.status === 'Returned' || i.status === 'Deleted') return;
-                if (i.type === 'expense' || i.type === 'restock' || i.type === 'salary') {
+                if (i.type === 'expense' || i.type === 'restock' || i.type === 'salary' || i.type === 'buy_used' || i.type === 'buy_new') {
                     const when = parseLedgerDate(i.time);
                     if (!when || when < rangeStart || when > rangeEnd) return;
                     if (i.status && i.status !== 'Completed') return;
@@ -1891,7 +1934,7 @@
                 ...BOOKS_PROFIT_KEYS.map(({ key, label }) => `<tr><td>${label}純毛利</td><td class="num inc">${sc(key)}</td></tr>`),
                 `<tr class="tot"><td>純毛利合計</td><td class="num inc">${money(report.profitTotal)}</td></tr>`,
                 `<tr class="sec"><td colspan="2">支出</td></tr>`,
-                ...['配件進貨', '雜支', '薪資', '其他支出'].map(k => `<tr><td>${k}</td><td class="num exp">${se(k)}</td></tr>`),
+                ...BOOKS_EXPENSE_KEYS.map(k => `<tr><td>${k}</td><td class="num exp">${se(k)}</td></tr>`),
                 `<tr class="tot"><td>支出合計</td><td class="num exp">${money(report.expenseTotal)}</td></tr>`,
                 `<tr class="tot"><td>本期淨利</td><td class="num net">${money(report.net)}</td></tr>`,
                 `<tr><td class="mute">未入帳潛在毛利（未列入）</td><td class="num mute">${money(report.pendingPot)}</td></tr>`
@@ -2054,13 +2097,14 @@
         async function promptBooksEntry(kind) {
             const looping = !!UI.booksContinuous;
             const n = UI.booksSessionCount || 0;
-            const titles = { misc: '新增雜支', salary: '新增薪支', repair: '新增維修料件', transfer: '新增調貨配件' };
+            const titles = { misc: '新增雜支', salary: '新增薪支', repair: '新增維修料件', transfer: '新增調貨配件', buy_used: '收購二手機', buy_new: '收購新機' };
             const title = (titles[kind] || '新增支出') + (looping ? `　·　連續 ${n} 筆` : '');
             const parts = (kind === 'repair') ? (DB.inv || []).filter(i => i.type === 'accessory' && i.isHidden) : [];
             const opts = parts.map(p => `<option value="${booksEscape(p.name)}"></option>`).join('');
             let html = booksDateFieldHtml();
             if (kind === 'misc') html += '<input id="bk-n" class="swal2-input" placeholder="摘要（如：便當）"><input id="bk-a" type="number" class="swal2-input" placeholder="金額">';
             else if (kind === 'salary') html += '<input id="bk-n" class="swal2-input" placeholder="摘要（如：抽成／薪水）"><input id="bk-a" type="number" class="swal2-input" placeholder="金額">';
+            else if (kind === 'buy_used' || kind === 'buy_new') html += '<input id="bk-v" class="swal2-input" placeholder="來源／同行"><input id="bk-n" class="swal2-input" placeholder="型號／摘要"><input id="bk-a" type="number" class="swal2-input" placeholder="金額">';
             else if (kind === 'repair') html += `<input id="bk-n" class="swal2-input" list="bk-repair-list" placeholder="品名"><datalist id="bk-repair-list">${opts}</datalist><input id="bk-c" type="number" class="swal2-input" placeholder="成本"><input id="bk-q" type="number" class="swal2-input" placeholder="數量" value="1">`;
             else html += `<input id="bk-v" class="swal2-input" placeholder="廠商" value="${booksEscape(UI.lastBooksVendor || '')}"><input id="bk-n" class="swal2-input" placeholder="品名"><input id="bk-c" type="number" class="swal2-input" placeholder="成本"><input id="bk-q" type="number" class="swal2-input" placeholder="數量" value="1">`;
             const result = await Swal.fire({
@@ -2092,11 +2136,12 @@
                 preConfirm: () => {
                     const d = booksReadEntryDate();
                     if (!d) return false;
-                    if (kind === 'misc' || kind === 'salary') {
+                    if (kind === 'misc' || kind === 'salary' || kind === 'buy_used' || kind === 'buy_new') {
                         const name = (document.getElementById('bk-n').value || '').trim();
                         const a = parseInt(document.getElementById('bk-a').value, 10);
                         if (!a || a <= 0) { Swal.showValidationMessage('請填金額'); return false; }
-                        return { d, name, a };
+                        const vendor = document.getElementById('bk-v') ? (document.getElementById('bk-v').value || '').trim() : '';
+                        return { d, name, a, vendor };
                     }
                     const name = (document.getElementById('bk-n').value || '').trim();
                     const c = parseInt(document.getElementById('bk-c').value, 10);
@@ -2133,6 +2178,14 @@
                 let items, vendor = '';
                 if (kind === 'misc') items = [{ type: 'expense', name: `[營運雜支] ${v.name}`, cost: v.a, quantity: 1 }];
                 else if (kind === 'salary') items = [{ type: 'salary', name: `[薪資/抽成] ${v.name}`, cost: v.a, quantity: 1 }];
+                else if (kind === 'buy_used') {
+                    items = [{ type: 'buy_used', name: `[收購二手機] ${v.name}`, cost: v.a, quantity: 1 }];
+                    vendor = v.vendor || '收購';
+                }
+                else if (kind === 'buy_new') {
+                    items = [{ type: 'buy_new', name: `[收購新機] ${v.name}`, cost: v.a, quantity: 1 }];
+                    vendor = v.vendor || '收購';
+                }
                 else if (kind === 'repair') {
                     items = [{ type: 'restock', name: v.name, category: v.category, cost: v.c, quantity: v.q }];
                     vendor = '維修料件';
@@ -2154,6 +2207,202 @@
         function addBooksSalary() { return runBooksEntry('salary'); }
         function addBooksRepairPart() { return runBooksEntry('repair'); }
         function addBooksTransferAcc() { return runBooksEntry('transfer'); }
+        function toggleBooksExpenseMenu(ev) {
+            if (ev) ev.stopPropagation();
+            const menu = document.getElementById('books-expense-menu');
+            if (!menu) return;
+            menu.classList.toggle('hidden');
+        }
+        function pickBooksExpense(kind) {
+            const menu = document.getElementById('books-expense-menu');
+            if (menu) menu.classList.add('hidden');
+            return runBooksEntry(kind);
+        }
+        document.addEventListener('click', () => {
+            const menu = document.getElementById('books-expense-menu');
+            if (menu) menu.classList.add('hidden');
+        });
+        const FUND_SAFE_TARGET = 300000;
+        const FUND_ACCOUNTS = ['公司銀行戶', '門市現金', '第三方待入帳'];
+        const FUND_FLOWS = ['收入', '支出', '內部轉移'];
+        const FUND_CATEGORIES = ['營業營收匯入', '進貨採購支出', '營業費用', '營運雜支', '員工薪資', '店租', '業主固定提領', '業主季度分紅', '稅金', '借貸週轉'];
+        function openFundFlow() {
+            if (!(User && User.isAdmin)) {
+                Swal.fire({ icon: 'error', title: '僅管理員可查看資金流水', background: '#1e293b', color: 'white' });
+                return;
+            }
+            switchView('fund');
+            const el = document.getElementById('fund-month');
+            if (el && !el.value) el.value = ymdTaipei(new Date()).slice(0, 7);
+            loadFundFlow();
+        }
+        async function loadFundFlow() {
+            if (!(User && User.isAdmin)) return;
+            const month = (document.getElementById('fund-month')?.value || '').trim();
+            Swal.showLoading();
+            try {
+                const res = await API.getCompanyFund(month);
+                Swal.close();
+                if (res.status === 'error') {
+                    Swal.fire({ icon: 'error', title: '載入失敗', text: res.msg || '', background: '#1e293b', color: 'white' });
+                    return;
+                }
+                UI.lastFundData = res;
+                renderFundFlow(res, month);
+            } catch (err) {
+                Swal.close();
+                Swal.fire({ icon: 'error', title: '載入失敗', text: err.message || '請重試', background: '#1e293b', color: 'white' });
+            }
+        }
+        function renderFundFlow(data, month) {
+            const money = v => Math.round(Number(v) || 0).toLocaleString();
+            const sum = data.summary || {};
+            const bal = sum.balances || {};
+            const bank = Number(bal['公司銀行戶']) || 0;
+            const cash = Number(bal['門市現金']) || 0;
+            const pending = Number(bal['第三方待入帳']) || 0;
+            const pool = Number(sum.pool != null ? sum.pool : (bank + cash));
+            const target = Number(sum.target != null ? sum.target : FUND_SAFE_TARGET);
+            const gap = pool - target;
+            const gapText = gap >= 0 ? `高於目標 ${money(gap)}` : `離目標還差 ${money(-gap)}`;
+            const gapClass = gap >= 0 ? 'net' : 'exp';
+            const box = document.getElementById('fund-summary');
+            if (box) {
+                box.innerHTML = [
+                    `<div class="glass p-3 rounded-xl border-l-4 border-yellow-500"><div class="text-[10px] text-slate-400">公司銀行戶</div><div class="text-lg font-bold text-yellow-400">${money(bank)}</div></div>`,
+                    `<div class="glass p-3 rounded-xl border-l-4 border-green-500"><div class="text-[10px] text-slate-400">門市現金</div><div class="text-lg font-bold text-green-400">${money(cash)}</div></div>`,
+                    `<div class="glass p-3 rounded-xl border-l-4 border-slate-500"><div class="text-[10px] text-slate-400">第三方待入帳</div><div class="text-lg font-bold text-slate-300">${money(pending)}</div></div>`,
+                    `<div class="glass p-3 rounded-xl border-l-4 ${gap >= 0 ? 'border-green-400' : 'border-red-500'}"><div class="text-[10px] text-slate-400">銀行+現金水位（目標 ${money(target)}）</div><div class="text-lg font-bold ${gap >= 0 ? 'text-green-400' : 'text-red-400'}">${money(pool)}</div><div class="text-[11px] ${gap >= 0 ? 'text-green-500' : 'text-red-400'}">${gapText}</div></div>`
+                ].join('');
+            }
+            const hint = document.getElementById('fund-hint');
+            if (hint) {
+                const bits = [`期間 ${month || '全部'}　餘額為各帳戶即時水位`];
+                if (sum.ownerDrawHint) bits.push(`本月尚未登錄業主固定提領 ${money(sum.ownerDrawAmount || 80000)}（每月 5 號）`);
+                hint.textContent = bits.join('　');
+            }
+            const tables = document.getElementById('fund-tables');
+            if (!tables) return;
+            const rows = (data.rows || []).slice().sort((a, b) => String(b.date).localeCompare(String(a.date)) || String(b.txId).localeCompare(String(a.txId)));
+            const body = rows.length ? rows.map(r => {
+                const amt = Number(r.amount) || 0;
+                const amtClass = amt >= 0 ? 'inc' : 'exp';
+                return `<tr>
+                    <td>${booksEscape(r.date)}</td>
+                    <td>${booksEscape(r.accountType)}</td>
+                    <td>${booksEscape(r.flowType)}</td>
+                    <td>${booksEscape(r.category)}</td>
+                    <td class="num ${amtClass}">${amt >= 0 ? '' : '-'}${money(Math.abs(amt))}</td>
+                    <td class="num">${money(r.balanceAfter)}</td>
+                    <td>${booksEscape(r.relatedId)}</td>
+                    <td>${booksEscape(r.note)}</td>
+                    <td>${booksEscape(r.person)}</td>
+                </tr>`;
+            }).join('') : '<tr><td colspan="9" class="mute">此月沒有資金異動</td></tr>';
+            tables.innerHTML = `<div class="min-w-[920px]">
+                <div class="flex items-center justify-between mb-2"><div class="text-xs font-bold tracking-[0.2em] text-slate-400">資金流水明細</div><div class="text-[11px] text-slate-500">單位：元</div></div>
+                <table class="books-sheet">
+                    <thead><tr>
+                        <th>日期</th><th>資金帳戶</th><th>收支</th><th>科目</th>
+                        <th class="num">異動金額</th><th class="num">異動後餘額</th><th>關聯單號</th><th>備註</th><th>經手人</th>
+                    </tr></thead>
+                    <tbody>${body}</tbody>
+                </table>
+            </div>`;
+        }
+        async function openFundEntry() {
+            if (!booksRequireAdmin()) return;
+            const today = ymdTaipei(new Date());
+            const accOpts = FUND_ACCOUNTS.map(a => `<option value="${a}">${a}</option>`).join('');
+            const flowOpts = FUND_FLOWS.map(a => `<option value="${a}">${a}</option>`).join('');
+            const catOpts = FUND_CATEGORIES.map(a => `<option value="${a}">${a}</option>`).join('');
+            const { value } = await Swal.fire({
+                title: '新增資金異動',
+                html: `<label class="block text-left text-xs text-slate-400 mt-1 px-2">日期</label><input id="fd-d" type="date" class="swal2-input" value="${today}">
+                    <select id="fd-acc" class="swal2-select">${accOpts}</select>
+                    <select id="fd-flow" class="swal2-select">${flowOpts}</select>
+                    <select id="fd-to" class="swal2-select" style="display:none">${accOpts}</select>
+                    <select id="fd-cat" class="swal2-select">${catOpts}</select>
+                    <input id="fd-a" type="number" class="swal2-input" placeholder="金額">
+                    <input id="fd-rel" class="swal2-input" placeholder="關聯單號／銀行序號（選填）">
+                    <input id="fd-n" class="swal2-input" placeholder="備註（如：8月份老闆固定薪資）">`,
+                background: '#1e293b', color: 'white', showCancelButton: true, confirmButtonText: '入帳',
+                didOpen: () => {
+                    const flowEl = document.getElementById('fd-flow');
+                    const toEl = document.getElementById('fd-to');
+                    const catEl = document.getElementById('fd-cat');
+                    const accEl = document.getElementById('fd-acc');
+                    const sync = () => {
+                        const isXfer = flowEl.value === '內部轉移';
+                        toEl.style.display = isXfer ? '' : 'none';
+                        catEl.style.display = isXfer ? 'none' : '';
+                        if (isXfer) {
+                            const other = FUND_ACCOUNTS.find(a => a !== accEl.value) || FUND_ACCOUNTS[1];
+                            toEl.value = other;
+                        }
+                    };
+                    flowEl.addEventListener('change', sync);
+                    accEl.addEventListener('change', sync);
+                    sync();
+                },
+                preConfirm: () => {
+                    const date = (document.getElementById('fd-d').value || '').trim();
+                    const accountType = document.getElementById('fd-acc').value;
+                    const flowType = document.getElementById('fd-flow').value;
+                    const toAccount = document.getElementById('fd-to').value;
+                    const category = document.getElementById('fd-cat').value;
+                    const amount = parseInt(document.getElementById('fd-a').value, 10);
+                    const relatedId = (document.getElementById('fd-rel').value || '').trim();
+                    const note = (document.getElementById('fd-n').value || '').trim();
+                    if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) { Swal.showValidationMessage('請選擇日期'); return false; }
+                    if (!amount || amount <= 0) { Swal.showValidationMessage('請填金額'); return false; }
+                    if (flowType === '內部轉移' && toAccount === accountType) { Swal.showValidationMessage('轉出／轉入帳戶需不同'); return false; }
+                    return { date, accountType, flowType, toAccount, category, amount, relatedId, note };
+                }
+            });
+            if (!value) return;
+            Swal.fire({ title: '入帳中...', background: '#1e293b', color: 'white', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
+            try {
+                const r = await API.addCompanyFund({ ...value, person: User.name });
+                if (r.status === 'error') {
+                    Swal.fire({ icon: 'error', title: '入帳失敗', text: r.msg || '', background: '#1e293b', color: 'white' });
+                    return;
+                }
+                UI.lastFundData = r;
+                const monthEl = document.getElementById('fund-month');
+                if (monthEl && value.date) monthEl.value = value.date.slice(0, 7);
+                renderFundFlow(r, (monthEl && monthEl.value) || value.date.slice(0, 7));
+                Swal.fire({ icon: 'success', title: '已入帳', toast: true, position: 'top', timer: 1400, showConfirmButton: false, background: '#1e293b' });
+            } catch (err) {
+                Swal.fire({ icon: 'error', title: '入帳失敗', text: err.message || '', background: '#1e293b', color: 'white' });
+            }
+        }
+        function exportFundCsv() {
+            const data = UI.lastFundData;
+            if (!data) {
+                Swal.fire({ icon: 'warning', title: '請先載入期間', background: '#1e293b', color: 'white' });
+                return;
+            }
+            const month = (document.getElementById('fund-month')?.value || '').trim();
+            const lines = [];
+            lines.push(['日期', '資金帳戶', '收支類型', '科目類別', '異動金額', '異動後餘額', '關聯單號', '備註', '經手人'].map(csvCell).join(','));
+            (data.rows || []).forEach(r => {
+                lines.push([
+                    r.date, r.accountType, r.flowType, r.category,
+                    Math.round(Number(r.amount) || 0),
+                    Math.round(Number(r.balanceAfter) || 0),
+                    r.relatedId || '', r.note || '', r.person || ''
+                ].map(csvCell).join(','));
+            });
+            const blob = new Blob(['\uFEFF' + lines.join('\r\n')], { type: 'text/csv;charset=utf-8;' });
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(blob);
+            a.download = `公司資金流水_${month || 'all'}.csv`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(a.href);
+        }
         function exportBooksCsv() {
             const report = UI.lastBooksReport;
             if (!report) {
@@ -2166,7 +2415,7 @@
                 lines.push([report.periodLabel, '彙總', label + '純毛利', Math.round(report.profit[key] || 0)].map(csvCell).join(','));
             });
             lines.push([report.periodLabel, '彙總', '純毛利合計', Math.round(report.profitTotal || 0)].map(csvCell).join(','));
-            ['配件進貨', '雜支', '薪資', '其他支出'].forEach(k => {
+            BOOKS_EXPENSE_KEYS.forEach(k => {
                 lines.push([report.periodLabel, '彙總', k, Math.round(report.expense[k] || 0)].map(csvCell).join(','));
             });
             lines.push([report.periodLabel, '彙總', '支出合計', Math.round(report.expenseTotal || 0)].map(csvCell).join(','));
@@ -2352,7 +2601,7 @@
                 if(BlackList.items.includes(i.orderId + '_' + i.itemId)) return;
                 if(i.status === 'Returned' || i.status === 'Deleted') return; 
                 if(i.category === '調整入庫') return; 
-                if(i.type === 'expense' || i.type === 'restock' || i.type === 'salary') {
+                if(i.type === 'expense' || i.type === 'restock' || i.type === 'salary' || i.type === 'buy_used' || i.type === 'buy_new') {
                     let cost = Number(i.cost) || 0;
                     stats.exp += Math.abs(cost); 
                     stats.cash -= Math.abs(cost);
@@ -2650,7 +2899,7 @@
                 if(BlackList.items.includes(i.orderId + '_' + i.itemId)) return;
                 if(i.status === 'Returned' || i.status === 'Deleted') return; 
                 if(i.category === '調整入庫') return; 
-                if(i.type === 'expense' || i.type === 'restock' || i.type === 'salary') {
+                if(i.type === 'expense' || i.type === 'restock' || i.type === 'salary' || i.type === 'buy_used' || i.type === 'buy_new') {
                     let cost = Number(i.cost) || 0;
                     stats.exp += Math.abs(cost);
                     stats.cash -= Math.abs(cost);
