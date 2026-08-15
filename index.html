@@ -361,7 +361,7 @@
                     <button type="button" id="books-end-session" onclick="endBooksSession()" class="hidden px-3 py-1.5 rounded-lg bg-slate-800 border border-yellow-600 text-yellow-400 text-sm font-bold">結束登錄</button>
                 </div>
                 <span id="books-session-hint" class="text-xs text-yellow-500/90"></span>
-                <span class="books-hint text-[11px] text-slate-500">進貨入庫不進本表。台灣叫貨用手填「維修料件」，不必選庫存。</span>
+                <span class="books-hint text-[11px] text-slate-500">進貨只入庫、不進本表。叫回來放倉庫請走進貨。帳目「維修料件」只記付料錢，不入庫。</span>
             </div>
             <div id="books-period-label" class="text-xs text-slate-400 mb-2 shrink-0"></div>
             <div id="books-tables" class="flex-1 overflow-auto min-h-0"></div>
@@ -2254,12 +2254,12 @@
             let html = booksDateFieldHtml();
             if (kind === 'food') html += '<input id="bk-n" class="swal2-input" placeholder="摘要（如：便當）"><input id="bk-a" type="number" class="swal2-input" placeholder="金額">';
             else if (kind === 'sim') html += '<input id="bk-n" class="swal2-input" placeholder="摘要（如：DTAC／eSIM）"><input id="bk-a" type="number" class="swal2-input" placeholder="金額">';
-            else if (kind === 'extra_repair') html += '<div style="font-size:12px;color:#fbbf24;text-align:left;padding:4px 8px 0">POS 維修單已打過成本者勿再登，以免雙扣。</div><input id="bk-n" class="swal2-input" placeholder="摘要（如：外修、加價）"><input id="bk-a" type="number" class="swal2-input" placeholder="金額">';
+            else if (kind === 'extra_repair') html += '<div style="font-size:12px;color:#94a3b8;text-align:left;padding:4px 8px 0">外修、加價等、維修單上沒算進去的錢。</div><input id="bk-n" class="swal2-input" placeholder="摘要（如：外修、加價）"><input id="bk-a" type="number" class="swal2-input" placeholder="金額">';
             else if (kind === 'company_misc') html += '<input id="bk-n" class="swal2-input" placeholder="摘要（如：文具、清潔）"><input id="bk-a" type="number" class="swal2-input" placeholder="金額">';
             else if (kind === 'salary') html += '<input id="bk-n" class="swal2-input" placeholder="摘要（如：抽成／薪水）"><input id="bk-a" type="number" class="swal2-input" placeholder="金額">';
             else if (kind === 'loss') html += '<input id="bk-n" class="swal2-input" placeholder="摘要（如：拆壞螢幕）"><input id="bk-a" type="number" class="swal2-input" placeholder="損失金額">';
             else if (kind === 'buy_used' || kind === 'buy_new') html += '<input id="bk-v" class="swal2-input" placeholder="來源／同行"><input id="bk-n" class="swal2-input" placeholder="型號／摘要"><input id="bk-a" type="number" class="swal2-input" placeholder="金額">';
-            else if (kind === 'repair') html += '<div style="font-size:12px;color:#fbbf24;text-align:left;padding:4px 8px 0">不必選庫存。該筆維修單已打料成本者勿再登，以免雙扣。</div><input id="bk-v" class="swal2-input" placeholder="料商（選填）"><input id="bk-n" class="swal2-input" placeholder="品名（台灣叫貨，不必在庫）"><input id="bk-c" type="number" class="swal2-input" placeholder="成本"><input id="bk-q" type="number" class="swal2-input" placeholder="數量" value="1">';
+            else if (kind === 'repair') html += '<div style="font-size:12px;color:#94a3b8;text-align:left;padding:4px 8px 0">只記付料錢，不會入庫。叫回來放倉庫請用進貨。</div><input id="bk-v" class="swal2-input" placeholder="料商（選填）"><input id="bk-n" class="swal2-input" placeholder="品名"><input id="bk-c" type="number" class="swal2-input" placeholder="成本"><input id="bk-q" type="number" class="swal2-input" placeholder="數量" value="1">';
             else html += `<input id="bk-v" class="swal2-input" placeholder="廠商" value="${booksEscape(UI.lastBooksVendor || '')}"><input id="bk-n" class="swal2-input" placeholder="品名"><input id="bk-c" type="number" class="swal2-input" placeholder="成本"><input id="bk-q" type="number" class="swal2-input" placeholder="數量" value="1">`;
             const result = await Swal.fire({
                 title,
