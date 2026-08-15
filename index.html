@@ -49,7 +49,7 @@
         .books-sheet .mute { color: #64748b; }
         .books-sheet tbody tr:nth-child(even):not(.sec):not(.tot) { background: rgba(15, 23, 42, 0.55); }
         .books-entry-btn { flex: 1 1 auto; min-width: 7.5rem; padding: 8px 12px; border-radius: 8px; border: 1px solid #475569; background: #1e293b; color: #e2e8f0; font-size: 12px; font-weight: 700; }
-        .books-menu { position: absolute; left: 0; top: calc(100% + 4px); z-index: 40; min-width: 11rem; background: #0f172a; border: 1px solid #475569; border-radius: 8px; overflow: hidden; box-shadow: 0 12px 24px rgba(0,0,0,.35); }
+        .books-menu { position: absolute; left: 0; top: calc(100% + 4px); z-index: 40; min-width: 11rem; max-height: min(70vh, 22rem); overflow-y: auto; background: #0f172a; border: 1px solid #475569; border-radius: 8px; box-shadow: 0 12px 24px rgba(0,0,0,.35); }
         .books-menu button { display: block; width: 100%; text-align: left; padding: 9px 12px; font-size: 13px; color: #e2e8f0; background: transparent; border: 0; }
         .books-menu button:hover { background: #1e293b; color: #facc15; }
         .accordion-content { max-height: 0; overflow: hidden; transition: max-height 0.3s ease-out; background: #020617; border-bottom: 1px solid #1e293b; }
@@ -273,7 +273,10 @@
                 <div class="relative">
                     <button type="button" id="books-add-expense-btn" onclick="toggleBooksExpenseMenu(event)" class="books-entry-btn">新增支出 ▾</button>
                     <div id="books-expense-menu" class="books-menu hidden" onclick="event.stopPropagation()">
-                        <button type="button" onclick="pickBooksExpense('misc')">雜支</button>
+                        <button type="button" onclick="pickBooksExpense('food')">公司吃喝</button>
+                        <button type="button" onclick="pickBooksExpense('sim')">網卡</button>
+                        <button type="button" onclick="pickBooksExpense('extra_repair')">額外維修成本</button>
+                        <button type="button" onclick="pickBooksExpense('company_misc')">公司雜支</button>
                         <button type="button" onclick="pickBooksExpense('salary')">薪支</button>
                         <button type="button" onclick="pickBooksExpense('loss')">虧損</button>
                         <button type="button" onclick="pickBooksExpense('repair')">維修料件</button>
@@ -1759,16 +1762,19 @@
             if (t === 'repair_parts' || /維修料件/.test(name)) return '維修料件';
             if (t === 'transfer_acc' || /調貨配件/.test(name)) return '調貨配件';
             if (t === 'loss' || /虧損/.test(name)) return '虧損';
-            if (t === 'expense') return '雜支';
+            if (t === 'net_card' || /\[網卡\]/.test(name)) return '網卡';
+            if (t === 'extra_repair' || /額外維修成本/.test(name)) return '額外維修成本';
+            if (t === 'company_misc' || /\[公司雜支\]/.test(name)) return '公司雜支';
+            if (t === 'company_food' || t === 'expense' || /公司吃喝|營運雜支/.test(name)) return '公司吃喝';
             return '其他支出';
         }
         function isBooksManualExpense(i) {
-            return ['expense', 'salary', 'loss', 'buy_used', 'buy_new', 'repair_parts', 'transfer_acc'].includes(i.type);
+            return ['expense', 'company_food', 'company_misc', 'net_card', 'extra_repair', 'salary', 'loss', 'buy_used', 'buy_new', 'repair_parts', 'transfer_acc'].includes(i.type);
         }
         function isBooksOutflowType(i) {
             return isBooksManualExpense(i) || i.type === 'restock' || i.type === 'inventory';
         }
-        const BOOKS_EXPENSE_KEYS = ['維修料件', '調貨配件', '收購二手機', '收購新機', '雜支', '薪資', '虧損', '其他支出'];
+        const BOOKS_EXPENSE_KEYS = ['維修料件', '額外維修成本', '調貨配件', '收購二手機', '收購新機', '網卡', '公司吃喝', '公司雜支', '薪資', '虧損', '其他支出'];
         const BOOKS_PROFIT_KEYS = [
             { key: 'used', label: '二手機' },
             { key: 'new', label: '新機' },
@@ -1794,7 +1800,7 @@
         }
         function buildBooksReport(rows, rangeStart, rangeEnd, periodLabel) {
             const profit = emptyBooksProfit();
-            const expense = { '維修料件': 0, '調貨配件': 0, '收購二手機': 0, '收購新機': 0, '雜支': 0, '薪資': 0, '虧損': 0, '其他支出': 0 };
+            const expense = { '維修料件': 0, '額外維修成本': 0, '調貨配件': 0, '收購二手機': 0, '收購新機': 0, '網卡': 0, '公司吃喝': 0, '公司雜支': 0, '薪資': 0, '虧損': 0, '其他支出': 0 };
             const incomeDetails = [];
             const expenseDetails = [];
             let pendingPot = 0;
@@ -2107,10 +2113,14 @@
         async function promptBooksEntry(kind) {
             const looping = !!UI.booksContinuous;
             const n = UI.booksSessionCount || 0;
-            const titles = { misc: '新增雜支', salary: '新增薪支', loss: '新增虧損', repair: '新增維修料件', transfer: '新增調貨配件', buy_used: '收購二手機', buy_new: '收購新機' };
+            const titles = { food: '新增公司吃喝', sim: '新增網卡', extra_repair: '新增額外維修成本', company_misc: '新增公司雜支', salary: '新增薪支', loss: '新增虧損', repair: '新增維修料件', transfer: '新增調貨配件', buy_used: '收購二手機', buy_new: '收購新機' };
             const title = (titles[kind] || '新增支出') + (looping ? `　·　連續 ${n} 筆` : '');
+            const amountKinds = ['food', 'sim', 'extra_repair', 'company_misc', 'salary', 'loss', 'buy_used', 'buy_new'];
             let html = booksDateFieldHtml();
-            if (kind === 'misc') html += '<input id="bk-n" class="swal2-input" placeholder="摘要（如：便當）"><input id="bk-a" type="number" class="swal2-input" placeholder="金額">';
+            if (kind === 'food') html += '<input id="bk-n" class="swal2-input" placeholder="摘要（如：便當）"><input id="bk-a" type="number" class="swal2-input" placeholder="金額">';
+            else if (kind === 'sim') html += '<input id="bk-n" class="swal2-input" placeholder="摘要（如：DTAC／eSIM）"><input id="bk-a" type="number" class="swal2-input" placeholder="金額">';
+            else if (kind === 'extra_repair') html += '<div style="font-size:12px;color:#fbbf24;text-align:left;padding:4px 8px 0">POS 維修單已打過成本者勿再登，以免雙扣。</div><input id="bk-n" class="swal2-input" placeholder="摘要（如：外修、加價）"><input id="bk-a" type="number" class="swal2-input" placeholder="金額">';
+            else if (kind === 'company_misc') html += '<input id="bk-n" class="swal2-input" placeholder="摘要（如：文具、清潔）"><input id="bk-a" type="number" class="swal2-input" placeholder="金額">';
             else if (kind === 'salary') html += '<input id="bk-n" class="swal2-input" placeholder="摘要（如：抽成／薪水）"><input id="bk-a" type="number" class="swal2-input" placeholder="金額">';
             else if (kind === 'loss') html += '<input id="bk-n" class="swal2-input" placeholder="摘要（如：拆壞螢幕）"><input id="bk-a" type="number" class="swal2-input" placeholder="損失金額">';
             else if (kind === 'buy_used' || kind === 'buy_new') html += '<input id="bk-v" class="swal2-input" placeholder="來源／同行"><input id="bk-n" class="swal2-input" placeholder="型號／摘要"><input id="bk-a" type="number" class="swal2-input" placeholder="金額">';
@@ -2135,7 +2145,7 @@
                 preConfirm: () => {
                     const d = booksReadEntryDate();
                     if (!d) return false;
-                    if (kind === 'misc' || kind === 'salary' || kind === 'loss' || kind === 'buy_used' || kind === 'buy_new') {
+                    if (amountKinds.includes(kind)) {
                         const name = (document.getElementById('bk-n').value || '').trim();
                         const a = parseInt(document.getElementById('bk-a').value, 10);
                         if (!name) { Swal.showValidationMessage('請填摘要'); return false; }
@@ -2172,7 +2182,10 @@
                 if (step.action !== 'ok') return;
                 const v = step.value;
                 let items, vendor = '';
-                if (kind === 'misc') items = [{ type: 'expense', name: `[營運雜支] ${v.name}`, cost: v.a, quantity: 1 }];
+                if (kind === 'food') items = [{ type: 'company_food', name: `[公司吃喝] ${v.name}`, cost: v.a, quantity: 1 }];
+                else if (kind === 'sim') items = [{ type: 'net_card', name: `[網卡] ${v.name}`, cost: v.a, quantity: 1 }];
+                else if (kind === 'extra_repair') items = [{ type: 'extra_repair', name: `[額外維修成本] ${v.name}`, cost: v.a, quantity: 1 }];
+                else if (kind === 'company_misc') items = [{ type: 'company_misc', name: `[公司雜支] ${v.name}`, cost: v.a, quantity: 1 }];
                 else if (kind === 'salary') items = [{ type: 'salary', name: `[薪資/抽成] ${v.name}`, cost: v.a, quantity: 1 }];
                 else if (kind === 'loss') items = [{ type: 'loss', name: `[虧損] ${v.name}`, cost: v.a, quantity: 1 }];
                 else if (kind === 'buy_used') {
@@ -2200,7 +2213,7 @@
                 if (!UI.booksContinuous || !UI.booksLooping) return;
             }
         }
-        function addBooksMisc() { return runBooksEntry('misc'); }
+        function addBooksMisc() { return runBooksEntry('food'); }
         function addBooksSalary() { return runBooksEntry('salary'); }
         function addBooksRepairPart() { return runBooksEntry('repair'); }
         function addBooksTransferAcc() { return runBooksEntry('transfer'); }
