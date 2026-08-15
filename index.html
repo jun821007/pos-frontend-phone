@@ -74,7 +74,7 @@
         .books-kv .num { font-variant-numeric: tabular-nums; font-weight: 700; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; white-space: nowrap; }
         .books-kv .num.inc, .books-card-amt.inc { color: #facc15; }
         .books-kv .num.exp, .books-card-amt.exp { color: #f87171; }
-        .books-kv .num.mute, .books-kv .lab.mute { color: #64748b; }
+        .books-kv .num.mute, .books-kv .lab.mute, .books-card-amt.mute { color: #94a3b8; }
         .books-kv.tot { border-bottom-color: #334155; font-weight: 800; }
         .books-card { background: #0b1220; border: 1px solid #334155; border-radius: 12px; padding: 12px; margin-bottom: 8px; }
         .books-card-top { display: flex; justify-content: space-between; gap: 8px; font-size: 12px; color: #94a3b8; margin-bottom: 4px; }
@@ -361,7 +361,7 @@
                     <button type="button" id="books-end-session" onclick="endBooksSession()" class="hidden px-3 py-1.5 rounded-lg bg-slate-800 border border-yellow-600 text-yellow-400 text-sm font-bold">結束登錄</button>
                 </div>
                 <span id="books-session-hint" class="text-xs text-yellow-500/90"></span>
-                <span class="books-hint text-[11px] text-slate-500">進貨只入庫、不進本表。叫回來放倉庫請走進貨。帳目「維修料件」只記付料錢，不入庫。</span>
+                <span class="books-hint text-[11px] text-slate-500">進貨只入庫。帳目「維修料件」只記付料、不扣淨利。維修單照常填成本。</span>
             </div>
             <div id="books-period-label" class="text-xs text-slate-400 mb-2 shrink-0"></div>
             <div id="books-tables" class="flex-1 overflow-auto min-h-0"></div>
@@ -1871,7 +1871,11 @@
         function isBooksOutflowType(i) {
             return isBooksManualExpense(i) || i.type === 'restock' || i.type === 'inventory';
         }
-        const BOOKS_EXPENSE_KEYS = ['維修料件', '額外維修成本', '調貨配件', '收購二手機', '收購新機', '網卡', '公司吃喝', '公司雜支', '薪資', '虧損', '其他支出'];
+        const BOOKS_EXPENSE_KEYS = ['額外維修成本', '調貨配件', '收購二手機', '收購新機', '網卡', '公司吃喝', '公司雜支', '薪資', '虧損', '其他支出'];
+        const BOOKS_MEMO_KEYS = ['維修料件'];
+        function isBooksMemoSubject(subj) {
+            return BOOKS_MEMO_KEYS.includes(subj);
+        }
         const BOOKS_PROFIT_KEYS = [
             { key: 'used', label: '二手機' },
             { key: 'new', label: '新機' },
@@ -1912,17 +1916,19 @@
                     if (i.status && i.status !== 'Completed') return;
                     const amt = Math.abs(Number(i.cost) || 0);
                     const subj = booksExpenseSubject(i);
+                    const memo = isBooksMemoSubject(subj);
                     expense[subj] = (expense[subj] || 0) + amt;
                     expenseDetails.push({
                         date: formatBooksYmd(when),
                         ts: when.getTime(),
                         orderId: i.orderId || '',
-                        kind: '支出',
+                        kind: memo ? '備查' : '支出',
                         subject: subj,
                         name: i.itemName || i.name || '',
                         sale: '',
                         cost: amt,
                         amount: amt,
+                        memo,
                         customer: i.customer || '',
                         person: i.person || ''
                     });
@@ -1985,13 +1991,15 @@
             });
             const incomeRows = incomeDetails.filter(r => Math.abs(Number(r.amount)) >= 0.005);
             const profitTotal = BOOKS_PROFIT_KEYS.reduce((s, x) => s + (Number(profit[x.key]) || 0), 0);
-            const expenseTotal = Object.values(expense).reduce((s, n) => s + (Number(n) || 0), 0);
+            const expenseTotal = BOOKS_EXPENSE_KEYS.reduce((s, k) => s + (Number(expense[k]) || 0), 0);
+            const partsMemo = BOOKS_MEMO_KEYS.reduce((s, k) => s + (Number(expense[k]) || 0), 0);
             return {
                 periodLabel,
                 profit,
                 expense,
                 profitTotal,
                 expenseTotal,
+                partsMemo,
                 net: profitTotal - expenseTotal,
                 pendingPot,
                 incomeDetails: incomeRows,
@@ -2037,7 +2045,7 @@
             const money = v => Math.round(Number(v) || 0).toLocaleString();
             const moneyCell = v => (v === '' || v == null) ? '' : money(v);
             const labelEl = document.getElementById('books-period-label');
-            if (labelEl) labelEl.innerText = '期間 ' + (report.periodLabel || '') + '　未結／掛帳未列入　純毛利已扣贈';
+            if (labelEl) labelEl.innerText = '期間 ' + (report.periodLabel || '') + '　未結／掛帳未列入　維修料件備查不扣淨利';
             const box = document.getElementById('books-tables');
             if (!box) return;
             const sc = k => money(report.profit[k]);
@@ -2045,12 +2053,14 @@
             const nzExp = BOOKS_EXPENSE_KEYS.filter(k => Math.abs(Number(report.expense[k]) || 0) >= 0.005);
             const mProfit = BOOKS_PROFIT_KEYS.map(({ key, label }) => `<div class="books-kv"><span class="lab">${label}</span><span class="num inc">${sc(key)}</span></div>`).join('');
             const mExp = (nzExp.length ? nzExp : BOOKS_EXPENSE_KEYS).map(k => `<div class="books-kv"><span class="lab">${k}</span><span class="num exp">${se(k)}</span></div>`).join('');
+            const mMemo = BOOKS_MEMO_KEYS.map(k => `<div class="books-kv"><span class="lab mute">${k}（付料備查）</span><span class="num mute">${se(k)}</span></div>`).join('');
             const details = [
-                ...(report.incomeDetails || []).map(r => ({ ...r, income: r.amount, outgo: '' })),
-                ...(report.expenseDetails || []).map(r => ({ ...r, income: '', outgo: r.amount }))
+                ...(report.incomeDetails || []).map(r => ({ ...r, income: r.amount, outgo: '', memo: false })),
+                ...(report.expenseDetails || []).map(r => ({ ...r, income: '', outgo: r.amount, memo: !!r.memo }))
             ].sort((a, b) => (a.ts || 0) - (b.ts || 0) || String(a.orderId || '').localeCompare(String(b.orderId || '')));
             const mCards = details.length
                 ? details.map(r => {
+                    const isMemo = !!r.memo;
                     const isOut = r.outgo !== '';
                     const amt = isOut ? r.outgo : r.income;
                     const bits = [];
@@ -2058,10 +2068,13 @@
                     if (r.cost !== '' && r.cost != null) bits.push('成本 ' + money(r.cost));
                     if (r.orderId) bits.push(r.orderId);
                     if (r.person) bits.push(r.person);
+                    if (isMemo) bits.push('不扣淨利');
+                    const subj = isMemo ? (r.subject + '（備查）') : r.subject;
+                    const amtClass = isMemo ? 'mute' : (isOut ? 'exp' : 'inc');
                     return `<article class="books-card">
-                        <div class="books-card-top"><span>${booksEscape(r.date)}　${booksEscape(r.subject)}</span></div>
+                        <div class="books-card-top"><span>${booksEscape(r.date)}　${booksEscape(subj)}</span></div>
                         <div class="books-card-name">${booksEscape(r.name || r.subject)}</div>
-                        <div class="books-card-amt ${isOut ? 'exp' : 'inc'}">${isOut ? '−' : '+'}${money(amt)}</div>
+                        <div class="books-card-amt ${amtClass}">${isOut ? '−' : '+'}${money(amt)}</div>
                         ${bits.length ? `<div class="books-card-meta">${booksEscape(bits.join('　'))}</div>` : ''}
                     </article>`;
                 }).join('')
@@ -2074,6 +2087,8 @@
                 ...BOOKS_EXPENSE_KEYS.map(k => `<tr><td>${k}</td><td class="num exp">${se(k)}</td></tr>`),
                 `<tr class="tot"><td>支出合計</td><td class="num exp">${money(report.expenseTotal)}</td></tr>`,
                 `<tr class="tot"><td>本期淨利</td><td class="num net">${money(report.net)}</td></tr>`,
+                `<tr class="sec"><td colspan="2">備查（不扣淨利）</td></tr>`,
+                ...BOOKS_MEMO_KEYS.map(k => `<tr><td class="mute">${k}（付料備查）</td><td class="num mute">${se(k)}</td></tr>`),
                 `<tr><td class="mute">未入帳潛在毛利（未列入）</td><td class="num mute">${money(report.pendingPot)}</td></tr>`
             ].join('');
             const detBody = details.length
@@ -2081,11 +2096,11 @@
                     <td>${booksEscape(r.date)}</td>
                     <td>${booksEscape(r.orderId)}</td>
                     <td>${booksEscape(r.name)}</td>
-                    <td>${booksEscape(r.subject)}</td>
+                    <td>${booksEscape(r.memo ? r.subject + '（備查）' : r.subject)}</td>
                     <td class="num">${moneyCell(r.sale)}</td>
                     <td class="num">${moneyCell(r.cost)}</td>
                     <td class="num inc">${r.income === '' ? '' : money(r.income)}</td>
-                    <td class="num exp">${r.outgo === '' ? '' : money(r.outgo)}</td>
+                    <td class="num ${r.memo ? 'mute' : 'exp'}">${r.outgo === '' ? '' : money(r.outgo)}</td>
                     <td>${booksEscape(r.person)}</td>
                 </tr>`).join('')
                 : '<tr><td colspan="9" class="mute">此期間沒有已入帳資料</td></tr>';
@@ -2102,8 +2117,11 @@
                     <div class="books-sec">支出</div>
                     ${mExp}
                     <div class="books-kv tot"><span class="lab">支出合計</span><span class="num exp">${money(report.expenseTotal)}</span></div>
+                    <div class="books-kv tot"><span class="lab">本期淨利</span><span class="num net">${money(report.net)}</span></div>
+                    <div class="books-sec">備查　不扣淨利</div>
+                    ${mMemo}
                     <div class="books-kv"><span class="lab mute">未入帳潛在毛利</span><span class="num mute">${money(report.pendingPot)}</span></div>
-                    <div class="books-sec">明細　收入為純毛利　支出為成本／費用</div>
+                    <div class="books-sec">明細　維修料件為備查</div>
                     ${mCards}
                 </div>
                 <div class="books-d">
@@ -2115,7 +2133,7 @@
                         </table>
                     </div>
                     <div>
-                        <div class="flex items-center justify-between mb-2"><div class="text-xs font-bold tracking-[0.2em] text-slate-400">明細帳</div><div class="text-[11px] text-slate-500">收入為純毛利　支出為成本／費用</div></div>
+                        <div class="flex items-center justify-between mb-2"><div class="text-xs font-bold tracking-[0.2em] text-slate-400">明細帳</div><div class="text-[11px] text-slate-500">維修料件為備查，不列入支出合計</div></div>
                         <table class="books-sheet">
                             <thead><tr>
                                 <th>日期</th><th>單號</th><th>摘要</th><th>科目</th>
@@ -2259,7 +2277,7 @@
             else if (kind === 'salary') html += '<input id="bk-n" class="swal2-input" placeholder="摘要（如：抽成／薪水）"><input id="bk-a" type="number" class="swal2-input" placeholder="金額">';
             else if (kind === 'loss') html += '<input id="bk-n" class="swal2-input" placeholder="摘要（如：拆壞螢幕）"><input id="bk-a" type="number" class="swal2-input" placeholder="損失金額">';
             else if (kind === 'buy_used' || kind === 'buy_new') html += '<input id="bk-v" class="swal2-input" placeholder="來源／同行"><input id="bk-n" class="swal2-input" placeholder="型號／摘要"><input id="bk-a" type="number" class="swal2-input" placeholder="金額">';
-            else if (kind === 'repair') html += '<div style="font-size:12px;color:#94a3b8;text-align:left;padding:4px 8px 0">只記付料錢，不會入庫。叫回來放倉庫請用進貨。</div><input id="bk-v" class="swal2-input" placeholder="料商（選填）"><input id="bk-n" class="swal2-input" placeholder="品名"><input id="bk-c" type="number" class="swal2-input" placeholder="成本"><input id="bk-q" type="number" class="swal2-input" placeholder="數量" value="1">';
+            else if (kind === 'repair') html += '<div style="font-size:12px;color:#94a3b8;text-align:left;padding:4px 8px 0">只記付給料商多少，不扣本期淨利。維修單照常填成本。</div><input id="bk-v" class="swal2-input" placeholder="料商（選填）"><input id="bk-n" class="swal2-input" placeholder="品名"><input id="bk-c" type="number" class="swal2-input" placeholder="成本"><input id="bk-q" type="number" class="swal2-input" placeholder="數量" value="1">';
             else html += `<input id="bk-v" class="swal2-input" placeholder="廠商" value="${booksEscape(UI.lastBooksVendor || '')}"><input id="bk-n" class="swal2-input" placeholder="品名"><input id="bk-c" type="number" class="swal2-input" placeholder="成本"><input id="bk-q" type="number" class="swal2-input" placeholder="數量" value="1">`;
             const result = await Swal.fire({
                 title,
@@ -2579,6 +2597,9 @@
             });
             lines.push([report.periodLabel, '彙總', '支出合計', Math.round(report.expenseTotal || 0)].map(csvCell).join(','));
             lines.push([report.periodLabel, '彙總', '本期淨利', Math.round(report.net || 0)].map(csvCell).join(','));
+            BOOKS_MEMO_KEYS.forEach(k => {
+                lines.push([report.periodLabel, '備查', k + '（不扣淨利）', Math.round(report.expense[k] || 0)].map(csvCell).join(','));
+            });
             lines.push('');
             lines.push(['日期', '單號', '收支', '科目', '品名', '售價', '成本', '金額', '經手人'].map(csvCell).join(','));
             const pushDet = r => {
