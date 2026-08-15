@@ -1928,7 +1928,7 @@
                     </table>
                 </div>`;
         }
-        async function submitBooksLedger(items, vendorName) {
+        async function submitBooksLedger(items, vendorName, entryDate) {
             if (!(User && User.isAdmin)) {
                 Swal.fire({ icon: 'error', title: '僅管理員可入帳', background: '#1e293b', color: 'white' });
                 return;
@@ -1936,19 +1936,41 @@
             const oid = 'EXP' + Date.now().toString().slice(-6);
             Swal.fire({ title: '入帳中...', background: '#1e293b', color: 'white', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
             try {
-                const r = await API.handleRestock({ items, person: User.name, orderId: oid, vendorName: vendorName || undefined });
+                const r = await API.handleRestock({ items, person: User.name, orderId: oid, vendorName: vendorName || undefined, entryDate: entryDate || undefined });
                 if (r.status === 'error') {
                     Swal.fire({ icon: 'error', title: '入帳失敗', text: r.msg || '請重試', background: '#1e293b', color: 'white' });
                     return;
                 }
                 await fetchData();
                 if (document.getElementById('view-books') && !document.getElementById('view-books').classList.contains('hidden')) {
+                    if (entryDate && /^\d{4}-\d{2}-\d{2}$/.test(entryDate)) {
+                        const monthEl = document.getElementById('books-month');
+                        if (monthEl) monthEl.value = entryDate.slice(0, 7);
+                    }
                     await loadBooksReport();
                 }
                 Swal.fire({ icon: 'success', title: '已入帳', toast: true, position: 'top', timer: 1400, showConfirmButton: false, background: '#1e293b' });
             } catch (err) {
                 Swal.fire({ icon: 'error', title: '入帳失敗', text: (err && err.message) || '請重試', background: '#1e293b', color: 'white' });
             }
+        }
+        function booksDefaultEntryYmd() {
+            const today = ymdTaipei(new Date());
+            const period = booksPeriodRange();
+            if (!period) return today;
+            if (today >= period.startYmd && today <= period.endYmd) return today;
+            return period.endYmd;
+        }
+        function booksDateFieldHtml() {
+            return `<label class="block text-left text-xs text-slate-400 mt-1 px-2">日期</label><input id="bk-d" type="date" class="swal2-input" value="${booksDefaultEntryYmd()}">`;
+        }
+        function booksReadEntryDate() {
+            const d = (document.getElementById('bk-d')?.value || '').trim();
+            if (!/^\d{4}-\d{2}-\d{2}$/.test(d)) {
+                Swal.showValidationMessage('請選擇日期');
+                return null;
+            }
+            return d;
         }
         function booksRequireAdmin() {
             if (User && User.isAdmin) return true;
@@ -1959,33 +1981,37 @@
             if (!booksRequireAdmin()) return;
             const { value } = await Swal.fire({
                 title: '新增雜支',
-                html: '<input id="bk-n" class="swal2-input" placeholder="摘要（如：便當）"><input id="bk-a" type="number" class="swal2-input" placeholder="金額">',
+                html: booksDateFieldHtml() + '<input id="bk-n" class="swal2-input" placeholder="摘要（如：便當）"><input id="bk-a" type="number" class="swal2-input" placeholder="金額">',
                 background: '#1e293b', color: 'white', showCancelButton: true, confirmButtonText: '入帳',
                 preConfirm: () => {
+                    const d = booksReadEntryDate();
+                    if (!d) return false;
                     const n = (document.getElementById('bk-n').value || '').trim();
                     const a = parseInt(document.getElementById('bk-a').value, 10);
                     if (!a || a <= 0) { Swal.showValidationMessage('請填金額'); return false; }
-                    return { n, a };
+                    return { d, n, a };
                 }
             });
             if (!value) return;
-            await submitBooksLedger([{ type: 'expense', name: `[營運雜支] ${value.n}`, cost: value.a, quantity: 1 }]);
+            await submitBooksLedger([{ type: 'expense', name: `[營運雜支] ${value.n}`, cost: value.a, quantity: 1 }], '', value.d);
         }
         async function addBooksSalary() {
             if (!booksRequireAdmin()) return;
             const { value } = await Swal.fire({
                 title: '新增薪支',
-                html: '<input id="bk-n" class="swal2-input" placeholder="摘要（如：抽成／薪水）"><input id="bk-a" type="number" class="swal2-input" placeholder="金額">',
+                html: booksDateFieldHtml() + '<input id="bk-n" class="swal2-input" placeholder="摘要（如：抽成／薪水）"><input id="bk-a" type="number" class="swal2-input" placeholder="金額">',
                 background: '#1e293b', color: 'white', showCancelButton: true, confirmButtonText: '入帳',
                 preConfirm: () => {
+                    const d = booksReadEntryDate();
+                    if (!d) return false;
                     const n = (document.getElementById('bk-n').value || '').trim();
                     const a = parseInt(document.getElementById('bk-a').value, 10);
                     if (!a || a <= 0) { Swal.showValidationMessage('請填金額'); return false; }
-                    return { n, a };
+                    return { d, n, a };
                 }
             });
             if (!value) return;
-            await submitBooksLedger([{ type: 'salary', name: `[薪資/抽成] ${value.n}`, cost: value.a, quantity: 1 }]);
+            await submitBooksLedger([{ type: 'salary', name: `[薪資/抽成] ${value.n}`, cost: value.a, quantity: 1 }], '', value.d);
         }
         async function addBooksRepairPart() {
             if (!booksRequireAdmin()) return;
@@ -1993,7 +2019,7 @@
             const opts = parts.map(p => `<option value="${booksEscape(p.name)}"></option>`).join('');
             const { value } = await Swal.fire({
                 title: '新增維修料件',
-                html: `<input id="bk-n" class="swal2-input" list="bk-repair-list" placeholder="品名"><datalist id="bk-repair-list">${opts}</datalist><input id="bk-c" type="number" class="swal2-input" placeholder="成本"><input id="bk-q" type="number" class="swal2-input" placeholder="數量" value="1">`,
+                html: booksDateFieldHtml() + `<input id="bk-n" class="swal2-input" list="bk-repair-list" placeholder="品名"><datalist id="bk-repair-list">${opts}</datalist><input id="bk-c" type="number" class="swal2-input" placeholder="成本"><input id="bk-q" type="number" class="swal2-input" placeholder="數量" value="1">`,
                 background: '#1e293b', color: 'white', showCancelButton: true, confirmButtonText: '入帳',
                 didOpen: () => {
                     const nEl = document.getElementById('bk-n');
@@ -2007,6 +2033,8 @@
                     nEl.addEventListener('blur', fill);
                 },
                 preConfirm: () => {
+                    const d = booksReadEntryDate();
+                    if (!d) return false;
                     const n = (document.getElementById('bk-n').value || '').trim();
                     const c = parseInt(document.getElementById('bk-c').value, 10);
                     const q = parseInt(document.getElementById('bk-q').value, 10) || 1;
@@ -2014,19 +2042,21 @@
                     if (!c || c <= 0) { Swal.showValidationMessage('請填成本'); return false; }
                     if (q <= 0) { Swal.showValidationMessage('數量需大於 0'); return false; }
                     const hit = parts.find(p => p.name === n);
-                    return { n, c, q, category: hit ? hit.category : '維修料件' };
+                    return { d, n, c, q, category: hit ? hit.category : '維修料件' };
                 }
             });
             if (!value) return;
-            await submitBooksLedger([{ type: 'restock', name: value.n, category: value.category, cost: value.c, quantity: value.q }], '維修料件');
+            await submitBooksLedger([{ type: 'restock', name: value.n, category: value.category, cost: value.c, quantity: value.q }], '維修料件', value.d);
         }
         async function addBooksTransferAcc() {
             if (!booksRequireAdmin()) return;
             const { value } = await Swal.fire({
                 title: '新增調貨配件',
-                html: '<input id="bk-v" class="swal2-input" placeholder="廠商"><input id="bk-n" class="swal2-input" placeholder="品名"><input id="bk-c" type="number" class="swal2-input" placeholder="成本"><input id="bk-q" type="number" class="swal2-input" placeholder="數量" value="1">',
+                html: booksDateFieldHtml() + '<input id="bk-v" class="swal2-input" placeholder="廠商"><input id="bk-n" class="swal2-input" placeholder="品名"><input id="bk-c" type="number" class="swal2-input" placeholder="成本"><input id="bk-q" type="number" class="swal2-input" placeholder="數量" value="1">',
                 background: '#1e293b', color: 'white', showCancelButton: true, confirmButtonText: '入帳',
                 preConfirm: () => {
+                    const d = booksReadEntryDate();
+                    if (!d) return false;
                     const v = (document.getElementById('bk-v').value || '').trim();
                     const n = (document.getElementById('bk-n').value || '').trim();
                     const c = parseInt(document.getElementById('bk-c').value, 10);
@@ -2034,11 +2064,11 @@
                     if (!n) { Swal.showValidationMessage('請填品名'); return false; }
                     if (!c || c <= 0) { Swal.showValidationMessage('請填成本'); return false; }
                     if (q <= 0) { Swal.showValidationMessage('數量需大於 0'); return false; }
-                    return { v, n, c, q };
+                    return { d, v, n, c, q };
                 }
             });
             if (!value) return;
-            await submitBooksLedger([{ type: 'restock', name: value.n, category: '調貨配件', cost: value.c, quantity: value.q }], value.v || '調貨');
+            await submitBooksLedger([{ type: 'restock', name: value.n, category: '調貨配件', cost: value.c, quantity: value.q }], value.v || '調貨', value.d);
         }
         function exportBooksCsv() {
             const report = UI.lastBooksReport;
