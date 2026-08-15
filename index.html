@@ -265,11 +265,19 @@
                     <button type="button" onclick="exportBooksCsv()" class="bg-slate-800 border border-slate-600 text-slate-200 px-3 py-2 rounded-lg text-sm">匯出 CSV</button>
                 </div>
             </div>
-            <div class="flex flex-wrap gap-2 shrink-0 mb-3">
+            <div class="flex flex-wrap gap-2 shrink-0 mb-2">
                 <button type="button" onclick="addBooksMisc()" class="books-entry-btn">新增雜支</button>
                 <button type="button" onclick="addBooksSalary()" class="books-entry-btn">新增薪支</button>
                 <button type="button" onclick="addBooksRepairPart()" class="books-entry-btn">新增維修料件</button>
                 <button type="button" onclick="addBooksTransferAcc()" class="books-entry-btn">新增調貨配件</button>
+            </div>
+            <div class="flex flex-wrap items-center gap-3 shrink-0 mb-3">
+                <label class="inline-flex items-center gap-2 text-sm text-slate-300 cursor-pointer">
+                    <input type="checkbox" id="books-continuous" class="accent-yellow-500 w-4 h-4" onchange="setBooksContinuous(this.checked)">
+                    連續登錄
+                </label>
+                <button type="button" id="books-end-session" onclick="endBooksSession()" class="hidden px-3 py-1.5 rounded-lg bg-slate-800 border border-yellow-600 text-yellow-400 text-sm font-bold">結束登錄</button>
+                <span id="books-session-hint" class="text-xs text-yellow-500/90"></span>
             </div>
             <div id="books-period-label" class="text-xs text-slate-400 mb-2 shrink-0"></div>
             <div id="books-tables" class="flex-1 overflow-auto pb-20 min-h-0"></div>
@@ -517,7 +525,7 @@
         let ItemRegistry = {};
         let OrderRegistry = {};
         let User = { name: '', isAdmin: false };
-        let UI = { tab: 'phone', sub: '', rsMode: 'inventory', rsCat: 'all', multiSelect: false, selectedPhones: new Set(), selectedPendingOrders: new Set(), pendingOrderMeta: {}, pendingOrdersByCustomer: {}, allPendingOrderIds: [], pendingTab: 'unpaid', statsCollapsed: { report: true, history: true }, categoryOrder: null, favAccessoryIds: null, posPrefsLoaded: false, booksMode: 'month', lastBooksReport: null };
+        let UI = { tab: 'phone', sub: '', rsMode: 'inventory', rsCat: 'all', multiSelect: false, selectedPhones: new Set(), selectedPendingOrders: new Set(), pendingOrderMeta: {}, pendingOrdersByCustomer: {}, allPendingOrderIds: [], pendingTab: 'unpaid', statsCollapsed: { report: true, history: true }, categoryOrder: null, favAccessoryIds: null, posPrefsLoaded: false, booksMode: 'month', lastBooksReport: null, booksContinuous: false, booksLooping: false, lastBooksEntryYmd: null, lastBooksVendor: '', booksSessionCount: 0 };
         let cartFooterTranslateY = 0;
         const CART_FOOTER_DRAG_MAX_UP = 360;
         const CART_FOOTER_DRAG_MAX_DOWN = 0;
@@ -1847,23 +1855,25 @@
                 el.value = ymd.slice(0, 7);
             }
             loadBooksReport();
+            updateBooksSessionBar();
         }
-        async function loadBooksReport() {
+        async function loadBooksReport(opts) {
             if (!(User && User.isAdmin)) return;
+            const silent = !!(opts && opts.silent);
             const period = booksPeriodRange();
             if (!period) {
-                Swal.fire({ icon: 'warning', title: '請選擇月份', background: '#1e293b', color: 'white' });
+                if (!silent) Swal.fire({ icon: 'warning', title: '請選擇月份', background: '#1e293b', color: 'white' });
                 return;
             }
-            Swal.showLoading();
+            if (!silent) Swal.showLoading();
             try {
                 const res = await API.getHistory(period.startYmd, period.endYmd);
-                Swal.close();
+                if (!silent) Swal.close();
                 const report = buildBooksReport(res || [], period.rangeStart, period.rangeEnd, period.label);
                 UI.lastBooksReport = report;
                 renderBooksReport(report);
             } catch (err) {
-                Swal.close();
+                if (!silent) Swal.close();
                 Swal.fire({ icon: 'error', title: '載入失敗', text: err.message || '請重試', background: '#1e293b' });
             }
         }
@@ -1928,33 +1938,48 @@
                     </table>
                 </div>`;
         }
-        async function submitBooksLedger(items, vendorName, entryDate) {
+        async function submitBooksLedger(items, vendorName, entryDate, opts) {
             if (!(User && User.isAdmin)) {
                 Swal.fire({ icon: 'error', title: '僅管理員可入帳', background: '#1e293b', color: 'white' });
-                return;
+                return false;
             }
+            const quiet = !!(opts && opts.quiet);
             const oid = 'EXP' + Date.now().toString().slice(-6);
-            Swal.fire({ title: '入帳中...', background: '#1e293b', color: 'white', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
+            if (!quiet) Swal.fire({ title: '入帳中...', background: '#1e293b', color: 'white', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
             try {
                 const r = await API.handleRestock({ items, person: User.name, orderId: oid, vendorName: vendorName || undefined, entryDate: entryDate || undefined });
                 if (r.status === 'error') {
                     Swal.fire({ icon: 'error', title: '入帳失敗', text: r.msg || '請重試', background: '#1e293b', color: 'white' });
-                    return;
+                    return false;
                 }
-                await fetchData();
-                if (document.getElementById('view-books') && !document.getElementById('view-books').classList.contains('hidden')) {
-                    if (entryDate && /^\d{4}-\d{2}-\d{2}$/.test(entryDate)) {
-                        const monthEl = document.getElementById('books-month');
-                        if (monthEl) monthEl.value = entryDate.slice(0, 7);
+                if (entryDate && /^\d{4}-\d{2}-\d{2}$/.test(entryDate)) {
+                    UI.lastBooksEntryYmd = entryDate;
+                    const monthEl = document.getElementById('books-month');
+                    if (monthEl) monthEl.value = entryDate.slice(0, 7);
+                }
+                UI.booksSessionCount = (UI.booksSessionCount || 0) + 1;
+                updateBooksSessionBar();
+                if (!quiet) {
+                    await fetchData();
+                    if (document.getElementById('view-books') && !document.getElementById('view-books').classList.contains('hidden')) {
+                        await loadBooksReport();
                     }
-                    await loadBooksReport();
+                    Swal.fire({ icon: 'success', title: '已入帳', toast: true, position: 'top', timer: 1400, showConfirmButton: false, background: '#1e293b' });
                 }
-                Swal.fire({ icon: 'success', title: '已入帳', toast: true, position: 'top', timer: 1400, showConfirmButton: false, background: '#1e293b' });
+                return true;
             } catch (err) {
                 Swal.fire({ icon: 'error', title: '入帳失敗', text: (err && err.message) || '請重試', background: '#1e293b', color: 'white' });
+                return false;
             }
         }
+        function booksPeriodStartYmd() {
+            const period = booksPeriodRange();
+            if (period && period.startYmd) return period.startYmd;
+            return ymdTaipei(new Date()).slice(0, 8) + '01';
+        }
         function booksDefaultEntryYmd() {
+            if (UI.lastBooksEntryYmd && /^\d{4}-\d{2}-\d{2}$/.test(UI.lastBooksEntryYmd)) return UI.lastBooksEntryYmd;
+            if (UI.booksContinuous) return booksPeriodStartYmd();
             const today = ymdTaipei(new Date());
             const period = booksPeriodRange();
             if (!period) return today;
@@ -1972,104 +1997,163 @@
             }
             return d;
         }
+        function updateBooksSessionBar() {
+            const on = !!UI.booksContinuous;
+            const stop = document.getElementById('books-end-session');
+            const hint = document.getElementById('books-session-hint');
+            const chk = document.getElementById('books-continuous');
+            if (chk) chk.checked = on;
+            if (stop) stop.classList.toggle('hidden', !on);
+            if (!hint) return;
+            if (!on) {
+                hint.textContent = '';
+                return;
+            }
+            const n = UI.booksSessionCount || 0;
+            const ymd = UI.lastBooksEntryYmd || booksPeriodStartYmd();
+            hint.textContent = n
+                ? `連續登錄中 · 已入帳 ${n} 筆 · 上一筆日期 ${ymd.replace(/-/g, '/')}`
+                : `連續登錄中 · 日期預填本月初 ${ymd.replace(/-/g, '/')}，可改。結束時按「結束登錄」`;
+        }
+        function setBooksContinuous(on) {
+            UI.booksContinuous = !!on;
+            if (on) {
+                if (!UI.lastBooksEntryYmd) UI.lastBooksEntryYmd = booksPeriodStartYmd();
+            } else {
+                UI.booksLooping = false;
+                Swal.close();
+            }
+            updateBooksSessionBar();
+        }
+        async function endBooksSession() {
+            const n = UI.booksSessionCount || 0;
+            UI.booksLooping = false;
+            UI.booksContinuous = false;
+            UI.booksSessionCount = 0;
+            Swal.close();
+            updateBooksSessionBar();
+            try {
+                await fetchData();
+                await loadBooksReport();
+            } catch (e) {}
+            Swal.fire({
+                icon: 'success',
+                title: n ? `已結束登錄，共 ${n} 筆` : '已結束登錄',
+                toast: true,
+                position: 'top',
+                timer: 1800,
+                showConfirmButton: false,
+                background: '#1e293b'
+            });
+        }
         function booksRequireAdmin() {
             if (User && User.isAdmin) return true;
             Swal.fire({ icon: 'error', title: '僅管理員可入帳', background: '#1e293b', color: 'white' });
             return false;
         }
-        async function addBooksMisc() {
-            if (!booksRequireAdmin()) return;
-            const { value } = await Swal.fire({
-                title: '新增雜支',
-                html: booksDateFieldHtml() + '<input id="bk-n" class="swal2-input" placeholder="摘要（如：便當）"><input id="bk-a" type="number" class="swal2-input" placeholder="金額">',
-                background: '#1e293b', color: 'white', showCancelButton: true, confirmButtonText: '入帳',
-                preConfirm: () => {
-                    const d = booksReadEntryDate();
-                    if (!d) return false;
-                    const n = (document.getElementById('bk-n').value || '').trim();
-                    const a = parseInt(document.getElementById('bk-a').value, 10);
-                    if (!a || a <= 0) { Swal.showValidationMessage('請填金額'); return false; }
-                    return { d, n, a };
-                }
-            });
-            if (!value) return;
-            await submitBooksLedger([{ type: 'expense', name: `[營運雜支] ${value.n}`, cost: value.a, quantity: 1 }], '', value.d);
-        }
-        async function addBooksSalary() {
-            if (!booksRequireAdmin()) return;
-            const { value } = await Swal.fire({
-                title: '新增薪支',
-                html: booksDateFieldHtml() + '<input id="bk-n" class="swal2-input" placeholder="摘要（如：抽成／薪水）"><input id="bk-a" type="number" class="swal2-input" placeholder="金額">',
-                background: '#1e293b', color: 'white', showCancelButton: true, confirmButtonText: '入帳',
-                preConfirm: () => {
-                    const d = booksReadEntryDate();
-                    if (!d) return false;
-                    const n = (document.getElementById('bk-n').value || '').trim();
-                    const a = parseInt(document.getElementById('bk-a').value, 10);
-                    if (!a || a <= 0) { Swal.showValidationMessage('請填金額'); return false; }
-                    return { d, n, a };
-                }
-            });
-            if (!value) return;
-            await submitBooksLedger([{ type: 'salary', name: `[薪資/抽成] ${value.n}`, cost: value.a, quantity: 1 }], '', value.d);
-        }
-        async function addBooksRepairPart() {
-            if (!booksRequireAdmin()) return;
-            const parts = (DB.inv || []).filter(i => i.type === 'accessory' && i.isHidden);
+        async function promptBooksEntry(kind) {
+            const looping = !!UI.booksContinuous;
+            const n = UI.booksSessionCount || 0;
+            const titles = { misc: '新增雜支', salary: '新增薪支', repair: '新增維修料件', transfer: '新增調貨配件' };
+            const title = (titles[kind] || '新增支出') + (looping ? `　·　連續 ${n} 筆` : '');
+            const parts = (kind === 'repair') ? (DB.inv || []).filter(i => i.type === 'accessory' && i.isHidden) : [];
             const opts = parts.map(p => `<option value="${booksEscape(p.name)}"></option>`).join('');
-            const { value } = await Swal.fire({
-                title: '新增維修料件',
-                html: booksDateFieldHtml() + `<input id="bk-n" class="swal2-input" list="bk-repair-list" placeholder="品名"><datalist id="bk-repair-list">${opts}</datalist><input id="bk-c" type="number" class="swal2-input" placeholder="成本"><input id="bk-q" type="number" class="swal2-input" placeholder="數量" value="1">`,
-                background: '#1e293b', color: 'white', showCancelButton: true, confirmButtonText: '入帳',
+            let html = booksDateFieldHtml();
+            if (kind === 'misc') html += '<input id="bk-n" class="swal2-input" placeholder="摘要（如：便當）"><input id="bk-a" type="number" class="swal2-input" placeholder="金額">';
+            else if (kind === 'salary') html += '<input id="bk-n" class="swal2-input" placeholder="摘要（如：抽成／薪水）"><input id="bk-a" type="number" class="swal2-input" placeholder="金額">';
+            else if (kind === 'repair') html += `<input id="bk-n" class="swal2-input" list="bk-repair-list" placeholder="品名"><datalist id="bk-repair-list">${opts}</datalist><input id="bk-c" type="number" class="swal2-input" placeholder="成本"><input id="bk-q" type="number" class="swal2-input" placeholder="數量" value="1">`;
+            else html += `<input id="bk-v" class="swal2-input" placeholder="廠商" value="${booksEscape(UI.lastBooksVendor || '')}"><input id="bk-n" class="swal2-input" placeholder="品名"><input id="bk-c" type="number" class="swal2-input" placeholder="成本"><input id="bk-q" type="number" class="swal2-input" placeholder="數量" value="1">`;
+            const result = await Swal.fire({
+                title,
+                html,
+                background: '#1e293b',
+                color: 'white',
+                showCancelButton: !looping,
+                cancelButtonText: '取消',
+                showDenyButton: looping,
+                denyButtonText: '結束登錄',
+                confirmButtonText: '入帳',
+                allowOutsideClick: !looping,
+                allowEscapeKey: true,
                 didOpen: () => {
-                    const nEl = document.getElementById('bk-n');
-                    const cEl = document.getElementById('bk-c');
-                    const fill = () => {
-                        const hit = parts.find(p => p.name === nEl.value.trim());
-                        if (hit && (cEl.value === '' || Number(cEl.value) === Number(hit.cost))) cEl.value = hit.cost || '';
-                        else if (hit) cEl.value = hit.cost || cEl.value;
-                    };
-                    nEl.addEventListener('change', fill);
-                    nEl.addEventListener('blur', fill);
+                    if (kind === 'repair') {
+                        const nEl = document.getElementById('bk-n');
+                        const cEl = document.getElementById('bk-c');
+                        const fill = () => {
+                            const hit = parts.find(p => p.name === nEl.value.trim());
+                            if (hit) cEl.value = hit.cost || cEl.value;
+                        };
+                        nEl.addEventListener('change', fill);
+                        nEl.addEventListener('blur', fill);
+                    }
+                    const f = document.getElementById('bk-n');
+                    if (f) f.focus();
                 },
                 preConfirm: () => {
                     const d = booksReadEntryDate();
                     if (!d) return false;
-                    const n = (document.getElementById('bk-n').value || '').trim();
+                    if (kind === 'misc' || kind === 'salary') {
+                        const name = (document.getElementById('bk-n').value || '').trim();
+                        const a = parseInt(document.getElementById('bk-a').value, 10);
+                        if (!a || a <= 0) { Swal.showValidationMessage('請填金額'); return false; }
+                        return { d, name, a };
+                    }
+                    const name = (document.getElementById('bk-n').value || '').trim();
                     const c = parseInt(document.getElementById('bk-c').value, 10);
                     const q = parseInt(document.getElementById('bk-q').value, 10) || 1;
-                    if (!n) { Swal.showValidationMessage('請填品名'); return false; }
+                    if (!name) { Swal.showValidationMessage('請填品名'); return false; }
                     if (!c || c <= 0) { Swal.showValidationMessage('請填成本'); return false; }
                     if (q <= 0) { Swal.showValidationMessage('數量需大於 0'); return false; }
-                    const hit = parts.find(p => p.name === n);
-                    return { d, n, c, q, category: hit ? hit.category : '維修料件' };
+                    if (kind === 'repair') {
+                        const hit = parts.find(p => p.name === name);
+                        return { d, name, c, q, category: hit ? hit.category : '維修料件' };
+                    }
+                    return { d, name, c, q, vendor: (document.getElementById('bk-v').value || '').trim() };
                 }
             });
-            if (!value) return;
-            await submitBooksLedger([{ type: 'restock', name: value.n, category: value.category, cost: value.c, quantity: value.q }], '維修料件', value.d);
+            if (result.isDenied) return { action: 'end' };
+            if (!result.isConfirmed || !result.value) return { action: 'cancel' };
+            return { action: 'ok', value: result.value };
         }
-        async function addBooksTransferAcc() {
+        async function runBooksEntry(kind) {
             if (!booksRequireAdmin()) return;
-            const { value } = await Swal.fire({
-                title: '新增調貨配件',
-                html: booksDateFieldHtml() + '<input id="bk-v" class="swal2-input" placeholder="廠商"><input id="bk-n" class="swal2-input" placeholder="品名"><input id="bk-c" type="number" class="swal2-input" placeholder="成本"><input id="bk-q" type="number" class="swal2-input" placeholder="數量" value="1">',
-                background: '#1e293b', color: 'white', showCancelButton: true, confirmButtonText: '入帳',
-                preConfirm: () => {
-                    const d = booksReadEntryDate();
-                    if (!d) return false;
-                    const v = (document.getElementById('bk-v').value || '').trim();
-                    const n = (document.getElementById('bk-n').value || '').trim();
-                    const c = parseInt(document.getElementById('bk-c').value, 10);
-                    const q = parseInt(document.getElementById('bk-q').value, 10) || 1;
-                    if (!n) { Swal.showValidationMessage('請填品名'); return false; }
-                    if (!c || c <= 0) { Swal.showValidationMessage('請填成本'); return false; }
-                    if (q <= 0) { Swal.showValidationMessage('數量需大於 0'); return false; }
-                    return { d, v, n, c, q };
+            if (UI.booksContinuous) {
+                UI.booksLooping = true;
+                if (!UI.lastBooksEntryYmd) UI.lastBooksEntryYmd = booksPeriodStartYmd();
+                updateBooksSessionBar();
+            }
+            while (true) {
+                const step = await promptBooksEntry(kind);
+                if (step.action === 'end' || (step.action === 'cancel' && UI.booksContinuous)) {
+                    await endBooksSession();
+                    return;
                 }
-            });
-            if (!value) return;
-            await submitBooksLedger([{ type: 'restock', name: value.n, category: '調貨配件', cost: value.c, quantity: value.q }], value.v || '調貨', value.d);
+                if (step.action !== 'ok') return;
+                const v = step.value;
+                let items, vendor = '';
+                if (kind === 'misc') items = [{ type: 'expense', name: `[營運雜支] ${v.name}`, cost: v.a, quantity: 1 }];
+                else if (kind === 'salary') items = [{ type: 'salary', name: `[薪資/抽成] ${v.name}`, cost: v.a, quantity: 1 }];
+                else if (kind === 'repair') {
+                    items = [{ type: 'restock', name: v.name, category: v.category, cost: v.c, quantity: v.q }];
+                    vendor = '維修料件';
+                }
+                else {
+                    vendor = v.vendor || '調貨';
+                    UI.lastBooksVendor = v.vendor || UI.lastBooksVendor || '';
+                    items = [{ type: 'restock', name: v.name, category: '調貨配件', cost: v.c, quantity: v.q }];
+                }
+                const ok = await submitBooksLedger(items, vendor, v.d, { quiet: !!UI.booksContinuous });
+                if (!ok) {
+                    if (!UI.booksContinuous || !UI.booksLooping) return;
+                    continue;
+                }
+                if (!UI.booksContinuous || !UI.booksLooping) return;
+            }
         }
+        function addBooksMisc() { return runBooksEntry('misc'); }
+        function addBooksSalary() { return runBooksEntry('salary'); }
+        function addBooksRepairPart() { return runBooksEntry('repair'); }
+        function addBooksTransferAcc() { return runBooksEntry('transfer'); }
         function exportBooksCsv() {
             const report = UI.lastBooksReport;
             if (!report) {
