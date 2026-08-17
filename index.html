@@ -108,6 +108,18 @@
         .accordion-content.open { max-height: 5000px; transition: max-height 0.5s ease-in; }
         .list-row { border-bottom: 1px solid #334155; padding: 12px 8px; cursor: pointer; transition: background 0.2s; }
         .list-row:hover { background: #1e293b; }
+        .phone-list { display: flex; flex-direction: column; gap: 0; padding: 0 0 6rem; }
+        .phone-row { display: flex; align-items: flex-start; gap: 10px; padding: 11px 12px; border-bottom: 1px solid #1e293b; border-left: 3px solid #3b82f6; cursor: pointer; background: rgba(15, 23, 42, 0.55); }
+        .phone-row:active { background: #1e293b; }
+        .phone-row.is-selected { background: rgba(234, 179, 8, 0.14); border-left-color: #eab308; }
+        .phone-row-check { display: none; width: 22px; flex-shrink: 0; margin-top: 3px; color: #64748b; font-size: 16px; text-align: center; }
+        .phone-list.is-multiselect .phone-row-check { display: block; }
+        .phone-row.is-selected .phone-row-check { color: #eab308; }
+        .phone-row-main { flex: 1; min-width: 0; }
+        .phone-row-top { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+        .phone-row-name { font-size: 15px; font-weight: 700; color: #f1f5f9; line-height: 1.35; min-width: 0; word-break: break-word; }
+        .phone-row-id { font-size: 11px; color: #94a3b8; font-weight: 600; flex-shrink: 0; }
+        .phone-row-spec { margin-top: 5px; display: flex; flex-wrap: wrap; gap: 6px; }
         .list-row-exp { border-bottom: 1px solid #334155; padding: 12px 8px; background: rgba(69, 10, 10, 0.2); }
         .cp-box { display: flex; flex-direction: column; align-items: flex-end; justify-content: center; line-height: 1.2; }
         .cp-cost { font-size: 10px; color: #64748b; }
@@ -206,7 +218,7 @@
                         </div>
                     </div>
                 </div>
-                <div id="item-grid" class="flex-1 overflow-y-auto p-3 grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-3 content-start pb-24 md:pb-4"></div>
+                <div id="item-grid" class="flex-1 overflow-y-auto content-start pb-24 md:pb-4 p-0 phone-list"></div>
             </div>
             <div id="cart-panel" class="hidden md:flex w-80 bg-slate-900 border-l border-slate-800 flex-col h-full max-h-[100dvh] md:max-h-none min-h-0 z-30 absolute md:static inset-0 md:inset-auto">
                 <div class="p-3 border-b border-slate-800 flex justify-between items-center bg-slate-800/50 shrink-0"><h2 class="font-bold text-white">結帳清單</h2><button onclick="toggleMobileCart('pos',false)" class="md:hidden text-slate-400 p-2"><i class="fa-solid fa-chevron-down"></i></button><button onclick="clearCart()" class="text-xs text-red-400 hidden md:block">清空</button></div>
@@ -1079,12 +1091,57 @@
         }
         function createPill(t, f) { const d = document.createElement('div'); d.className = 'pill-btn'; d.innerText = t; d.onclick = () => { document.querySelectorAll('.pill-btn').forEach(b=>b.classList.remove('active')); d.classList.add('active'); f(); }; return d; }
         
-        function filterItems(mode, val) { 
-            const term = document.getElementById('search-input').value.toLowerCase(); const grid = document.getElementById('item-grid'); grid.innerHTML = ''; 
-            let list = DB.inv.filter(i => { if (i.isHidden && !i.category.includes("加工好電池")) return false; if(term) return (i.name.toLowerCase().includes(term) || String(i.stock_id).includes(term)) && i.type === UI.tab; if(UI.tab === 'phone') return i.type === 'phone' && i.status_label === val; if(UI.tab === 'accessory') return i.type === 'accessory' && i.category === val; return false; }); 
-            if(list.length === 0) { grid.innerHTML = '<div class="col-span-full text-center text-slate-600 mt-10">無資料</div>'; return; } 
+        function setItemGridMode(kind) {
+            const grid = document.getElementById('item-grid');
+            if (!grid) return;
+            const base = 'flex-1 overflow-y-auto content-start pb-24 md:pb-4';
+            if (kind === 'phone') {
+                grid.className = base + ' p-0 phone-list' + (UI.multiSelect ? ' is-multiselect' : '');
+            } else {
+                grid.className = base + ' p-3 grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-3';
+            }
+        }
+        function filterItems(mode, val) {
+            const term = document.getElementById('search-input').value.toLowerCase();
+            const grid = document.getElementById('item-grid');
+            grid.innerHTML = '';
+            setItemGridMode(UI.tab === 'phone' ? 'phone' : 'grid');
+            let list = DB.inv.filter(i => {
+                if (i.isHidden && !i.category.includes("加工好電池")) return false;
+                if (term) return (i.name.toLowerCase().includes(term) || String(i.stock_id).includes(term)) && i.type === UI.tab;
+                if (UI.tab === 'phone') return i.type === 'phone' && i.status_label === val;
+                if (UI.tab === 'accessory') return i.type === 'accessory' && i.category === val;
+                return false;
+            });
+            if (list.length === 0) {
+                grid.innerHTML = '<div class="col-span-full text-center text-slate-600 mt-10 px-4">無資料</div>';
+                return;
+            }
             const fav = UI.tab === 'accessory' ? getFavAccessories() : [];
-            list.forEach(i => { let color = i.type==='phone' ? 'border-blue-500' : 'border-green-500'; let price = i.price > 0 ? `$${i.price.toLocaleString()}` : (i.defaultPrice > 0 ? `$${i.defaultPrice.toLocaleString()}` : ''); let idBadge = i.type==='phone' ? `<span class="text-[10px] bg-slate-800 px-1 rounded text-slate-400">#${i.stock_id}</span>` : ''; let specs = ''; if(i.type === 'phone') { if(i.battery) specs += `<span class="spec-tag"><i class="fa-solid fa-battery-half mr-1"></i>${i.battery}%</span>`; if(i.ios) specs += `<span class="spec-tag">iOS ${i.ios}</span>`; } let switchBtn = ''; let favStar = ''; if(i.type === 'accessory') { const isFav = fav.includes(String(i.id)); favStar = `<button onclick="event.stopPropagation();toggleFavAccessory('${i.id}')" class="absolute bottom-2 right-2 w-8 h-8 rounded-full ${isFav?'bg-amber-500/30 text-amber-400':'bg-slate-800 text-slate-500 hover:text-amber-400'} flex items-center justify-center transition"><i class="fa-${isFav?'solid':'regular'} fa-star text-xs"></i></button>`; } let selOverlay = i.type==='phone' ? `<div id="sel-${i.id}" class="hidden absolute inset-0 rounded-xl bg-yellow-500/20 border-2 border-yellow-400 pointer-events-none flex items-center justify-center"><i class="fa-solid fa-check-circle text-yellow-400 text-3xl"></i></div>` : ""; grid.innerHTML += `<div onclick="triggerAddToCart('${i.id}')" class="glass p-3 rounded-xl border-l-4 ${color} relative group active:scale-95 transition" id="card-${i.id}">${selOverlay}${switchBtn}${favStar}<div class="flex justify-between mb-1">${idBadge}<span class="text-xs font-bold text-slate-400">庫: ${i.stock}</span></div><div class="font-bold text-sm text-slate-200 line-clamp-2 leading-tight h-9">${i.name}</div><div class="mt-1 flex flex-wrap gap-1">${specs}</div><div class="mt-2 text-right font-bold text-yellow-500">${price}</div></div>`; }); 
+            if (UI.tab === 'phone') {
+                list.forEach(i => {
+                    const sid = String(i.id);
+                    const selected = UI.selectedPhones.has(sid);
+                    let specs = '';
+                    if (i.battery) specs += `<span class="spec-tag"><i class="fa-solid fa-battery-half mr-1"></i>${i.battery}%</span>`;
+                    if (i.ios) specs += `<span class="spec-tag">iOS ${i.ios}</span>`;
+                    grid.innerHTML += `<div onclick="triggerAddToCart('${sid}')" class="phone-row${selected ? ' is-selected' : ''}" id="card-${sid}" data-id="${sid}">
+                        <div class="phone-row-check"><i class="fa-solid fa-circle-check"></i></div>
+                        <div class="phone-row-main">
+                            <div class="phone-row-top"><div class="phone-row-name">${i.name}</div><span class="phone-row-id">#${i.stock_id}</span></div>
+                            ${specs ? `<div class="phone-row-spec">${specs}</div>` : ''}
+                        </div>
+                    </div>`;
+                });
+                return;
+            }
+            list.forEach(i => {
+                let color = 'border-green-500';
+                let price = i.price > 0 ? `$${i.price.toLocaleString()}` : (i.defaultPrice > 0 ? `$${i.defaultPrice.toLocaleString()}` : '');
+                const isFav = fav.includes(String(i.id));
+                const favStar = `<button onclick="event.stopPropagation();toggleFavAccessory('${i.id}')" class="absolute bottom-2 right-2 w-8 h-8 rounded-full ${isFav?'bg-amber-500/30 text-amber-400':'bg-slate-800 text-slate-500 hover:text-amber-400'} flex items-center justify-center"><i class="fa-${isFav?'solid':'regular'} fa-star text-xs"></i></button>`;
+                grid.innerHTML += `<div onclick="triggerAddToCart('${i.id}')" class="glass p-3 rounded-xl border-l-4 ${color} relative group" id="card-${i.id}">${favStar}<div class="flex justify-between mb-1"><span></span><span class="text-xs font-bold text-slate-400">庫: ${i.stock}</span></div><div class="font-bold text-sm text-slate-200 line-clamp-2 leading-tight h-9">${i.name}</div><div class="mt-2 text-right font-bold text-yellow-500">${price}</div></div>`;
+            });
         }
 
         function saveItemGridScroll() {
@@ -3496,6 +3553,7 @@
         }
         function renderFavAccessoryGrid(){
             const grid=document.getElementById('item-grid');
+            setItemGridMode('grid');
             grid.innerHTML='';
             const fav=getFavAccessories();
             const catOrder=getOrderedCategories();
@@ -3522,7 +3580,7 @@
                 grid.innerHTML+=`<div onclick="triggerAddToCart('${i.id}')" class="glass p-3 rounded-xl border-l-4 ${border} relative group active:scale-95 transition"><button onclick="toggleFavAccessory('${i.id}')" class="absolute bottom-2 right-2 w-8 h-8 rounded-full ${isFav?'bg-amber-500/30 text-amber-400':'bg-slate-800 text-slate-500 hover:text-amber-400'} flex items-center justify-center transition"><i class="fa-${isFav?'solid':'regular'} fa-star text-xs"></i></button><div class="flex justify-between mb-1"><span class="text-xs font-bold text-slate-400">${i.category||''}</span><span class="text-xs text-slate-400">庫: ${i.stock}</span></div><div class="font-bold text-sm text-slate-200 line-clamp-2 leading-tight h-9">${i.name}</div><div class="mt-2 text-right font-bold text-yellow-500">${price}</div></div>`;
             });
         }
-        function renderCompanyAccessoryGrid() { const grid = document.getElementById('item-grid'); grid.innerHTML = ''; if(DB.companyTemplates.length === 0) { grid.innerHTML = '<div class="col-span-full text-center text-slate-500 mt-10">尚無公司配件模板，請至設定新增</div>'; return; } DB.companyTemplates.forEach(t => { grid.innerHTML += `<div onclick="addCompanyTemplateToCart('${t.name}', ${t.cost}, ${t.price})" class="glass p-3 rounded-xl border-l-4 border-blue-400 cursor-pointer active:scale-95 transition group"><div class="flex justify-between mb-1"><span class="text-xs font-bold text-blue-400">公司貨</span></div><div class="font-bold text-sm text-slate-200 line-clamp-2 leading-tight h-9">${t.name}</div><div class="mt-2 text-right font-bold text-yellow-500">$${t.price.toLocaleString()}</div></div>`; }); }
+        function renderCompanyAccessoryGrid() { const grid = document.getElementById('item-grid'); setItemGridMode('grid'); grid.innerHTML = ''; if(DB.companyTemplates.length === 0) { grid.innerHTML = '<div class="col-span-full text-center text-slate-500 mt-10">尚無公司配件模板，請至設定新增</div>'; return; } DB.companyTemplates.forEach(t => { grid.innerHTML += `<div onclick="addCompanyTemplateToCart('${t.name}', ${t.cost}, ${t.price})" class="glass p-3 rounded-xl border-l-4 border-blue-400 cursor-pointer group"><div class="flex justify-between mb-1"><span class="text-xs font-bold text-blue-400">公司貨</span></div><div class="font-bold text-sm text-slate-200 line-clamp-2 leading-tight h-9">${t.name}</div><div class="mt-2 text-right font-bold text-yellow-500">$${t.price.toLocaleString()}</div></div>`; }); }
         function updateCategoryNumbers(list) {
             Array.from(list.children).forEach((child, i) => {
                 const numSpan = child.querySelector('span:last-child');
@@ -3699,7 +3757,7 @@
                 }
             }
         }
-        function renderServiceGrid() { document.getElementById('item-grid').innerHTML = `<div onclick="modalRepair()" class="glass p-6 rounded-xl border-l-4 border-yellow-500 flex flex-col items-center justify-center gap-2 active:scale-95 transition"><i class="fa-solid fa-screwdriver-wrench text-4xl text-yellow-500"></i><span class="font-bold">維修登記</span></div><div onclick="modalWrap()" class="glass p-6 rounded-xl border-l-4 border-purple-500 flex flex-col items-center justify-center gap-2 active:scale-95 transition"><i class="fa-solid fa-wand-magic-sparkles text-4xl text-purple-500"></i><span class="font-bold">包膜服務</span></div><div onclick="modalNewPhone()" class="glass p-6 rounded-xl border-l-4 border-green-500 flex flex-col items-center justify-center gap-2 active:scale-95 transition"><i class="fa-solid fa-mobile-screen text-4xl text-green-500"></i><span class="font-bold">新機</span></div><div onclick="modalPeerTransfer()" class="glass p-6 rounded-xl border-l-4 border-blue-500 flex flex-col items-center justify-center gap-2 active:scale-95 transition"><i class="fa-solid fa-truck-fast text-4xl text-blue-500"></i><span class="font-bold">同行調貨</span></div><div onclick="modalESIM()" class="glass p-6 rounded-xl border-l-4 border-cyan-500 flex flex-col items-center justify-center gap-2 active:scale-95 transition"><i class="fa-solid fa-sim-card text-4xl text-cyan-500"></i><span class="font-bold">eSIM</span></div><div onclick="modalShipping()" class="glass p-6 rounded-xl border-l-4 border-slate-400 flex flex-col items-center justify-center gap-2 active:scale-95 transition"><i class="fa-solid fa-truck text-4xl text-slate-400"></i><span class="font-bold">運費</span></div><div onclick="modalSoftware()" class="glass p-6 rounded-xl border-l-4 border-indigo-500 flex flex-col items-center justify-center gap-2 active:scale-95 transition"><i class="fa-solid fa-mobile-screen-button text-4xl text-indigo-400"></i><span class="font-bold">軟體</span></div>`; }
+        function renderServiceGrid() { setItemGridMode('grid'); document.getElementById('item-grid').innerHTML = `<div onclick="modalRepair()" class="glass p-6 rounded-xl border-l-4 border-yellow-500 flex flex-col items-center justify-center gap-2"><i class="fa-solid fa-screwdriver-wrench text-4xl text-yellow-500"></i><span class="font-bold">維修登記</span></div><div onclick="modalWrap()" class="glass p-6 rounded-xl border-l-4 border-purple-500 flex flex-col items-center justify-center gap-2"><i class="fa-solid fa-wand-magic-sparkles text-4xl text-purple-500"></i><span class="font-bold">包膜服務</span></div><div onclick="modalNewPhone()" class="glass p-6 rounded-xl border-l-4 border-green-500 flex flex-col items-center justify-center gap-2"><i class="fa-solid fa-mobile-screen text-4xl text-green-500"></i><span class="font-bold">新機</span></div><div onclick="modalPeerTransfer()" class="glass p-6 rounded-xl border-l-4 border-blue-500 flex flex-col items-center justify-center gap-2"><i class="fa-solid fa-truck-fast text-4xl text-blue-500"></i><span class="font-bold">同行調貨</span></div><div onclick="modalESIM()" class="glass p-6 rounded-xl border-l-4 border-cyan-500 flex flex-col items-center justify-center gap-2"><i class="fa-solid fa-sim-card text-4xl text-cyan-500"></i><span class="font-bold">eSIM</span></div><div onclick="modalShipping()" class="glass p-6 rounded-xl border-l-4 border-slate-400 flex flex-col items-center justify-center gap-2"><i class="fa-solid fa-truck text-4xl text-slate-400"></i><span class="font-bold">運費</span></div><div onclick="modalSoftware()" class="glass p-6 rounded-xl border-l-4 border-indigo-500 flex flex-col items-center justify-center gap-2"><i class="fa-solid fa-mobile-screen-button text-4xl text-indigo-400"></i><span class="font-bold">軟體</span></div>`; }
         async function addToCart(id) { const i = DB.inv.find(x => x.id == id); if(!i) return; let p = i.price, q = 1; let defPrice = i.defaultPrice > 0 ? i.defaultPrice : (i.price > 0 ? i.price : ''); if (i.type === 'accessory' || i.price === 0) { let isGift = false; const html = `<input id="sw-p" type="number" class="swal2-input" placeholder="單價" value="${defPrice}"><div class="flex items-center justify-center gap-2 mt-2"><button type="button" id="sw-gift-btn" class="px-3 py-2 rounded bg-red-900/50 text-red-400 border border-red-700 text-sm">贈</button><button type="button" id="sw-cost-btn" class="px-3 py-2 rounded bg-emerald-900/50 text-emerald-400 border border-emerald-700 text-sm">本</button><div style="display:flex;align-items:center;justify-content:center;gap:12px"><button type="button" onclick="var el=document.getElementById('sw-q');el.value=Math.max(1,parseInt(el.value||1)-1)" style="width:52px;height:52px;font-size:26px;border-radius:12px;background:#334155;color:white;border:none;cursor:pointer">-</button><input id="sw-q" type="number" value="1" min="1" style="width:72px;height:52px;font-size:22px;text-align:center;background:#1e293b;color:white;border:2px solid #475569;border-radius:12px;outline:none"><button type="button" onclick="var el=document.getElementById('sw-q');el.value=parseInt(el.value||1)+1" style="width:52px;height:52px;font-size:26px;border-radius:12px;background:#334155;color:white;border:none;cursor:pointer">+</button></div></div>`; const { value } = await Swal.fire({ title: i.name, html, background: '#1e293b', color: 'white', didOpen: () => { document.getElementById('sw-gift-btn').onclick = () => { isGift = true; Swal.clickConfirm(); }; const costBtn = document.getElementById('sw-cost-btn'); if (costBtn) costBtn.onclick = () => { const el = document.getElementById('sw-p'); if (el) { el.value = String(Number(i.cost) || 0); el.focus(); } }; }, preConfirm: () => isGift ? (function(){var _gq=parseInt(String(document.getElementById('sw-q').value||'1'),10); if(isNaN(_gq)||_gq<1)_gq=1; return [0,_gq,true];})() : [document.getElementById('sw-p').value, document.getElementById('sw-q').value, false] }); if(value===undefined) return; if(value[2]) { var _gq3=parseInt(String(value[1]),10); if(isNaN(_gq3)||_gq3<1)_gq3=1; Cart.push({ ...i, name: i.name + ' (贈)', price: 0, quantity: _gq3, itemId: i.id, originalPrice: defPrice||0, isGift: true }); } else { p = parseInt(value[0]); q = parseInt(value[1]); Cart.push({ ...i, price: p, quantity: q, itemId: i.id, originalPrice: p, isGift: false }); } } else { Cart.push({ ...i, price: p, quantity: q, itemId: i.id, originalPrice: p, isGift: false }); } renderCart(); }
         function renderCart() { 
             const c = document.getElementById('cart-items'); 
@@ -4138,9 +4196,8 @@
         async function modalShipping(){const {value:v}=await Swal.fire({title:'運費',input:'number',inputPlaceholder:'金額',background:'#1e293b',color:'white'}); if(v!=null&&v!==''){const amt=Number(v)||0; Cart.push({type:'shipping',name:'運費',cost:amt,price:amt,quantity:1,itemId:'SF-'+Date.now(),originalPrice:amt,isGift:false}); renderCart();}}
         function renderDirectTransferGrid() {
             const grid = document.getElementById('item-grid');
-            grid.innerHTML = '';
-            // 顯示一個「新增調貨」的按鈕
-            grid.innerHTML = `<div onclick="modalDirectTransfer()" class="glass p-6 rounded-xl border-l-4 border-purple-500 flex flex-col items-center justify-center gap-2 active:scale-95 transition cursor-pointer"><i class="fa-solid fa-truck-fast text-4xl text-purple-500"></i><span class="font-bold text-white">新增調貨</span><span class="text-xs text-slate-400">點擊新增調貨項目</span></div>`;
+            setItemGridMode('grid');
+            grid.innerHTML = `<div onclick="modalDirectTransfer()" class="glass p-6 rounded-xl border-l-4 border-purple-500 flex flex-col items-center justify-center gap-2 cursor-pointer"><i class="fa-solid fa-truck-fast text-4xl text-purple-500"></i><span class="font-bold text-white">新增調貨</span><span class="text-xs text-slate-400">點擊新增調貨項目</span></div>`;
         }
         async function modalDirectTransfer() {
             const { value: v } = await Swal.fire({
@@ -4189,23 +4246,30 @@
         }
         function toggleMultiSelectMode() {
             UI.multiSelect = !UI.multiSelect;
-            if (!UI.multiSelect) { UI.selectedPhones = new Set(); refreshPhoneSelection(); }
+            if (!UI.multiSelect) UI.selectedPhones = new Set();
+            const grid = document.getElementById('item-grid');
+            if (grid && UI.tab === 'phone') grid.classList.toggle('is-multiselect', UI.multiSelect);
+            refreshPhoneSelection();
             renderMultiSelectBar();
         }
         function cancelMultiSelect() {
-            UI.multiSelect = false; UI.selectedPhones = new Set(); refreshPhoneSelection(); renderMultiSelectBar();
+            UI.multiSelect = false; UI.selectedPhones = new Set();
+            const grid = document.getElementById('item-grid');
+            if (grid) grid.classList.remove('is-multiselect');
+            refreshPhoneSelection();
+            renderMultiSelectBar();
         }
         function togglePhoneSelect(id) {
-            if (UI.selectedPhones.has(id)) UI.selectedPhones.delete(id);
-            else UI.selectedPhones.add(id);
+            const sid = String(id);
+            if (UI.selectedPhones.has(sid)) UI.selectedPhones.delete(sid);
+            else UI.selectedPhones.add(sid);
             refreshPhoneSelection();
             renderMultiSelectBar();
         }
         function refreshPhoneSelection() {
-            document.querySelectorAll('[id^="sel-"]').forEach(el => {
-                const id = el.id.replace('sel-', '');
-                if (UI.selectedPhones.has(id)) el.classList.remove('hidden');
-                else el.classList.add('hidden');
+            document.querySelectorAll('.phone-row').forEach(el => {
+                const sid = String(el.dataset.id || '');
+                el.classList.toggle('is-selected', UI.selectedPhones.has(sid));
             });
         }
         async function batchChangeSelectedPhoneStatus() {
