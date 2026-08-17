@@ -116,10 +116,14 @@
         .phone-list.is-multiselect .phone-row-check { display: block; }
         .phone-row.is-selected .phone-row-check { color: #eab308; }
         .phone-row-main { flex: 1; min-width: 0; }
-        .phone-row-top { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
-        .phone-row-name { font-size: 15px; font-weight: 700; color: #f1f5f9; line-height: 1.35; min-width: 0; word-break: break-word; }
-        .phone-row-id { font-size: 11px; color: #94a3b8; font-weight: 600; flex-shrink: 0; }
+        .phone-row-top { display: flex; align-items: baseline; gap: 8px; }
+        .phone-row-name { font-size: 15px; font-weight: 700; color: #f1f5f9; line-height: 1.35; min-width: 0; flex: 1; word-break: break-word; }
+        .phone-row-id { font-size: 11px; color: #94a3b8; font-weight: 600; flex-shrink: 0; min-width: 2.5rem; }
         .phone-row-spec { margin-top: 5px; display: flex; flex-wrap: wrap; gap: 6px; }
+        .acc-check { display: none; position: absolute; top: 8px; left: 8px; color: #64748b; font-size: 18px; z-index: 2; }
+        #item-grid.is-multiselect .acc-check { display: block; }
+        .acc-card.is-selected { box-shadow: inset 0 0 0 2px #eab308; background: rgba(234, 179, 8, 0.12); }
+        .acc-card.is-selected .acc-check { color: #eab308; }
         .list-row-exp { border-bottom: 1px solid #334155; padding: 12px 8px; background: rgba(69, 10, 10, 0.2); }
         .cp-box { display: flex; flex-direction: column; align-items: flex-end; justify-content: center; line-height: 1.2; }
         .cp-cost { font-size: 10px; color: #64748b; }
@@ -210,9 +214,9 @@
                         <div id="multi-select-bar" class="hidden items-center gap-2 shrink-0 flex">
                             <button onclick="toggleMultiSelectMode()" id="btn-multiselect" class="pill-btn border-yellow-500 text-yellow-400 shrink-0">☑ 多選</button>
                             <div id="multi-select-confirm" class="hidden items-center gap-2 flex">
-                                <span id="multi-count" class="text-xs text-slate-400 shrink-0">0 台</span>
-                                <button onclick="confirmMultiPhone()" class="bg-yellow-500 text-black font-bold px-3 py-1.5 rounded-xl text-xs shrink-0">加入</button>
-                                <button onclick="batchChangeSelectedPhoneStatus()" class="bg-blue-600 text-white font-bold px-3 py-1.5 rounded-xl text-xs shrink-0">批次改狀態</button>
+                                <span id="multi-count" class="text-xs text-slate-400 shrink-0">0</span>
+                                <button onclick="confirmMultiAdd()" class="bg-yellow-500 text-black font-bold px-3 py-1.5 rounded-xl text-xs shrink-0">加入</button>
+                                <button onclick="batchChangeSelectedPhoneStatus()" id="btn-batch-phone-status" class="bg-blue-600 text-white font-bold px-3 py-1.5 rounded-xl text-xs shrink-0">批次改狀態</button>
                                 <button onclick="cancelMultiSelect()" class="text-slate-400 text-xs shrink-0">取消</button>
                             </div>
                         </div>
@@ -679,7 +683,7 @@
         let ItemRegistry = {};
         let OrderRegistry = {};
         let User = { name: '', isAdmin: false };
-        let UI = { tab: 'phone', sub: '', rsMode: 'inventory', rsCat: 'all', multiSelect: false, selectedPhones: new Set(), selectedPendingOrders: new Set(), pendingOrderMeta: {}, pendingOrdersByCustomer: {}, allPendingOrderIds: [], pendingTab: 'unpaid', statsCollapsed: { report: true, history: true }, categoryOrder: null, favAccessoryIds: null, posPrefsLoaded: false, booksMode: 'month', lastBooksReport: null, lastFundData: null, booksContinuous: false, booksLooping: false, lastBooksEntryYmd: null, lastBooksVendor: '', booksSessionCount: 0 };
+        let UI = { tab: 'phone', sub: '', rsMode: 'inventory', rsCat: 'all', multiSelect: false, selectedPhones: new Set(), selectedAcc: new Set(), selectedPendingOrders: new Set(), pendingOrderMeta: {}, pendingOrdersByCustomer: {}, allPendingOrderIds: [], pendingTab: 'unpaid', statsCollapsed: { report: true, history: true }, categoryOrder: null, favAccessoryIds: null, posPrefsLoaded: false, booksMode: 'month', lastBooksReport: null, lastFundData: null, booksContinuous: false, booksLooping: false, lastBooksEntryYmd: null, lastBooksVendor: '', booksSessionCount: 0 };
         let cartFooterTranslateY = 0;
         const CART_FOOTER_DRAG_MAX_UP = 360;
         const CART_FOOTER_DRAG_MAX_DOWN = 0;
@@ -1085,9 +1089,10 @@
             }
             return Array.from(allCats).sort();
         }
-        function switchMainTab(t) { 
-            UI.tab = t; document.querySelectorAll('.main-tab').forEach(e => e.classList.remove('active')); document.getElementById('tab-'+t).classList.add('active'); const sub = document.getElementById('sub-cat-scroll'); sub.innerHTML = ''; 
-            if (t === 'phone') { ['庫存中','客訂中','寄賣中'].forEach(s => sub.appendChild(createPill(s, () => filterItems('status', s)))); if(sub.firstChild) sub.firstChild.click(); renderMultiSelectBar(); } else if (t === 'accessory') { const favBtn = document.createElement('div'); favBtn.className = 'pill-btn border-amber-500 text-amber-400 shrink-0'; favBtn.innerHTML = '⭐ 常用'; favBtn.setAttribute('title','常用品'); favBtn.onclick = () => { document.querySelectorAll('.pill-btn').forEach(b=>b.classList.remove('active')); favBtn.classList.add('active'); renderFavAccessoryGrid(); }; sub.appendChild(favBtn); const btn = document.createElement('div'); btn.className = 'pill-btn border-blue-500 text-blue-400'; btn.innerHTML = '🏢 公司貨'; btn.onclick = () => { document.querySelectorAll('.pill-btn').forEach(b=>b.classList.remove('active')); btn.classList.add('active'); renderCompanyAccessoryGrid(); }; sub.appendChild(btn); const transferBtn = document.createElement('div'); transferBtn.className = 'pill-btn border-purple-500 text-purple-400'; transferBtn.innerHTML = '🚚 調貨'; transferBtn.onclick = () => { document.querySelectorAll('.pill-btn').forEach(b=>b.classList.remove('active')); transferBtn.classList.add('active'); renderDirectTransferGrid(); }; sub.appendChild(transferBtn); const cats = getOrderedCategories(); cats.forEach(c => sub.appendChild(createPill(c, () => filterItems('cat', c)))); if(sub.firstChild) sub.firstChild.click(); } else { renderServiceGrid(); } 
+        function switchMainTab(t) {
+            if (UI.tab !== t) cancelMultiSelect();
+            UI.tab = t; document.querySelectorAll('.main-tab').forEach(e => e.classList.remove('active')); document.getElementById('tab-'+t).classList.add('active'); const sub = document.getElementById('sub-cat-scroll'); sub.innerHTML = '';
+            if (t === 'phone') { ['庫存中','客訂中','寄賣中'].forEach(s => sub.appendChild(createPill(s, () => filterItems('status', s)))); if(sub.firstChild) sub.firstChild.click(); renderMultiSelectBar(); } else if (t === 'accessory') { const favBtn = document.createElement('div'); favBtn.className = 'pill-btn border-amber-500 text-amber-400 shrink-0'; favBtn.innerHTML = '⭐ 常用'; favBtn.setAttribute('title','常用品'); favBtn.onclick = () => { document.querySelectorAll('.pill-btn').forEach(b=>b.classList.remove('active')); favBtn.classList.add('active'); renderFavAccessoryGrid(); }; sub.appendChild(favBtn); const btn = document.createElement('div'); btn.className = 'pill-btn border-blue-500 text-blue-400'; btn.innerHTML = '🏢 公司貨'; btn.onclick = () => { document.querySelectorAll('.pill-btn').forEach(b=>b.classList.remove('active')); btn.classList.add('active'); renderCompanyAccessoryGrid(); }; sub.appendChild(btn); const transferBtn = document.createElement('div'); transferBtn.className = 'pill-btn border-purple-500 text-purple-400'; transferBtn.innerHTML = '🚚 調貨'; transferBtn.onclick = () => { document.querySelectorAll('.pill-btn').forEach(b=>b.classList.remove('active')); transferBtn.classList.add('active'); renderDirectTransferGrid(); }; sub.appendChild(transferBtn); const cats = getOrderedCategories(); cats.forEach(c => sub.appendChild(createPill(c, () => filterItems('cat', c)))); if(sub.firstChild) sub.firstChild.click(); renderMultiSelectBar(); } else { renderServiceGrid(); renderMultiSelectBar(); }
         }
         function createPill(t, f) { const d = document.createElement('div'); d.className = 'pill-btn'; d.innerText = t; d.onclick = () => { document.querySelectorAll('.pill-btn').forEach(b=>b.classList.remove('active')); d.classList.add('active'); f(); }; return d; }
         
@@ -1098,7 +1103,7 @@
             if (kind === 'phone') {
                 grid.className = base + ' p-0 phone-list' + (UI.multiSelect ? ' is-multiselect' : '');
             } else {
-                grid.className = base + ' p-3 grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-3';
+                grid.className = base + ' p-3 grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-3' + (UI.multiSelect && UI.tab === 'accessory' && kind === 'grid' ? ' is-multiselect' : '');
             }
         }
         function filterItems(mode, val) {
@@ -1128,7 +1133,7 @@
                     grid.innerHTML += `<div onclick="triggerAddToCart('${sid}')" class="phone-row${selected ? ' is-selected' : ''}" id="card-${sid}" data-id="${sid}">
                         <div class="phone-row-check"><i class="fa-solid fa-circle-check"></i></div>
                         <div class="phone-row-main">
-                            <div class="phone-row-top"><div class="phone-row-name">${i.name}</div><span class="phone-row-id">#${i.stock_id}</span></div>
+                            <div class="phone-row-top"><span class="phone-row-id">#${i.stock_id}</span><div class="phone-row-name">${i.name}</div></div>
                             ${specs ? `<div class="phone-row-spec">${specs}</div>` : ''}
                         </div>
                     </div>`;
@@ -1139,8 +1144,11 @@
                 let color = 'border-green-500';
                 let price = i.price > 0 ? `$${i.price.toLocaleString()}` : (i.defaultPrice > 0 ? `$${i.defaultPrice.toLocaleString()}` : '');
                 const isFav = fav.includes(String(i.id));
-                const favStar = `<button onclick="event.stopPropagation();toggleFavAccessory('${i.id}')" class="absolute bottom-2 right-2 w-8 h-8 rounded-full ${isFav?'bg-amber-500/30 text-amber-400':'bg-slate-800 text-slate-500 hover:text-amber-400'} flex items-center justify-center"><i class="fa-${isFav?'solid':'regular'} fa-star text-xs"></i></button>`;
-                grid.innerHTML += `<div onclick="triggerAddToCart('${i.id}')" class="glass p-3 rounded-xl border-l-4 ${color} relative group" id="card-${i.id}">${favStar}<div class="flex justify-between mb-1"><span></span><span class="text-xs font-bold text-slate-400">庫: ${i.stock}</span></div><div class="font-bold text-sm text-slate-200 line-clamp-2 leading-tight h-9">${i.name}</div><div class="mt-2 text-right font-bold text-yellow-500">${price}</div></div>`;
+                const sid = String(i.id);
+                const key = 'a:' + sid;
+                const selected = UI.selectedAcc.has(key);
+                const favStar = `<button onclick="event.stopPropagation();toggleFavAccessory('${sid}')" class="absolute bottom-2 right-2 w-8 h-8 rounded-full ${isFav?'bg-amber-500/30 text-amber-400':'bg-slate-800 text-slate-500 hover:text-amber-400'} flex items-center justify-center"><i class="fa-${isFav?'solid':'regular'} fa-star text-xs"></i></button>`;
+                grid.innerHTML += `<div onclick="triggerAddToCart('${sid}')" class="glass p-3 rounded-xl border-l-4 ${color} relative group acc-card${selected ? ' is-selected' : ''}" data-acc-key="${key}" id="card-${sid}"><div class="acc-check"><i class="fa-solid fa-circle-check"></i></div>${favStar}<div class="flex justify-between mb-1"><span></span><span class="text-xs font-bold text-slate-400">庫: ${i.stock}</span></div><div class="font-bold text-sm text-slate-200 line-clamp-2 leading-tight h-9">${i.name}</div><div class="mt-2 text-right font-bold text-yellow-500">${price}</div></div>`;
             });
         }
 
@@ -1182,6 +1190,7 @@
         }
         async function triggerAddToCart(id) {
             if (UI.multiSelect && UI.tab === 'phone') { togglePhoneSelect(id); return; }
+            if (UI.multiSelect && UI.tab === 'accessory') { toggleAccSelect('a:' + String(id)); return; }
             const i = DB.inv.find(x => String(x.id) === String(id));
             if(!i) { Swal.fire({icon:'error', title:'找不到商品', text:`ID: ${id}`, background:'#1e293b', color:'white'}); return; }
             let p = i.price, q = 1;
@@ -3577,10 +3586,36 @@
                 const price=i.price>0?`$${i.price.toLocaleString()}`:(i.defaultPrice>0?`$${i.defaultPrice.toLocaleString()}`:'');
                 const isFav=fav.includes(String(i.id));
                 const border=getAccessoryCategoryBorder(i.category);
-                grid.innerHTML+=`<div onclick="triggerAddToCart('${i.id}')" class="glass p-3 rounded-xl border-l-4 ${border} relative group active:scale-95 transition"><button onclick="toggleFavAccessory('${i.id}')" class="absolute bottom-2 right-2 w-8 h-8 rounded-full ${isFav?'bg-amber-500/30 text-amber-400':'bg-slate-800 text-slate-500 hover:text-amber-400'} flex items-center justify-center transition"><i class="fa-${isFav?'solid':'regular'} fa-star text-xs"></i></button><div class="flex justify-between mb-1"><span class="text-xs font-bold text-slate-400">${i.category||''}</span><span class="text-xs text-slate-400">庫: ${i.stock}</span></div><div class="font-bold text-sm text-slate-200 line-clamp-2 leading-tight h-9">${i.name}</div><div class="mt-2 text-right font-bold text-yellow-500">${price}</div></div>`;
+                const sid=String(i.id);
+                const key='a:'+sid;
+                const selected=UI.selectedAcc.has(key);
+                grid.innerHTML+=`<div onclick="triggerAddToCart('${sid}')" class="glass p-3 rounded-xl border-l-4 ${border} relative group acc-card${selected?' is-selected':''}" data-acc-key="${key}"><div class="acc-check"><i class="fa-solid fa-circle-check"></i></div><button onclick="event.stopPropagation();toggleFavAccessory('${sid}')" class="absolute bottom-2 right-2 w-8 h-8 rounded-full ${isFav?'bg-amber-500/30 text-amber-400':'bg-slate-800 text-slate-500 hover:text-amber-400'} flex items-center justify-center"><i class="fa-${isFav?'solid':'regular'} fa-star text-xs"></i></button><div class="flex justify-between mb-1"><span class="text-xs font-bold text-slate-400">${i.category||''}</span><span class="text-xs text-slate-400">庫: ${i.stock}</span></div><div class="font-bold text-sm text-slate-200 line-clamp-2 leading-tight h-9">${i.name}</div><div class="mt-2 text-right font-bold text-yellow-500">${price}</div></div>`;
             });
         }
-        function renderCompanyAccessoryGrid() { const grid = document.getElementById('item-grid'); setItemGridMode('grid'); grid.innerHTML = ''; if(DB.companyTemplates.length === 0) { grid.innerHTML = '<div class="col-span-full text-center text-slate-500 mt-10">尚無公司配件模板，請至設定新增</div>'; return; } DB.companyTemplates.forEach(t => { grid.innerHTML += `<div onclick="addCompanyTemplateToCart('${t.name}', ${t.cost}, ${t.price})" class="glass p-3 rounded-xl border-l-4 border-blue-400 cursor-pointer group"><div class="flex justify-between mb-1"><span class="text-xs font-bold text-blue-400">公司貨</span></div><div class="font-bold text-sm text-slate-200 line-clamp-2 leading-tight h-9">${t.name}</div><div class="mt-2 text-right font-bold text-yellow-500">$${t.price.toLocaleString()}</div></div>`; }); }
+        function renderCompanyAccessoryGrid() {
+            const grid = document.getElementById('item-grid');
+            setItemGridMode('grid');
+            grid.innerHTML = '';
+            if (DB.companyTemplates.length === 0) {
+                grid.innerHTML = '<div class="col-span-full text-center text-slate-500 mt-10">尚無公司配件模板，請至設定新增</div>';
+                return;
+            }
+            DB.companyTemplates.forEach(t => {
+                const key = 'c:' + t.name;
+                const selected = UI.selectedAcc.has(key);
+                grid.innerHTML += `<div onclick="onCompanyAccTap(this)" data-name="${booksEscape(t.name)}" data-cost="${Number(t.cost)||0}" data-price="${Number(t.price)||0}" data-acc-key="${booksEscape(key)}" class="glass p-3 rounded-xl border-l-4 border-blue-400 cursor-pointer group acc-card${selected ? ' is-selected' : ''}"><div class="acc-check"><i class="fa-solid fa-circle-check"></i></div><div class="flex justify-between mb-1"><span class="text-xs font-bold text-blue-400">公司貨</span></div><div class="font-bold text-sm text-slate-200 line-clamp-2 leading-tight h-9">${t.name}</div><div class="mt-2 text-right font-bold text-yellow-500">$${(Number(t.price)||0).toLocaleString()}</div></div>`;
+            });
+        }
+        function onCompanyAccTap(el) {
+            const name = el.getAttribute('data-name') || '';
+            const cost = Number(el.getAttribute('data-cost')) || 0;
+            const price = Number(el.getAttribute('data-price')) || 0;
+            if (UI.multiSelect && UI.tab === 'accessory') {
+                toggleAccSelect('c:' + name);
+                return;
+            }
+            addCompanyTemplateToCart(name, cost, price);
+        }
         function updateCategoryNumbers(list) {
             Array.from(list.children).forEach((child, i) => {
                 const numSpan = child.querySelector('span:last-child');
@@ -4231,14 +4266,19 @@
             const bar = document.getElementById('multi-select-bar');
             const confirm = document.getElementById('multi-select-confirm');
             const btn = document.getElementById('btn-multiselect');
+            const batch = document.getElementById('btn-batch-phone-status');
             if (!bar) return;
-            if (UI.tab !== 'phone') { bar.classList.add('hidden'); return; }
+            if (UI.tab !== 'phone' && UI.tab !== 'accessory') { bar.classList.add('hidden'); return; }
             bar.classList.remove('hidden');
+            if (batch) batch.classList.toggle('hidden', UI.tab !== 'phone');
             if (UI.multiSelect) {
                 if (btn) { btn.classList.add('active'); }
                 if (confirm) confirm.classList.remove('hidden');
                 const cnt = document.getElementById('multi-count');
-                if (cnt) cnt.textContent = UI.selectedPhones.size + ' 台';
+                if (cnt) {
+                    const n = UI.tab === 'phone' ? UI.selectedPhones.size : UI.selectedAcc.size;
+                    cnt.textContent = n + (UI.tab === 'phone' ? ' 台' : ' 件');
+                }
             } else {
                 if (btn) btn.classList.remove('active');
                 if (confirm) confirm.classList.add('hidden');
@@ -4246,17 +4286,24 @@
         }
         function toggleMultiSelectMode() {
             UI.multiSelect = !UI.multiSelect;
-            if (!UI.multiSelect) UI.selectedPhones = new Set();
+            if (!UI.multiSelect) {
+                UI.selectedPhones = new Set();
+                UI.selectedAcc = new Set();
+            }
             const grid = document.getElementById('item-grid');
-            if (grid && UI.tab === 'phone') grid.classList.toggle('is-multiselect', UI.multiSelect);
+            if (grid && (UI.tab === 'phone' || UI.tab === 'accessory')) grid.classList.toggle('is-multiselect', UI.multiSelect);
             refreshPhoneSelection();
+            refreshAccSelection();
             renderMultiSelectBar();
         }
         function cancelMultiSelect() {
-            UI.multiSelect = false; UI.selectedPhones = new Set();
+            UI.multiSelect = false;
+            UI.selectedPhones = new Set();
+            UI.selectedAcc = new Set();
             const grid = document.getElementById('item-grid');
             if (grid) grid.classList.remove('is-multiselect');
             refreshPhoneSelection();
+            refreshAccSelection();
             renderMultiSelectBar();
         }
         function togglePhoneSelect(id) {
@@ -4271,6 +4318,121 @@
                 const sid = String(el.dataset.id || '');
                 el.classList.toggle('is-selected', UI.selectedPhones.has(sid));
             });
+        }
+        function toggleAccSelect(key) {
+            const k = String(key || '');
+            if (!k) return;
+            if (UI.selectedAcc.has(k)) UI.selectedAcc.delete(k);
+            else UI.selectedAcc.add(k);
+            refreshAccSelection();
+            renderMultiSelectBar();
+        }
+        function refreshAccSelection() {
+            document.querySelectorAll('.acc-card').forEach(el => {
+                const k = el.getAttribute('data-acc-key') || '';
+                el.classList.toggle('is-selected', UI.selectedAcc.has(k));
+            });
+        }
+        async function confirmMultiAdd() {
+            if (UI.tab === 'accessory') return confirmMultiAcc();
+            return confirmMultiPhone();
+        }
+        async function confirmMultiAcc() {
+            if (UI.selectedAcc.size === 0) return;
+            const rows = Array.from(UI.selectedAcc).map(key => {
+                if (key.startsWith('c:')) {
+                    const name = key.slice(2);
+                    const t = (DB.companyTemplates || []).find(x => x.name === name);
+                    if (!t) return null;
+                    return { kind: 'tpl', name: t.name, cost: Number(t.cost) || 0, defPrice: Number(t.price) || 0 };
+                }
+                const id = key.slice(2);
+                const i = DB.inv.find(x => String(x.id) === String(id));
+                if (!i) return null;
+                const def = Number(i.defaultPrice) > 0 ? i.defaultPrice : (Number(i.price) > 0 ? i.price : '');
+                return { kind: 'inv', item: i, name: i.name, cost: Number(i.cost) || 0, defPrice: def };
+            }).filter(Boolean);
+            if (!rows.length) return;
+            const rowsHTML = rows.map((r, idx) => {
+                const costHint = r.cost > 0 ? `<span class="text-slate-500 text-[10px] ml-1">本 ${Number(r.cost).toLocaleString()}</span>` : '';
+                return `<div class="flex items-center gap-2 py-1.5 border-b border-slate-700 text-left">
+                    <div class="flex-1 min-w-0 text-sm text-slate-300 truncate">${booksEscape(r.name)}${costHint}</div>
+                    <button type="button" class="text-xs px-2 py-1 rounded bg-red-900/50 text-red-400 border border-red-700 shrink-0" onclick="var el=document.getElementById('multi-acc-price-${idx}');if(el)el.value='0'">贈</button>
+                    <input id="multi-acc-price-${idx}" type="number" class="swal2-input !my-0 !w-20 !text-sm" placeholder="售價" value="${r.defPrice}">
+                </div>`;
+            }).join('');
+            const { value: prices } = await Swal.fire({
+                title: `共 ${rows.length} 件配件`,
+                html: `<div class="flex gap-2 mb-2">
+                        <button type="button" id="multi-acc-all-gift" class="flex-1 text-xs py-2 rounded bg-red-900/50 text-red-400 border border-red-700">全部贈</button>
+                    </div>
+                    <div class="mb-2 max-h-48 overflow-y-auto text-left">${rowsHTML}</div>
+                    <div class="flex gap-2 items-center mt-2">
+                        <input id="multi-acc-same" type="number" class="swal2-input !my-0 flex-1 !text-sm" placeholder="同一售價">
+                        <button type="button" id="multi-acc-fill" class="text-xs px-2 py-2 rounded bg-slate-600 text-white shrink-0">套用</button>
+                    </div>`,
+                background: '#1e293b', color: 'white',
+                showCancelButton: true, confirmButtonText: '加入購物車', cancelButtonText: '取消',
+                didOpen: () => {
+                    const allGift = document.getElementById('multi-acc-all-gift');
+                    if (allGift) allGift.onclick = () => {
+                        rows.forEach((_, idx) => {
+                            const el = document.getElementById('multi-acc-price-' + idx);
+                            if (el) el.value = '0';
+                        });
+                    };
+                    const fill = document.getElementById('multi-acc-fill');
+                    if (fill) fill.onclick = () => {
+                        const v = document.getElementById('multi-acc-same')?.value;
+                        if (v === '' || v == null) return;
+                        rows.forEach((_, idx) => {
+                            const el = document.getElementById('multi-acc-price-' + idx);
+                            if (el) el.value = String(v);
+                        });
+                    };
+                },
+                preConfirm: () => {
+                    const vals = rows.map((_, idx) => {
+                        const raw = document.getElementById('multi-acc-price-' + idx)?.value;
+                        if (raw === '' || raw == null) return null;
+                        const n = parseInt(raw, 10);
+                        return isNaN(n) ? null : n;
+                    });
+                    if (vals.some(v => v == null || v < 0)) { Swal.showValidationMessage('每件請填售價，贈品填 0'); return false; }
+                    return vals;
+                }
+            });
+            if (!prices) return;
+            rows.forEach((r, idx) => {
+                const p = prices[idx];
+                const isGift = p === 0;
+                if (r.kind === 'tpl') {
+                    Cart.push({
+                        type: 'accessory',
+                        category: '公司配件',
+                        name: isGift ? (r.name + ' (贈)') : r.name,
+                        price: p,
+                        cost: r.cost,
+                        quantity: 1,
+                        itemId: 'CP-' + Date.now() + '-' + idx,
+                        originalPrice: Number(r.defPrice) || p,
+                        isGift
+                    });
+                    return;
+                }
+                const i = r.item;
+                Cart.push({
+                    ...i,
+                    name: isGift ? (i.name + ' (贈)') : i.name,
+                    price: p,
+                    quantity: 1,
+                    itemId: i.id,
+                    originalPrice: Number(r.defPrice) || p,
+                    isGift
+                });
+            });
+            renderCart();
+            cancelMultiSelect();
         }
         async function batchChangeSelectedPhoneStatus() {
             if (UI.selectedPhones.size === 0) return;
