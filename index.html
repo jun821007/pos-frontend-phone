@@ -74,6 +74,7 @@
         .books-kv .num { font-variant-numeric: tabular-nums; font-weight: 700; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; white-space: nowrap; }
         .books-kv .num.inc, .books-card-amt.inc { color: #facc15; }
         .books-kv .num.exp, .books-card-amt.exp { color: #f87171; }
+        .books-kv .num.net, .books-sheet .num.net { color: #4ade80; }
         .books-kv .num.mute, .books-kv .lab.mute, .books-card-amt.mute { color: #94a3b8; }
         .books-kv.tot { border-bottom-color: #334155; font-weight: 800; }
         .books-card { background: #0b1220; border: 1px solid #334155; border-radius: 12px; padding: 12px; margin-bottom: 8px; }
@@ -351,6 +352,7 @@
                 <div class="books-toolbar-period">
                     <button type="button" id="books-mode-month" onclick="setBooksMode('month')" class="pill-btn active">一個月</button>
                     <button type="button" id="books-mode-bimonth" onclick="setBooksMode('bimonth')" class="pill-btn">雙月</button>
+                    <button type="button" id="books-mode-year" onclick="setBooksMode('year')" class="pill-btn">一年</button>
                     <input type="month" id="books-month" onchange="loadBooksReport()" class="input-dark p-2 rounded text-sm">
                     <button type="button" onclick="loadBooksReport()" class="bg-yellow-600 text-black font-bold px-3 py-2 rounded-lg text-sm">載入</button>
                 </div>
@@ -1876,11 +1878,13 @@
             }
         }
         function setBooksMode(mode) {
-            UI.booksMode = mode === 'bimonth' ? 'bimonth' : 'month';
+            UI.booksMode = mode === 'bimonth' ? 'bimonth' : (mode === 'year' ? 'year' : 'month');
             const m = document.getElementById('books-mode-month');
             const b = document.getElementById('books-mode-bimonth');
+            const y = document.getElementById('books-mode-year');
             if (m) m.classList.toggle('active', UI.booksMode === 'month');
             if (b) b.classList.toggle('active', UI.booksMode === 'bimonth');
+            if (y) y.classList.toggle('active', UI.booksMode === 'year');
             loadBooksReport();
         }
         function booksPeriodRange() {
@@ -1889,7 +1893,10 @@
             let y = Number(ym.slice(0, 4));
             let m = Number(ym.slice(5, 7));
             let y1 = y, m1 = m, y2 = y, m2 = m;
-            if (UI.booksMode === 'bimonth') {
+            if (UI.booksMode === 'year') {
+                m1 = 1;
+                m2 = 12;
+            } else if (UI.booksMode === 'bimonth') {
                 if (m % 2 === 0) {
                     m1 = m - 1;
                     if (m1 < 1) { m1 = 12; y1 = y - 1; }
@@ -1904,9 +1911,9 @@
             const endYmd = `${y2}-${pad(m2)}-${pad(last.getDate())}`;
             const rangeStart = new Date(y1, m1 - 1, 1, 0, 0, 0, 0);
             const rangeEnd = new Date(y2, m2, 0, 23, 59, 59, 999);
-            const label = UI.booksMode === 'bimonth'
-                ? `${y1}/${pad(m1)}–${y2}/${pad(m2)}`
-                : `${y1}/${pad(m1)}`;
+            const label = UI.booksMode === 'year'
+                ? `${y1}年`
+                : (UI.booksMode === 'bimonth' ? `${y1}/${pad(m1)}–${y2}/${pad(m2)}` : `${y1}/${pad(m1)}`);
             return { startYmd, endYmd, rangeStart, rangeEnd, label };
         }
         function booksCategoryOf(it) {
@@ -1968,6 +1975,11 @@
         function formatBooksYmd(d) {
             if (!d) return '';
             return ymdTaipei(d).replace(/-/g, '/');
+        }
+        function booksMonthIndex(ymd) {
+            const m = String(ymd || '').match(/\d{4}[\/\-](\d{1,2})/);
+            const n = m ? Number(m[1]) : 0;
+            return (n >= 1 && n <= 12) ? n : 0;
         }
         function buildBooksReport(rows, rangeStart, rangeEnd, periodLabel) {
             const profit = emptyBooksProfit();
@@ -2068,8 +2080,20 @@
             const profitTotal = BOOKS_PROFIT_KEYS.reduce((s, x) => s + (Number(profit[x.key]) || 0), 0);
             const expenseTotal = BOOKS_EXPENSE_KEYS.reduce((s, k) => s + (Number(expense[k]) || 0), 0);
             const partsMemo = BOOKS_MEMO_KEYS.reduce((s, k) => s + (Number(expense[k]) || 0), 0);
+            const monthly = Array.from({ length: 12 }, (_, i) => ({ month: i + 1, profit: 0, expense: 0, net: 0 }));
+            incomeRows.forEach(r => {
+                const mi = booksMonthIndex(r.date);
+                if (mi) monthly[mi - 1].profit += Number(r.amount) || 0;
+            });
+            expenseDetails.forEach(r => {
+                if (r.memo) return;
+                const mi = booksMonthIndex(r.date);
+                if (mi) monthly[mi - 1].expense += Number(r.amount) || 0;
+            });
+            monthly.forEach(x => { x.net = x.profit - x.expense; });
             return {
                 periodLabel,
+                mode: UI.booksMode || 'month',
                 profit,
                 expense,
                 profitTotal,
@@ -2077,6 +2101,7 @@
                 partsMemo,
                 net: profitTotal - expenseTotal,
                 pendingPot,
+                monthly,
                 incomeDetails: incomeRows,
                 expenseDetails
             };
@@ -2118,8 +2143,9 @@
         function renderBooksReport(report) {
             const money = v => Math.round(Number(v) || 0).toLocaleString();
             const moneyCell = v => (v === '' || v == null) ? '' : money(v);
+            const isYear = report.mode === 'year';
             const labelEl = document.getElementById('books-period-label');
-            if (labelEl) labelEl.innerText = '期間 ' + (report.periodLabel || '') + '　日期為入帳日　未結／掛帳未列入　維修料件備查不扣淨利';
+            if (labelEl) labelEl.innerText = '期間 ' + (report.periodLabel || '') + (isYear ? '　各月／科目為入帳日　未結未列入' : '　日期為入帳日　未結／掛帳未列入　維修料件備查不扣淨利');
             const box = document.getElementById('books-tables');
             if (!box) return;
             const sc = k => money(report.profit[k]);
@@ -2128,6 +2154,9 @@
             const mProfit = BOOKS_PROFIT_KEYS.map(({ key, label }) => `<div class="books-kv"><span class="lab">${label}</span><span class="num inc">${sc(key)}</span></div>`).join('');
             const mExp = (nzExp.length ? nzExp : BOOKS_EXPENSE_KEYS).map(k => `<div class="books-kv"><span class="lab">${k}</span><span class="num exp">${se(k)}</span></div>`).join('');
             const mMemo = BOOKS_MEMO_KEYS.map(k => `<div class="books-kv"><span class="lab mute">${k}（付料備查）</span><span class="num mute">${se(k)}</span></div>`).join('');
+            const monthly = Array.isArray(report.monthly) ? report.monthly : Array.from({ length: 12 }, (_, i) => ({ month: i + 1, profit: 0, expense: 0, net: 0 }));
+            const mMonthly = monthly.map(x => `<div class="books-kv"><span class="lab">${x.month}月</span><span class="num inc">${money(x.profit)}</span></div>`).join('');
+            const dMonthly = monthly.map(x => `<tr><td>${x.month}月</td><td class="num inc">${money(x.profit)}</td><td class="num exp">${money(x.expense)}</td><td class="num net">${money(x.net)}</td></tr>`).join('');
             const details = [
                 ...(report.incomeDetails || []).map(r => ({ ...r, income: r.amount, outgo: '', memo: false })),
                 ...(report.expenseDetails || []).map(r => ({ ...r, income: '', outgo: r.amount, memo: !!r.memo }))
@@ -2187,10 +2216,11 @@
             box.innerHTML = `
                 <div class="books-m">
                     <div class="books-hero">
-                        <div class="books-hero-card inc"><span>純毛利</span><b>${money(report.profitTotal)}</b></div>
-                        <div class="books-hero-card exp"><span>支出</span><b>${money(report.expenseTotal)}</b></div>
-                        <div class="books-hero-card net"><span>本期淨利</span><b>${money(report.net)}</b></div>
+                        <div class="books-hero-card inc"><span>${isYear ? '年純毛利' : '純毛利'}</span><b>${money(report.profitTotal)}</b></div>
+                        <div class="books-hero-card exp"><span>${isYear ? '年支出' : '支出'}</span><b>${money(report.expenseTotal)}</b></div>
+                        <div class="books-hero-card net"><span>${isYear ? '年淨利' : '本期淨利'}</span><b>${money(report.net)}</b></div>
                     </div>
+                    ${isYear ? `<div class="books-sec">各月收入（純毛利）</div>${mMonthly}<div class="books-kv tot"><span class="lab">年純毛利合計</span><span class="num inc">${money(report.profitTotal)}</span></div>` : ''}
                     <div class="books-sec">收入</div>
                     ${mProfit}
                     <div class="books-kv tot"><span class="lab">純毛利合計</span><span class="num inc">${money(report.profitTotal)}</span></div>
@@ -2201,8 +2231,7 @@
                     <div class="books-sec">備查　不扣淨利</div>
                     ${mMemo}
                     <div class="books-kv"><span class="lab mute">未入帳潛在毛利</span><span class="num mute">${money(report.pendingPot)}</span></div>
-                    <div class="books-sec">明細　維修料件為備查</div>
-                    ${mCards}
+                    ${isYear ? `<div class="books-kv mute"><span class="lab mute">一年不列逐筆明細，請改選一個月</span><span></span></div>` : `<div class="books-sec">明細　維修料件為備查</div>${mCards}`}
                 </div>
                 <div class="books-d">
                     <div class="mb-5">
@@ -2212,7 +2241,14 @@
                             <tbody>${sumRows}</tbody>
                         </table>
                     </div>
-                    <div>
+                    ${isYear ? `<div>
+                        <div class="flex items-center justify-between mb-2"><div class="text-xs font-bold tracking-[0.2em] text-slate-400">各月收入</div><div class="text-[11px] text-slate-500">入帳日　單位：元</div></div>
+                        <table class="books-sheet">
+                            <thead><tr><th>月份</th><th class="num">純毛利</th><th class="num">支出</th><th class="num">淨利</th></tr></thead>
+                            <tbody>${dMonthly}</tbody>
+                            <tfoot><tr class="tot"><td>全年</td><td class="num inc">${money(report.profitTotal)}</td><td class="num exp">${money(report.expenseTotal)}</td><td class="num net">${money(report.net)}</td></tr></tfoot>
+                        </table>
+                    </div>` : `<div>
                         <div class="flex items-center justify-between mb-2"><div class="text-xs font-bold tracking-[0.2em] text-slate-400">明細帳</div><div class="text-[11px] text-slate-500">維修料件為備查，不列入支出合計</div></div>
                         <table class="books-sheet">
                             <thead><tr>
@@ -2227,7 +2263,7 @@
                                 <td></td>
                             </tr></tfoot>
                         </table>
-                    </div>
+                    </div>`}
                 </div>`;
         }
         async function submitBooksLedger(items, vendorName, entryDate, opts) {
@@ -2680,19 +2716,28 @@
             BOOKS_MEMO_KEYS.forEach(k => {
                 lines.push([report.periodLabel, '備查', k + '（不扣淨利）', Math.round(report.expense[k] || 0)].map(csvCell).join(','));
             });
-            lines.push('');
-            lines.push(['入帳日', '結帳日', '單號', '收支', '科目', '品名', '售價', '成本', '金額', '經手人'].map(csvCell).join(','));
-            const pushDet = r => {
-                lines.push([
-                    r.date, r.checkoutDate || '', r.orderId, r.kind, r.subject, r.name,
-                    r.sale === '' ? '' : Math.round(Number(r.sale) || 0),
-                    r.cost === '' ? '' : Math.round(Number(r.cost) || 0),
-                    Math.round(Number(r.amount) || 0),
-                    r.person || ''
-                ].map(csvCell).join(','));
-            };
-            (report.incomeDetails || []).forEach(pushDet);
-            (report.expenseDetails || []).forEach(pushDet);
+            if (report.mode === 'year' && Array.isArray(report.monthly)) {
+                lines.push('');
+                lines.push(['月份', '純毛利', '支出', '淨利'].map(csvCell).join(','));
+                report.monthly.forEach(x => {
+                    lines.push([x.month + '月', Math.round(x.profit || 0), Math.round(x.expense || 0), Math.round(x.net || 0)].map(csvCell).join(','));
+                });
+            }
+            if (report.mode !== 'year') {
+                lines.push('');
+                lines.push(['入帳日', '結帳日', '單號', '收支', '科目', '品名', '售價', '成本', '金額', '經手人'].map(csvCell).join(','));
+                const pushDet = r => {
+                    lines.push([
+                        r.date, r.checkoutDate || '', r.orderId, r.kind, r.subject, r.name,
+                        r.sale === '' ? '' : Math.round(Number(r.sale) || 0),
+                        r.cost === '' ? '' : Math.round(Number(r.cost) || 0),
+                        Math.round(Number(r.amount) || 0),
+                        r.person || ''
+                    ].map(csvCell).join(','));
+                };
+                (report.incomeDetails || []).forEach(pushDet);
+                (report.expenseDetails || []).forEach(pushDet);
+            }
             const blob = new Blob(['\uFEFF' + lines.join('\r\n')], { type: 'text/csv;charset=utf-8;' });
             const a = document.createElement('a');
             const safe = String(report.periodLabel || 'report').replace(/[^\d\-–年月]/g, '');
