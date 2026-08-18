@@ -3784,7 +3784,50 @@
                 switchMainTab('accessory');
             }
         }
-        async function addCompanyTemplateToCart(name, cost, price) { const { value: v } = await Swal.fire({ title: name, html: `<input id="p" type="number" class="swal2-input" value="${price}" placeholder="售價"><div style="display:flex;align-items:center;justify-content:center;gap:12px;margin-top:8px"><button type="button" onclick="var el=document.getElementById('q');el.value=Math.max(1,parseInt(el.value||1)-1)" style="width:52px;height:52px;font-size:26px;border-radius:12px;background:#334155;color:white;border:none;cursor:pointer">-</button><input id="q" type="number" value="1" min="1" style="width:72px;height:52px;font-size:22px;text-align:center;background:#1e293b;color:white;border:2px solid #475569;border-radius:12px;outline:none"><button type="button" onclick="var el=document.getElementById('q');el.value=parseInt(el.value||1)+1" style="width:52px;height:52px;font-size:26px;border-radius:12px;background:#334155;color:white;border:none;cursor:pointer">+</button></div>`, background: '#1e293b', color: 'white', preConfirm: () => [document.getElementById('p').value, document.getElementById('q').value] }); if(v) { Cart.push({ type: 'accessory', category: '公司配件', name: name, price: parseInt(v[0]), cost: cost, quantity: parseInt(v[1]), itemId: 'CP-'+Date.now() }); renderCart(); } }
+        async function addCompanyTemplateToCart(name, cost, price) {
+            window._swGift = false;
+            const defPrice = Number(price) || 0;
+            const { value } = await Swal.fire({
+                title: name,
+                html: `<input id="p" type="number" class="swal2-input" value="${defPrice}" placeholder="售價"><div class="flex items-center justify-center gap-2 mt-2"><button type="button" id="sw-gift-btn" class="px-3 py-2 rounded bg-red-900/50 text-red-400 border border-red-700 text-sm">贈</button><div style="display:flex;align-items:center;justify-content:center;gap:12px"><button type="button" onclick="var el=document.getElementById('q');if(el)el.value=Math.max(1,parseInt(el.value||1)-1)" style="width:52px;height:52px;font-size:26px;border-radius:12px;background:#334155;color:white;border:none;cursor:pointer">-</button><input id="q" type="number" value="1" min="1" style="width:72px;height:52px;font-size:22px;text-align:center;background:#1e293b;color:white;border:2px solid #475569;border-radius:12px;outline:none"><button type="button" onclick="var el=document.getElementById('q');if(el)el.value=parseInt(el.value||1)+1" style="width:52px;height:52px;font-size:26px;border-radius:12px;background:#334155;color:white;border:none;cursor:pointer">+</button></div></div>`,
+                background: '#1e293b',
+                color: 'white',
+                showCancelButton: true,
+                confirmButtonText: '加入',
+                didOpen: () => {
+                    const btn = document.getElementById('sw-gift-btn');
+                    if (btn) btn.onclick = () => { window._swGift = true; Swal.clickConfirm(); };
+                },
+                preConfirm: () => {
+                    const qEl = document.getElementById('q');
+                    let q = parseInt(String(qEl && qEl.value || '1'), 10);
+                    if (isNaN(q) || q < 1) q = 1;
+                    if (window._swGift) {
+                        window._swGift = false;
+                        return [0, q, true];
+                    }
+                    const pEl = document.getElementById('p');
+                    return [pEl && pEl.value, q, false];
+                }
+            });
+            if (!value) return;
+            const isGift = !!value[2];
+            const p = isGift ? 0 : (parseInt(value[0], 10) || 0);
+            let q = parseInt(value[1], 10);
+            if (isNaN(q) || q < 1) q = 1;
+            Cart.push({
+                type: 'accessory',
+                category: '公司配件',
+                name: isGift ? (name + ' (贈)') : name,
+                price: p,
+                cost: Number(cost) || 0,
+                quantity: q,
+                itemId: 'CP-' + Date.now(),
+                originalPrice: defPrice,
+                isGift
+            });
+            renderCart();
+        }
         async function addNewCompanyTemplate() { const n = document.getElementById('new-cp-name').value.trim(); const c = document.getElementById('new-cp-cost').value; const p = document.getElementById('new-cp-price').value; if(!n || !c || !p) { Swal.fire({icon:'warning', title:'請填寫完整', toast:true, position:'top', background:'#1e293b'}); return; } try { const res = await API.addCompanyTemplate(n, c, p); if(res.status === 'success') { Swal.fire({icon:'success', title:'已新增', toast:true, position:'top', background:'#1e293b'}); document.getElementById('new-cp-name').value=''; document.getElementById('new-cp-cost').value=''; document.getElementById('new-cp-price').value=''; fetchData(); renderCompanyTemplateList(); } else { Swal.fire({icon:'error', title:'新增失敗', text: res.msg || '', background:'#1e293b'}); } } catch(e) { Swal.fire({icon:'error', title:'新增失敗', text: e.message || '請重試', background:'#1e293b'}); } }
         async function addNewAccessory(){const cat=document.getElementById('new-acc-category').value.trim();const nm=document.getElementById('new-acc-name').value.trim();if(!cat||!nm){Swal.fire({icon:'warning',title:'請填寫分類與品項名稱',toast:true,position:'top',background:'#1e293b'});return;}try{const res=await API.addAccessory(cat,nm);if(res.status==='success'){Swal.fire({icon:'success',title:'已新增 '+res.id,toast:true,background:'#1e293b'});document.getElementById('new-acc-category').value='';document.getElementById('new-acc-name').value='';fetchData();}else{Swal.fire({icon:'error',title:'新增失敗',text:res.msg||'',background:'#1e293b'});}}catch(e){Swal.fire({icon:'error',title:'新增失敗',text:e.message||'',background:'#1e293b'});}}
         function renderCompanyTemplateList(){const el=document.getElementById('company-template-list');if(!el)return;el.innerHTML='';(DB.companyTemplates||[]).forEach(t=>{el.innerHTML+='<div class="flex justify-between p-2 bg-slate-800 rounded"><span>'+t.name+'</span><button onclick="deleteCompanyTemplate(&quot;'+t.name.replace(/"/g,'&quot;')+'&quot;)" class="text-red-400"><i class="fa-solid fa-trash"></i></button></div>';});}
