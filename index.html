@@ -351,7 +351,7 @@
                 <div class="books-toolbar-period">
                     <button type="button" id="books-mode-month" onclick="setBooksMode('month')" class="pill-btn active">一個月</button>
                     <button type="button" id="books-mode-bimonth" onclick="setBooksMode('bimonth')" class="pill-btn">雙月</button>
-                    <input type="month" id="books-month" class="input-dark p-2 rounded text-sm">
+                    <input type="month" id="books-month" onchange="loadBooksReport()" class="input-dark p-2 rounded text-sm">
                     <button type="button" onclick="loadBooksReport()" class="bg-yellow-600 text-black font-bold px-3 py-2 rounded-lg text-sm">載入</button>
                 </div>
                 <div class="books-toolbar-entry">
@@ -1843,15 +1843,18 @@
             const checkout = parseLedgerDate(i.time);
             return checkout && checkout >= rangeStart && checkout <= rangeEnd;
         }
+        function booksCountedWhen(i) {
+            if (!i) return null;
+            if (isDeferredPayMethod(i.payMethod)) {
+                return parseLedgerDate(i.settledAt) || parseLedgerDate(i.time);
+            }
+            return parseLedgerDate(i.time);
+        }
         function ledgerCountsCompletedForBooks(i, rangeStart, rangeEnd) {
             if (i.status !== 'Completed') return false;
             if (isBooksOutflowType(i)) return false;
-            if (isDeferredPayMethod(i.payMethod)) {
-                const settled = parseLedgerDate(i.settledAt) || parseLedgerDate(i.time);
-                return settled && settled >= rangeStart && settled <= rangeEnd;
-            }
-            const checkout = parseLedgerDate(i.time);
-            return checkout && checkout >= rangeStart && checkout <= rangeEnd;
+            const when = booksCountedWhen(i);
+            return when && when >= rangeStart && when <= rangeEnd;
         }
         function ledgerCountsPendingPot(i, rangeStart, rangeEnd) {
             if (i.status !== 'Pending') return false;
@@ -1878,6 +1881,7 @@
             const b = document.getElementById('books-mode-bimonth');
             if (m) m.classList.toggle('active', UI.booksMode === 'month');
             if (b) b.classList.toggle('active', UI.booksMode === 'bimonth');
+            loadBooksReport();
         }
         function booksPeriodRange() {
             const ym = (document.getElementById('books-month')?.value || '').trim();
@@ -2037,12 +2041,17 @@
                 catProfit.repair -= giftAlloc.repair || 0;
                 catProfit.soft -= giftAlloc.soft || 0;
                 catProfit.other -= (giftAlloc.card || 0);
+                const countedAt = booksCountedWhen(normalized[0]) || parseLedgerDate(g.time);
+                const checkoutAt = parseLedgerDate(g.time);
+                const checkoutYmd = formatBooksYmd(checkoutAt);
+                const countedYmd = formatBooksYmd(countedAt);
                 BOOKS_PROFIT_KEYS.forEach(({ key, label }) => {
                     profit[key] += catProfit[key];
                     if (Math.abs(catProfit[key]) < 0.005 && catNames[key].length === 0) return;
                     incomeDetails.push({
-                        date: formatBooksYmd(parseLedgerDate(g.time)),
-                        ts: (parseLedgerDate(g.time) || new Date(0)).getTime(),
+                        date: countedYmd,
+                        checkoutDate: checkoutYmd,
+                        ts: (countedAt || new Date(0)).getTime(),
                         orderId: g.orderId,
                         kind: '收入',
                         subject: label + '純毛利',
@@ -2078,13 +2087,12 @@
                 return;
             }
             switchView('books');
-            setBooksMode(UI.booksMode || 'month');
             const el = document.getElementById('books-month');
             if (el && !el.value) {
                 const ymd = ymdTaipei(new Date());
                 el.value = ymd.slice(0, 7);
             }
-            loadBooksReport();
+            setBooksMode(UI.booksMode || 'month');
             updateBooksSessionBar();
         }
         async function loadBooksReport(opts) {
@@ -2111,7 +2119,7 @@
             const money = v => Math.round(Number(v) || 0).toLocaleString();
             const moneyCell = v => (v === '' || v == null) ? '' : money(v);
             const labelEl = document.getElementById('books-period-label');
-            if (labelEl) labelEl.innerText = '期間 ' + (report.periodLabel || '') + '　未結／掛帳未列入　維修料件備查不扣淨利';
+            if (labelEl) labelEl.innerText = '期間 ' + (report.periodLabel || '') + '　日期為入帳日　未結／掛帳未列入　維修料件備查不扣淨利';
             const box = document.getElementById('books-tables');
             if (!box) return;
             const sc = k => money(report.profit[k]);
@@ -2132,6 +2140,7 @@
                     const bits = [];
                     if (r.sale !== '' && r.sale != null) bits.push('售 ' + money(r.sale));
                     if (r.cost !== '' && r.cost != null) bits.push('成本 ' + money(r.cost));
+                    if (r.checkoutDate && r.checkoutDate !== r.date) bits.push('結帳 ' + r.checkoutDate);
                     if (r.orderId) bits.push(r.orderId);
                     if (r.person) bits.push(r.person);
                     if (isMemo) bits.push('不扣淨利');
@@ -2158,8 +2167,12 @@
                 `<tr><td class="mute">未入帳潛在毛利（未列入）</td><td class="num mute">${money(report.pendingPot)}</td></tr>`
             ].join('');
             const detBody = details.length
-                ? details.map(r => `<tr>
-                    <td>${booksEscape(r.date)}</td>
+                ? details.map(r => {
+                    const dateHtml = (r.checkoutDate && r.checkoutDate !== r.date)
+                        ? `${booksEscape(r.date)}<div class="text-[10px] text-slate-500">結帳 ${booksEscape(r.checkoutDate)}</div>`
+                        : booksEscape(r.date);
+                    return `<tr>
+                    <td>${dateHtml}</td>
                     <td>${booksEscape(r.orderId)}</td>
                     <td>${booksEscape(r.name)}</td>
                     <td>${booksEscape(r.memo ? r.subject + '（備查）' : r.subject)}</td>
@@ -2168,7 +2181,8 @@
                     <td class="num inc">${r.income === '' ? '' : money(r.income)}</td>
                     <td class="num ${r.memo ? 'mute' : 'exp'}">${r.outgo === '' ? '' : money(r.outgo)}</td>
                     <td>${booksEscape(r.person)}</td>
-                </tr>`).join('')
+                </tr>`;
+                }).join('')
                 : '<tr><td colspan="9" class="mute">此期間沒有已入帳資料</td></tr>';
             box.innerHTML = `
                 <div class="books-m">
@@ -2202,7 +2216,7 @@
                         <div class="flex items-center justify-between mb-2"><div class="text-xs font-bold tracking-[0.2em] text-slate-400">明細帳</div><div class="text-[11px] text-slate-500">維修料件為備查，不列入支出合計</div></div>
                         <table class="books-sheet">
                             <thead><tr>
-                                <th>日期</th><th>單號</th><th>摘要</th><th>科目</th>
+                                <th>入帳日</th><th>單號</th><th>摘要</th><th>科目</th>
                                 <th class="num">售價</th><th class="num">成本</th><th class="num">收入</th><th class="num">支出</th><th>經手人</th>
                             </tr></thead>
                             <tbody>${detBody}</tbody>
@@ -2667,10 +2681,10 @@
                 lines.push([report.periodLabel, '備查', k + '（不扣淨利）', Math.round(report.expense[k] || 0)].map(csvCell).join(','));
             });
             lines.push('');
-            lines.push(['日期', '單號', '收支', '科目', '品名', '售價', '成本', '金額', '經手人'].map(csvCell).join(','));
+            lines.push(['入帳日', '結帳日', '單號', '收支', '科目', '品名', '售價', '成本', '金額', '經手人'].map(csvCell).join(','));
             const pushDet = r => {
                 lines.push([
-                    r.date, r.orderId, r.kind, r.subject, r.name,
+                    r.date, r.checkoutDate || '', r.orderId, r.kind, r.subject, r.name,
                     r.sale === '' ? '' : Math.round(Number(r.sale) || 0),
                     r.cost === '' ? '' : Math.round(Number(r.cost) || 0),
                     Math.round(Number(r.amount) || 0),
