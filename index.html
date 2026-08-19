@@ -2080,6 +2080,8 @@
             const profitTotal = BOOKS_PROFIT_KEYS.reduce((s, x) => s + (Number(profit[x.key]) || 0), 0);
             const expenseTotal = BOOKS_EXPENSE_KEYS.reduce((s, k) => s + (Number(expense[k]) || 0), 0);
             const partsMemo = BOOKS_MEMO_KEYS.reduce((s, k) => s + (Number(expense[k]) || 0), 0);
+            const net = profitTotal - expenseTotal;
+            const netAfterMemo = net - partsMemo;
             const monthly = Array.from({ length: 12 }, (_, i) => ({ month: i + 1, profit: 0, expense: 0, net: 0 }));
             incomeRows.forEach(r => {
                 const mi = booksMonthIndex(r.date);
@@ -2099,7 +2101,9 @@
                 profitTotal,
                 expenseTotal,
                 partsMemo,
-                net: profitTotal - expenseTotal,
+                memoTotal: partsMemo,
+                net,
+                netAfterMemo,
                 pendingPot,
                 monthly,
                 incomeDetails: incomeRows,
@@ -2158,6 +2162,9 @@
                 if (k === '額外維修成本') return k + '（料錢備查）';
                 return k + '（付料備查）';
             };
+            const memoTotal = Number(report.memoTotal ?? report.partsMemo) || 0;
+            const netAfterMemo = Number(report.netAfterMemo ?? ((Number(report.net) || 0) - memoTotal));
+            const memoNetRow = `<div class="books-kv tot"><span class="lab mute">備查合計</span><span class="num mute">${money(memoTotal)}</span></div><div class="books-kv tot"><span class="lab">如扣備查本期淨利</span><span class="num net">${money(netAfterMemo)}</span></div>`;
             const mMemo = BOOKS_MEMO_KEYS.map(k => `<div class="books-kv"><span class="lab mute">${memoLabel(k)}</span><span class="num mute">${se(k)}</span></div>`).join('');
             const monthly = Array.isArray(report.monthly) ? report.monthly : Array.from({ length: 12 }, (_, i) => ({ month: i + 1, profit: 0, expense: 0, net: 0 }));
             const mMonthly = monthly.map(x => `<div class="books-kv"><span class="lab">${x.month}月</span><span class="num inc">${money(x.profit)}</span></div>`).join('');
@@ -2198,6 +2205,8 @@
                 `<tr class="tot"><td>本期淨利</td><td class="num net">${money(report.net)}</td></tr>`,
                 `<tr class="sec"><td colspan="2">備查（不扣淨利）</td></tr>`,
                 ...BOOKS_MEMO_KEYS.map(k => `<tr><td class="mute">${memoLabel(k)}</td><td class="num mute">${se(k)}</td></tr>`),
+                `<tr class="tot"><td class="mute">備查合計</td><td class="num mute">${money(memoTotal)}</td></tr>`,
+                `<tr class="tot"><td>如扣備查本期淨利</td><td class="num net">${money(netAfterMemo)}</td></tr>`,
                 `<tr><td class="mute">未入帳潛在毛利（未列入）</td><td class="num mute">${money(report.pendingPot)}</td></tr>`
             ].join('');
             const detBody = details.length
@@ -2235,6 +2244,7 @@
                     <div class="books-kv tot"><span class="lab">本期淨利</span><span class="num net">${money(report.net)}</span></div>
                     <div class="books-sec">備查　不扣淨利</div>
                     ${mMemo}
+                    ${memoNetRow}
                     <div class="books-kv"><span class="lab mute">未入帳潛在毛利</span><span class="num mute">${money(report.pendingPot)}</span></div>
                     ${isYear ? `<div class="books-kv mute"><span class="lab mute">一年不列逐筆明細，請改選一個月</span><span></span></div>` : `<div class="books-sec">明細　收購／料錢／維修料件為備查</div>${mCards}`}
                 </div>
@@ -2721,6 +2731,9 @@
             BOOKS_MEMO_KEYS.forEach(k => {
                 lines.push([report.periodLabel, '備查', k + '（不扣淨利）', Math.round(report.expense[k] || 0)].map(csvCell).join(','));
             });
+            const memoTotal = Number(report.memoTotal ?? report.partsMemo) || 0;
+            lines.push([report.periodLabel, '備查', '備查合計', Math.round(memoTotal)].map(csvCell).join(','));
+            lines.push([report.periodLabel, '彙總', '如扣備查本期淨利', Math.round(report.netAfterMemo ?? ((Number(report.net) || 0) - memoTotal))].map(csvCell).join(','));
             if (report.mode === 'year' && Array.isArray(report.monthly)) {
                 lines.push('');
                 lines.push(['月份', '純毛利', '支出', '淨利'].map(csvCell).join(','));
