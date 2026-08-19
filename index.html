@@ -2268,8 +2268,32 @@
                             <tfoot><tr class="tot"><td>全年</td><td class="num inc">${money(report.profitTotal)}</td><td class="num exp">${money(report.expenseTotal)}</td><td class="num net">${money(report.net)}</td></tr></tfoot>
                         </table>
                     </div>` : `<div>
-                        <div class="flex items-center justify-between mb-2"><div class="text-xs font-bold tracking-[0.2em] text-slate-400">明細帳</div><div class="text-[11px] text-slate-500">收購、額外維修成本、維修料件為備查，不列入支出合計</div></div>
-                        <table class="books-sheet">
+                        <div class="flex items-center justify-between mb-2">
+                            <div class="text-xs font-bold tracking-[0.2em] text-slate-400">明細帳</div>
+                            <div class="flex items-center gap-2">
+                                <select id="books-det-filter" onchange="filterBooksDetail()" style="background:#1e293b;color:#cbd5e1;border:1px solid #334155;border-radius:6px;padding:3px 8px;font-size:11px;">
+                                    <option value="">全部科目</option>
+                                    <option value="二手機純毛利">二手機</option>
+                                    <option value="新機純毛利">新機</option>
+                                    <option value="配件純毛利">配件</option>
+                                    <option value="維修純毛利">維修</option>
+                                    <option value="軟體純毛利">軟體</option>
+                                    <option value="其他純毛利">其他收入</option>
+                                    <option value="調貨配件">調貨配件</option>
+                                    <option value="薪資">薪資</option>
+                                    <option value="公司吃喝">公司吃喝</option>
+                                    <option value="公司雜支">公司雜支</option>
+                                    <option value="網卡">網卡</option>
+                                    <option value="虧損">虧損</option>
+                                    <option value="收購二手機">收購二手機（備查）</option>
+                                    <option value="收購新機">收購新機（備查）</option>
+                                    <option value="額外維修成本">額外維修成本（備查）</option>
+                                    <option value="維修料件">維修料件（備查）</option>
+                                </select>
+                                <div class="text-[11px] text-slate-500">備查不列入支出合計</div>
+                            </div>
+                        </div>
+                        <table class="books-sheet" id="books-det-table">
                             <thead><tr>
                                 <th>入帳日</th><th>單號</th><th>摘要</th><th>科目</th>
                                 <th class="num">售價</th><th class="num">成本</th><th class="num">收入</th><th class="num">支出</th><th>經手人</th>
@@ -2284,6 +2308,18 @@
                         </table>
                     </div>`}
                 </div>`;
+        }
+        function filterBooksDetail() {
+            const sel = document.getElementById('books-det-filter');
+            const tbody = document.querySelector('#books-det-table tbody');
+            if (!sel || !tbody) return;
+            const val = sel.value;
+            tbody.querySelectorAll('tr').forEach(tr => {
+                if (!val) { tr.style.display = ''; return; }
+                const subjectCell = tr.cells[3];
+                const subject = subjectCell ? subjectCell.textContent.replace('（備查）', '').trim() : '';
+                tr.style.display = subject.includes(val) ? '' : 'none';
+            });
         }
         async function submitBooksLedger(items, vendorName, entryDate, opts) {
             if (!(User && User.isAdmin)) {
