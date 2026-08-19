@@ -379,7 +379,7 @@
                     <button type="button" id="books-end-session" onclick="endBooksSession()" class="hidden px-3 py-1.5 rounded-lg bg-slate-800 border border-yellow-600 text-yellow-400 text-sm font-bold">結束登錄</button>
                 </div>
                 <span id="books-session-hint" class="text-xs text-yellow-500/90"></span>
-                <span class="books-hint text-[11px] text-slate-500">自己庫存二手機賣掉會扣庫存成本。記帳「收購」只記付了多少、不扣淨利。維修料件同樣是備查。</span>
+                <span class="books-hint text-[11px] text-slate-500">二手機成本加在庫存，賣掉才算毛利。記帳「收購／額外維修成本」只記付了多少、方便對帳，不扣淨利。</span>
             </div>
             <div id="books-period-label" class="text-xs text-slate-400 mb-2 shrink-0"></div>
             <div id="books-tables" class="flex-1 overflow-auto min-h-0"></div>
@@ -1948,8 +1948,8 @@
         function isBooksOutflowType(i) {
             return isBooksManualExpense(i) || i.type === 'restock' || i.type === 'inventory';
         }
-        const BOOKS_EXPENSE_KEYS = ['額外維修成本', '調貨配件', '網卡', '公司吃喝', '公司雜支', '薪資', '虧損', '其他支出'];
-        const BOOKS_MEMO_KEYS = ['維修料件', '收購二手機', '收購新機'];
+        const BOOKS_EXPENSE_KEYS = ['調貨配件', '網卡', '公司吃喝', '公司雜支', '薪資', '虧損', '其他支出'];
+        const BOOKS_MEMO_KEYS = ['維修料件', '收購二手機', '收購新機', '額外維修成本'];
         function isBooksMemoSubject(subj) {
             return BOOKS_MEMO_KEYS.includes(subj);
         }
@@ -2153,7 +2153,11 @@
             const nzExp = BOOKS_EXPENSE_KEYS.filter(k => Math.abs(Number(report.expense[k]) || 0) >= 0.005);
             const mProfit = BOOKS_PROFIT_KEYS.map(({ key, label }) => `<div class="books-kv"><span class="lab">${label}</span><span class="num inc">${sc(key)}</span></div>`).join('');
             const mExp = (nzExp.length ? nzExp : BOOKS_EXPENSE_KEYS).map(k => `<div class="books-kv"><span class="lab">${k}</span><span class="num exp">${se(k)}</span></div>`).join('');
-            const memoLabel = k => k.indexOf('收購') >= 0 ? (k + '（付機備查）') : (k + '（付料備查）');
+            const memoLabel = k => {
+                if (k.indexOf('收購') >= 0) return k + '（付機備查）';
+                if (k === '額外維修成本') return k + '（料錢備查）';
+                return k + '（付料備查）';
+            };
             const mMemo = BOOKS_MEMO_KEYS.map(k => `<div class="books-kv"><span class="lab mute">${memoLabel(k)}</span><span class="num mute">${se(k)}</span></div>`).join('');
             const monthly = Array.isArray(report.monthly) ? report.monthly : Array.from({ length: 12 }, (_, i) => ({ month: i + 1, profit: 0, expense: 0, net: 0 }));
             const mMonthly = monthly.map(x => `<div class="books-kv"><span class="lab">${x.month}月</span><span class="num inc">${money(x.profit)}</span></div>`).join('');
@@ -2193,7 +2197,7 @@
                 `<tr class="tot"><td>支出合計</td><td class="num exp">${money(report.expenseTotal)}</td></tr>`,
                 `<tr class="tot"><td>本期淨利</td><td class="num net">${money(report.net)}</td></tr>`,
                 `<tr class="sec"><td colspan="2">備查（不扣淨利）</td></tr>`,
-                ...BOOKS_MEMO_KEYS.map(k => `<tr><td class="mute">${k.indexOf('收購') >= 0 ? k + '（付機備查）' : k + '（付料備查）'}</td><td class="num mute">${se(k)}</td></tr>`),
+                ...BOOKS_MEMO_KEYS.map(k => `<tr><td class="mute">${memoLabel(k)}</td><td class="num mute">${se(k)}</td></tr>`),
                 `<tr><td class="mute">未入帳潛在毛利（未列入）</td><td class="num mute">${money(report.pendingPot)}</td></tr>`
             ].join('');
             const detBody = details.length
@@ -2232,7 +2236,7 @@
                     <div class="books-sec">備查　不扣淨利</div>
                     ${mMemo}
                     <div class="books-kv"><span class="lab mute">未入帳潛在毛利</span><span class="num mute">${money(report.pendingPot)}</span></div>
-                    ${isYear ? `<div class="books-kv mute"><span class="lab mute">一年不列逐筆明細，請改選一個月</span><span></span></div>` : `<div class="books-sec">明細　收購／維修料件為備查</div>${mCards}`}
+                    ${isYear ? `<div class="books-kv mute"><span class="lab mute">一年不列逐筆明細，請改選一個月</span><span></span></div>` : `<div class="books-sec">明細　收購／料錢／維修料件為備查</div>${mCards}`}
                 </div>
                 <div class="books-d">
                     <div class="mb-5">
@@ -2250,7 +2254,7 @@
                             <tfoot><tr class="tot"><td>全年</td><td class="num inc">${money(report.profitTotal)}</td><td class="num exp">${money(report.expenseTotal)}</td><td class="num net">${money(report.net)}</td></tr></tfoot>
                         </table>
                     </div>` : `<div>
-                        <div class="flex items-center justify-between mb-2"><div class="text-xs font-bold tracking-[0.2em] text-slate-400">明細帳</div><div class="text-[11px] text-slate-500">收購與維修料件為備查，不列入支出合計</div></div>
+                        <div class="flex items-center justify-between mb-2"><div class="text-xs font-bold tracking-[0.2em] text-slate-400">明細帳</div><div class="text-[11px] text-slate-500">收購、額外維修成本、維修料件為備查，不列入支出合計</div></div>
                         <table class="books-sheet">
                             <thead><tr>
                                 <th>入帳日</th><th>單號</th><th>摘要</th><th>科目</th>
@@ -2389,7 +2393,7 @@
             let html = booksDateFieldHtml();
             if (kind === 'food') html += '<input id="bk-n" class="swal2-input" placeholder="摘要（如：便當）"><input id="bk-a" type="number" class="swal2-input" placeholder="金額">';
             else if (kind === 'sim') html += '<input id="bk-n" class="swal2-input" placeholder="摘要（如：DTAC／eSIM）"><input id="bk-a" type="number" class="swal2-input" placeholder="金額">';
-            else if (kind === 'extra_repair') html += '<div style="font-size:12px;color:#94a3b8;text-align:left;padding:4px 8px 0">外修、加價等、維修單上沒算進去的錢。</div><input id="bk-n" class="swal2-input" placeholder="摘要（如：外修、加價）"><input id="bk-a" type="number" class="swal2-input" placeholder="金額">';
+            else if (kind === 'extra_repair') html += '<div style="font-size:12px;color:#94a3b8;text-align:left;padding:4px 8px 0">只記花了多少料錢／外修，方便對帳，不扣本期淨利。二手機請把這筆加進庫存成本，賣掉才算毛利。</div><input id="bk-n" class="swal2-input" placeholder="摘要（如：料錢、外修、廖）"><input id="bk-a" type="number" class="swal2-input" placeholder="金額">';
             else if (kind === 'company_misc') html += '<input id="bk-n" class="swal2-input" placeholder="摘要（如：文具、清潔）"><input id="bk-a" type="number" class="swal2-input" placeholder="金額">';
             else if (kind === 'salary') html += '<input id="bk-n" class="swal2-input" placeholder="摘要（如：抽成／薪水）"><input id="bk-a" type="number" class="swal2-input" placeholder="金額">';
             else if (kind === 'loss') html += '<input id="bk-n" class="swal2-input" placeholder="摘要（如：拆壞螢幕）"><input id="bk-a" type="number" class="swal2-input" placeholder="損失金額">';
