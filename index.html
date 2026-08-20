@@ -233,6 +233,10 @@
                         <span class="w-8 h-0.5 rounded bg-slate-600"></span><span>可上下拖曳</span><span class="w-8 h-0.5 rounded bg-slate-600"></span>
                     </div>
                     <div class="cart-footer-wrap p-2 md:p-4 bg-slate-800 border-t border-slate-700 space-y-2 md:space-y-3 pb-safe">
+                    <div id="amend-banner" class="hidden text-[11px] rounded-lg border border-cyan-700 bg-cyan-950/40 text-cyan-200 px-2 py-1.5 flex items-center justify-between gap-2">
+                        <span id="amend-banner-text">補 key 中</span>
+                        <button type="button" onclick="cancelAmendOrder()" class="shrink-0 text-cyan-300 underline">取消</button>
+                    </div>
                     <div class="grid grid-cols-2 gap-1.5 md:gap-2"><input type="text" id="cust-name" class="w-full py-1.5 md:p-2 rounded-lg input-dark text-xs md:text-sm text-center" placeholder="客戶名稱"><div class="flex items-center justify-center py-1.5 md:p-2 bg-slate-700/50 rounded-lg"><span id="staff-name" class="text-[10px] md:text-xs font-bold">--</span></div></div>
                     <div class="flex gap-1 md:gap-2 items-center text-center text-[10px] md:text-xs">
                         <div class="grid grid-cols-3 flex-1 min-w-0 gap-1 md:gap-2">
@@ -685,7 +689,7 @@
         let ItemRegistry = {};
         let OrderRegistry = {};
         let User = { name: '', isAdmin: false };
-        let UI = { tab: 'phone', sub: '', rsMode: 'inventory', rsCat: 'all', multiSelect: false, selectedPhones: new Set(), selectedAcc: new Set(), selectedPendingOrders: new Set(), pendingOrderMeta: {}, pendingOrdersByCustomer: {}, allPendingOrderIds: [], pendingTab: 'unpaid', statsCollapsed: { report: true, history: true }, categoryOrder: null, favAccessoryIds: null, posPrefsLoaded: false, booksMode: 'month', lastBooksReport: null, lastFundData: null, booksContinuous: false, booksLooping: false, lastBooksEntryYmd: null, lastBooksVendor: '', booksSessionCount: 0 };
+        let UI = { tab: 'phone', sub: '', rsMode: 'inventory', rsCat: 'all', multiSelect: false, selectedPhones: new Set(), selectedAcc: new Set(), selectedPendingOrders: new Set(), pendingOrderMeta: {}, pendingOrdersByCustomer: {}, allPendingOrderIds: [], pendingTab: 'unpaid', statsCollapsed: { report: true, history: true }, categoryOrder: null, favAccessoryIds: null, posPrefsLoaded: false, booksMode: 'month', lastBooksReport: null, lastFundData: null, booksContinuous: false, booksLooping: false, lastBooksEntryYmd: null, lastBooksVendor: '', booksSessionCount: 0, amendTarget: null };
         let cartFooterTranslateY = 0;
         const CART_FOOTER_DRAG_MAX_UP = 360;
         const CART_FOOTER_DRAG_MAX_DOWN = 0;
@@ -1772,6 +1776,7 @@
                     <div class="w-16 text-right text-xs flex flex-col items-end gap-1 shrink-0">
                         <div class="flex items-center gap-1">${statusHtml}${payBadge}</div>
                         ${g.status === 'Pending' ? `<button onclick="event.stopPropagation(); settle('${g.orderId}', ${g.total})" class="text-[10px] bg-green-900 text-green-200 px-1.5 rounded border border-green-700 hover:bg-green-800">入帳</button>` : ''}
+                        ${opts.allowAmend ? `<button onclick="event.stopPropagation(); startAmendOrder('${oidEsc}')" class="text-[10px] bg-cyan-900 text-cyan-200 px-1.5 rounded border border-cyan-700 hover:bg-cyan-800">補 key</button>` : ''}
                         <button onclick="event.stopPropagation(); confirmDeleteOrder('${g.orderId}')" class="text-[10px] bg-red-900 text-red-200 px-1.5 rounded border border-red-700 hover:bg-red-800">刪單</button>
                     </div>
                 </div>
@@ -3010,7 +3015,7 @@
                     <div id="today-expense-group" class="accordion-content">${filteredExpense.map(i => renderExpenseRow(i)).join('')}</div>
                 </div>`;
             }
-            filteredIncome.forEach(g => { html += renderOrderRow(g); });
+            filteredIncome.forEach(g => { html += renderOrderRow(g, { allowAmend: true }); });
             div.innerHTML = html;
             if (tokens.length && !html.trim()) div.innerHTML = '<div class="text-center text-slate-500 py-8">沒有符合搜尋條件的異動</div>';
             document.getElementById('today-cash').innerText = stats.cash.toLocaleString();
@@ -3953,7 +3958,7 @@
                 }
             }
         }
-        function renderServiceGrid() { setItemGridMode('grid'); document.getElementById('item-grid').innerHTML = `<div onclick="modalRepair()" class="glass p-6 rounded-xl border-l-4 border-yellow-500 flex flex-col items-center justify-center gap-2"><i class="fa-solid fa-screwdriver-wrench text-4xl text-yellow-500"></i><span class="font-bold">維修登記</span></div><div onclick="modalWrap()" class="glass p-6 rounded-xl border-l-4 border-purple-500 flex flex-col items-center justify-center gap-2"><i class="fa-solid fa-wand-magic-sparkles text-4xl text-purple-500"></i><span class="font-bold">包膜服務</span></div><div onclick="modalNewPhone()" class="glass p-6 rounded-xl border-l-4 border-green-500 flex flex-col items-center justify-center gap-2"><i class="fa-solid fa-mobile-screen text-4xl text-green-500"></i><span class="font-bold">新機</span></div><div onclick="modalPeerTransfer()" class="glass p-6 rounded-xl border-l-4 border-blue-500 flex flex-col items-center justify-center gap-2"><i class="fa-solid fa-truck-fast text-4xl text-blue-500"></i><span class="font-bold">同行調貨</span></div><div onclick="modalESIM()" class="glass p-6 rounded-xl border-l-4 border-cyan-500 flex flex-col items-center justify-center gap-2"><i class="fa-solid fa-sim-card text-4xl text-cyan-500"></i><span class="font-bold">eSIM</span></div><div onclick="modalShipping()" class="glass p-6 rounded-xl border-l-4 border-slate-400 flex flex-col items-center justify-center gap-2"><i class="fa-solid fa-truck text-4xl text-slate-400"></i><span class="font-bold">運費</span></div><div onclick="modalSoftware()" class="glass p-6 rounded-xl border-l-4 border-indigo-500 flex flex-col items-center justify-center gap-2"><i class="fa-solid fa-mobile-screen-button text-4xl text-indigo-400"></i><span class="font-bold">軟體</span></div>`; }
+        function renderServiceGrid() { setItemGridMode('grid'); document.getElementById('item-grid').innerHTML = `<div onclick="modalRepair()" class="glass p-6 rounded-xl border-l-4 border-yellow-500 flex flex-col items-center justify-center gap-2"><i class="fa-solid fa-screwdriver-wrench text-4xl text-yellow-500"></i><span class="font-bold">維修登記</span></div><div onclick="modalWrap()" class="glass p-6 rounded-xl border-l-4 border-purple-500 flex flex-col items-center justify-center gap-2"><i class="fa-solid fa-wand-magic-sparkles text-4xl text-purple-500"></i><span class="font-bold">包膜服務</span></div><div onclick="modalNewPhone()" class="glass p-6 rounded-xl border-l-4 border-green-500 flex flex-col items-center justify-center gap-2"><i class="fa-solid fa-mobile-screen text-4xl text-green-500"></i><span class="font-bold">新機</span></div><div onclick="modalPeerTransfer()" class="glass p-6 rounded-xl border-l-4 border-blue-500 flex flex-col items-center justify-center gap-2"><i class="fa-solid fa-truck-fast text-4xl text-blue-500"></i><span class="font-bold">二手機</span></div><div onclick="modalESIM()" class="glass p-6 rounded-xl border-l-4 border-cyan-500 flex flex-col items-center justify-center gap-2"><i class="fa-solid fa-sim-card text-4xl text-cyan-500"></i><span class="font-bold">eSIM</span></div><div onclick="modalShipping()" class="glass p-6 rounded-xl border-l-4 border-slate-400 flex flex-col items-center justify-center gap-2"><i class="fa-solid fa-truck text-4xl text-slate-400"></i><span class="font-bold">運費</span></div><div onclick="modalSoftware()" class="glass p-6 rounded-xl border-l-4 border-indigo-500 flex flex-col items-center justify-center gap-2"><i class="fa-solid fa-mobile-screen-button text-4xl text-indigo-400"></i><span class="font-bold">軟體</span></div>`; }
         async function addToCart(id) { const i = DB.inv.find(x => x.id == id); if(!i) return; let p = i.price, q = 1; let defPrice = i.defaultPrice > 0 ? i.defaultPrice : (i.price > 0 ? i.price : ''); if (i.type === 'accessory' || i.price === 0) { let isGift = false; const html = `<input id="sw-p" type="number" class="swal2-input" placeholder="單價" value="${defPrice}"><div class="flex items-center justify-center gap-2 mt-2"><button type="button" id="sw-gift-btn" class="px-3 py-2 rounded bg-red-900/50 text-red-400 border border-red-700 text-sm">贈</button><button type="button" id="sw-cost-btn" class="px-3 py-2 rounded bg-emerald-900/50 text-emerald-400 border border-emerald-700 text-sm">本</button><div style="display:flex;align-items:center;justify-content:center;gap:12px"><button type="button" onclick="var el=document.getElementById('sw-q');el.value=Math.max(1,parseInt(el.value||1)-1)" style="width:52px;height:52px;font-size:26px;border-radius:12px;background:#334155;color:white;border:none;cursor:pointer">-</button><input id="sw-q" type="number" value="1" min="1" style="width:72px;height:52px;font-size:22px;text-align:center;background:#1e293b;color:white;border:2px solid #475569;border-radius:12px;outline:none"><button type="button" onclick="var el=document.getElementById('sw-q');el.value=parseInt(el.value||1)+1" style="width:52px;height:52px;font-size:26px;border-radius:12px;background:#334155;color:white;border:none;cursor:pointer">+</button></div></div>`; const { value } = await Swal.fire({ title: i.name, html, background: '#1e293b', color: 'white', didOpen: () => { document.getElementById('sw-gift-btn').onclick = () => { isGift = true; Swal.clickConfirm(); }; const costBtn = document.getElementById('sw-cost-btn'); if (costBtn) costBtn.onclick = () => { const el = document.getElementById('sw-p'); if (el) { el.value = String(Number(i.cost) || 0); el.focus(); } }; }, preConfirm: () => isGift ? (function(){var _gq=parseInt(String(document.getElementById('sw-q').value||'1'),10); if(isNaN(_gq)||_gq<1)_gq=1; return [0,_gq,true];})() : [document.getElementById('sw-p').value, document.getElementById('sw-q').value, false] }); if(value===undefined) return; if(value[2]) { var _gq3=parseInt(String(value[1]),10); if(isNaN(_gq3)||_gq3<1)_gq3=1; Cart.push({ ...i, name: i.name + ' (贈)', price: 0, quantity: _gq3, itemId: i.id, originalPrice: defPrice||0, isGift: true }); } else { p = parseInt(value[0]); q = parseInt(value[1]); Cart.push({ ...i, price: p, quantity: q, itemId: i.id, originalPrice: p, isGift: false }); } } else { Cart.push({ ...i, price: p, quantity: q, itemId: i.id, originalPrice: p, isGift: false }); } renderCart(); }
         function renderCart() { 
             const c = document.getElementById('cart-items'); 
@@ -3986,31 +3991,92 @@
         function toggleGift(idx) { let item = Cart[idx]; if(item.isGift) { item.isGift = false; item.price = item.originalPrice; item.name = item.name.replace(' (贈)',''); } else { item.isGift = true; item.price = 0; item.name += ' (贈)'; } renderCart(); }
         function clearCart() { Cart=[]; renderCart(); }
         function clearRestockCart() { RestockCart=[]; renderRestockCartList(); toggleMobileCart('restock', false); }
+
+        function updateAmendBanner() {
+            const banner = document.getElementById('amend-banner');
+            const text = document.getElementById('amend-banner-text');
+            const t = UI.amendTarget;
+            const custEl = document.getElementById('cust-name');
+            const payRadios = document.querySelectorAll('input[name="pay"]');
+            const confirmBtns = document.querySelectorAll('button[onclick="confirmCheckout()"]');
+            if (!t) {
+                if (banner) banner.classList.add('hidden');
+                if (custEl) { custEl.readOnly = false; custEl.classList.remove('opacity-60'); }
+                payRadios.forEach(r => { r.disabled = false; });
+                confirmBtns.forEach(b => { b.textContent = '確認結帳'; });
+                return;
+            }
+            const payLabel = t.payMethod === 'linepay' ? 'Line Pay' : (t.payMethod === 'credit' ? '掛帳' : '現金');
+            if (text) text.textContent = `補 key → ${t.orderId}　${t.customer}　${payLabel}`;
+            if (banner) banner.classList.remove('hidden');
+            if (custEl) {
+                custEl.value = t.customer || '';
+                custEl.readOnly = true;
+                custEl.classList.add('opacity-60');
+            }
+            payRadios.forEach(r => {
+                r.checked = r.value === t.payMethod;
+                r.disabled = true;
+            });
+            confirmBtns.forEach(b => { b.textContent = '確認併入'; });
+        }
+        function cancelAmendOrder() {
+            UI.amendTarget = null;
+            updateAmendBanner();
+        }
+        function startAmendOrder(orderId) {
+            const g = OrderRegistry[orderId];
+            const salesItems = (DB.sales || []).filter(i => String(i.orderId) === String(orderId) && i.status !== 'Returned' && i.status !== 'Deleted');
+            if (!salesItems.length && !(g && g.items && g.items.length)) {
+                Swal.fire({ icon: 'warning', title: '找不到該單', background: '#1e293b', color: 'white' });
+                return;
+            }
+            const sample = salesItems[0] || (g.items && g.items[0]) || {};
+            const customer = String((g && g.customer) || sample.customer || '過路客').trim() || '過路客';
+            const payMethod = String(sample.payMethod || (g && g.payMethod) || 'cash').trim() || 'cash';
+            const todayYmd = ymdTaipei(new Date());
+            const orderDay = ymdTaipei(parseLedgerDate(sample.time || (g && g.time)));
+            if (orderDay && orderDay !== todayYmd) {
+                Swal.fire({ icon: 'warning', title: '只能補當日單', text: '此單不是今天的帳', background: '#1e293b', color: 'white' });
+                return;
+            }
+            UI.amendTarget = { orderId: String(orderId), customer, payMethod };
+            Cart = [];
+            renderCart();
+            updateAmendBanner();
+            switchView('pos');
+            toggleMobileCart('pos', true);
+            Swal.fire({ icon: 'info', title: '補 key 模式', text: `客人／付款已鎖定，結帳會併入 ${orderId}`, toast: true, position: 'top', timer: 1800, showConfirmButton: false, background: '#1e293b' });
+        }
         
         async function confirmCheckout() { 
             try {
                 if(Cart.length === 0) return;
+                const amend = UI.amendTarget;
                 const payableTotal = Cart.reduce((sum, item) => {
                     if (item.deferredPickup && item.type === 'repair') return sum;
                     return sum + (Number(item.price) || 0) * (Number(item.quantity) || 1);
                 }, 0);
                 const hasDeferred = Cart.some((item) => item.deferredPickup && item.type === 'repair');
-                const confirmText = hasDeferred
+                let confirmText = hasDeferred
                     ? (payableTotal > 0 ? `本次收款 $${payableTotal.toLocaleString()}；待取件項目取件時再收款。` : '此單為留機登記，取件時再收款。')
                     : '';
+                if (amend) {
+                    confirmText = `併入 ${amend.orderId}（${amend.customer}）${confirmText ? '　' + confirmText : ''}`;
+                }
                 const confirm = await Swal.fire({
-                    title: '確定要結帳嗎？',
+                    title: amend ? '確定補 key 併單？' : '確定要結帳嗎？',
                     text: confirmText,
                     showCancelButton: true,
-                    confirmButtonText: '確定結帳',
+                    confirmButtonText: amend ? '確定併入' : '確定結帳',
                     cancelButtonText: '取消',
                     background: '#1e293b',
                     color: 'white'
                 });
                 if (!confirm.isConfirmed) return;
-                const cust = document.getElementById('cust-name').value || '過路客'; 
-                const pay = document.querySelector('input[name="pay"]:checked').value; 
-                const oid = 'ORD' + Date.now().toString().slice(-6);
+                const cust = amend ? amend.customer : (document.getElementById('cust-name').value || '過路客');
+                const pay = amend ? amend.payMethod : document.querySelector('input[name="pay"]:checked').value;
+                const oid = amend ? amend.orderId : ('ORD' + Date.now().toString().slice(-6));
                 const markEl = document.getElementById('order-peer-mark');
                 const peerMarkChecked = !!(markEl && markEl.checked);
                 const items = Cart.map(item => {
@@ -4048,6 +4114,7 @@
                         isStockBattery: item.isStockBattery, 
                         isDirectTransfer: item.isDirectTransfer || false,  // 標記為直接調貨
                         batteryCat: item.batteryCat||'', 
+                        batteryName: item.batteryName||'',
                         category: item.category||'', 
                         dealerName: item.dealerName||'', 
                         customer: item.customer||'',
@@ -4067,6 +4134,8 @@
                     Cart = [];
                     if (peerMarkChecked) savePeerMark(oid);
                     if (markEl) markEl.checked = false;
+                    UI.amendTarget = null;
+                    updateAmendBanner();
                     renderCart(); 
                     toggleMobileCart('pos', false);
                     try { const activeBtn = document.querySelector('.pill-btn.active'); if(activeBtn) filterItems(null, activeBtn.innerText); } catch(e) {}
@@ -4230,16 +4299,98 @@
         }
         async function modalPeerTransfer(keepDealer, keepCustomer) {
             const gp = id => document.getElementById(id);
-            const html = `<input id="p1" class="swal2-input" placeholder="同行名稱" value="${(keepDealer||'').replace(/"/g,'&quot;')}"><input id="p2" class="swal2-input" type="number" placeholder="成本"><input id="p3" class="swal2-input" placeholder="IMEI"><input id="p4" class="swal2-input" type="number" placeholder="銷售金額"><input id="p5" class="swal2-input" placeholder="客戶名稱" value="${(keepCustomer||'').replace(/"/g,'&quot;')}"><input id="p6" class="swal2-input" placeholder="型號（流水用）"><input id="p7" class="swal2-input" placeholder="容量（流水用）"><input id="p8" class="swal2-input" placeholder="顏色（流水用）"><div id="p-err" class="text-red-400 text-xs mt-1 min-h-[1rem]"></div><button type="button" id="p-add-btn" class="mt-2 w-full py-2 rounded bg-slate-600 text-white text-sm">＋ 新增（加入此筆並繼續填）</button>`;
-            const addOne = (v) => {
-                const spec = [v[5],v[6],v[7]].filter(Boolean).join(' ');
-                Cart.push({type:'peer_phone',name:'同行 '+v[0]+(spec?' '+spec:''),dealerName:v[0],cost:Number(v[1]),price:Number(v[3]),imei:v[2],customer:v[4],quantity:1,itemId:'PP-'+Date.now()+'-'+Math.random().toString(36).slice(2,9)});
+            const BATTERY_CATS = ['已加工成品電池', '成品大容量電池', '原廠拆機電池0循環'];
+            const batteries = (DB.inv || []).filter(i => i.type === 'accessory' && i.category && BATTERY_CATS.includes(i.category) && Number(i.stock) > 0);
+            const batOpts = batteries.map(b => `<option value="b${b.id}">${booksEscape((b.category || '電池') + ' - ' + b.name)}（庫 ${b.stock}／本 ${Number(b.cost)||0}）</option>`).join('');
+            const html = `
+                <input id="p1" class="swal2-input" placeholder="同行名稱" value="${(keepDealer||'').replace(/"/g,'&quot;')}">
+                <input id="p2" class="swal2-input" type="number" placeholder="成本">
+                <input id="p3" class="swal2-input" placeholder="IMEI">
+                <input id="p4" class="swal2-input" type="number" placeholder="銷售金額">
+                <input id="p5" class="swal2-input" placeholder="客戶名稱" value="${(keepCustomer||'').replace(/"/g,'&quot;')}">
+                <input id="p6" class="swal2-input" placeholder="型號（流水用）">
+                <input id="p7" class="swal2-input" placeholder="容量（流水用）">
+                <input id="p8" class="swal2-input" placeholder="顏色（流水用）">
+                <div class="text-left px-2 mt-3 mb-1 text-xs text-slate-400 border-t border-slate-700 pt-2">維修／換電池（成本扣在這台二手機利潤）</div>
+                <div class="flex gap-2 px-2 mb-1 text-xs">
+                    <label class="flex items-center gap-1 text-slate-300"><input type="radio" name="p-fix" value="none" checked class="accent-blue-500">無</label>
+                    <label class="flex items-center gap-1 text-slate-300"><input type="radio" name="p-fix" value="stock" class="accent-blue-500">庫存電池</label>
+                    <label class="flex items-center gap-1 text-slate-300"><input type="radio" name="p-fix" value="manual" class="accent-blue-500">手填外修</label>
+                </div>
+                <div id="p-stock-box" class="hidden px-1">
+                    <select id="p-bat" class="swal2-select" style="width:100%"><option value="">選擇庫存電池</option>${batOpts}</select>
+                </div>
+                <div id="p-manual-box" class="hidden">
+                    <input id="p-rn" class="swal2-input" placeholder="外修摘要（如：換電池／廖）">
+                    <input id="p-rc" class="swal2-input" type="number" placeholder="外修成本">
+                </div>
+                <div id="p-repair-price-row" class="hidden flex items-center gap-2 px-1 mt-1">
+                    <input id="p-rp" class="swal2-input !my-0 flex-1" type="number" placeholder="維修售價（另加價；含在機價則按贈）">
+                    <button type="button" id="p-rgift" class="shrink-0 px-3 py-2 rounded bg-red-900/50 text-red-400 border border-red-700 text-sm">贈</button>
+                </div>
+                <div id="p-err" class="text-red-400 text-xs mt-1 min-h-[1rem]"></div>
+                <button type="button" id="p-add-btn" class="mt-2 w-full py-2 rounded bg-slate-600 text-white text-sm">＋ 新增（加入此筆並繼續填）</button>`;
+            const syncRepairUI = () => {
+                const mode = (document.querySelector('input[name="p-fix"]:checked') || {}).value || 'none';
+                const stockBox = gp('p-stock-box');
+                const manBox = gp('p-manual-box');
+                const priceRow = gp('p-repair-price-row');
+                if (stockBox) stockBox.classList.toggle('hidden', mode !== 'stock');
+                if (manBox) manBox.classList.toggle('hidden', mode !== 'manual');
+                if (priceRow) priceRow.classList.toggle('hidden', mode === 'none');
+            };
+            const readRepair = () => {
+                const mode = (document.querySelector('input[name="p-fix"]:checked') || {}).value || 'none';
+                if (mode === 'none') return { mode, label: '', cost: 0, sale: 0, isGift: false, isStockBattery: false, batteryCat: '', batteryName: '' };
+                const rawSale = gp('p-rp')?.value;
+                const sale = (rawSale === '' || rawSale == null) ? 0 : (parseInt(rawSale, 10) || 0);
+                const isGift = sale === 0;
+                if (mode === 'stock') {
+                    const bid = gp('p-bat')?.value || '';
+                    const item = batteries.find(b => 'b' + b.id === bid);
+                    if (!item) return { error: '請選擇庫存電池' };
+                    return {
+                        mode, label: item.name || '庫存電池', cost: Number(item.cost) || 0, sale, isGift,
+                        isStockBattery: true, batteryCat: item.category || '電池', batteryName: item.name || ''
+                    };
+                }
+                const label = (gp('p-rn')?.value || '').trim();
+                const cost = parseInt(gp('p-rc')?.value, 10);
+                if (!label) return { error: '請填外修摘要' };
+                if (!cost || cost <= 0) return { error: '請填外修成本' };
+                return { mode, label, cost, sale, isGift, isStockBattery: false, batteryCat: '', batteryName: '' };
+            };
+            const addOne = (v, repair) => {
+                const spec = [v[5], v[6], v[7]].filter(Boolean).join(' ');
+                let name = '同行 ' + v[0] + (spec ? ' ' + spec : '');
+                const phoneCost = Number(v[1]) || 0;
+                const phoneSale = Number(v[3]) || 0;
+                let repairCost = 0, repairSale = 0;
+                if (repair && repair.mode !== 'none') {
+                    name += ' +' + repair.label + (repair.isGift ? '(贈)' : '');
+                    repairCost = Number(repair.cost) || 0;
+                    repairSale = Number(repair.sale) || 0;
+                }
+                Cart.push({
+                    type: 'peer_phone',
+                    name,
+                    dealerName: v[0],
+                    cost: phoneCost + repairCost,
+                    price: phoneSale + repairSale,
+                    imei: v[2],
+                    customer: v[4],
+                    quantity: 1,
+                    itemId: 'PP-' + Date.now() + '-' + Math.random().toString(36).slice(2, 9),
+                    isStockBattery: !!(repair && repair.isStockBattery),
+                    batteryCat: (repair && repair.batteryCat) || '',
+                    batteryName: (repair && repair.batteryName) || ''
+                });
                 applyFormCustomerToCheckout(v[4]);
                 renderCart();
             };
             const getV = () => [gp('p1'),gp('p2'),gp('p3'),gp('p4'),gp('p5'),gp('p6'),gp('p7'),gp('p8')].map(el=>el?el.value:'').map(s=>typeof s==='string'?s.trim():'');
-            const { value: v } = await Swal.fire({
-                title: '同行調貨',
+            const { value: packed } = await Swal.fire({
+                title: '二手機',
                 html,
                 background: '#1e293b',
                 color: 'white',
@@ -4247,18 +4398,39 @@
                 confirmButtonText: 'OK',
                 cancelButtonText: '取消',
                 didOpen: () => {
+                    document.querySelectorAll('input[name="p-fix"]').forEach(el => { el.onchange = syncRepairUI; });
+                    syncRepairUI();
+                    const giftBtn = gp('p-rgift');
+                    if (giftBtn) giftBtn.onclick = () => { const el = gp('p-rp'); if (el) el.value = '0'; };
                     gp('p-add-btn').onclick = () => {
                         const vals = getV();
+                        const repair = readRepair();
+                        if (repair.error) { if (gp('p-err')) gp('p-err').textContent = repair.error; return; }
                         if (vals[0] && vals[1] && vals[4]) {
-                            addOne(vals);
+                            addOne(vals, repair);
                             if (gp('p-err')) gp('p-err').textContent = '已加入';
                             gp('p2').value = ''; gp('p3').value = ''; gp('p4').value = ''; gp('p6').value = ''; gp('p7').value = ''; gp('p8').value = '';
+                            if (gp('p-rn')) gp('p-rn').value = '';
+                            if (gp('p-rc')) gp('p-rc').value = '';
+                            if (gp('p-rp')) gp('p-rp').value = '';
+                            if (gp('p-bat')) gp('p-bat').value = '';
+                            const noneRadio = document.querySelector('input[name="p-fix"][value="none"]');
+                            if (noneRadio) { noneRadio.checked = true; syncRepairUI(); }
                         } else { if (gp('p-err')) gp('p-err').textContent = '請填寫同行名稱、成本、客戶名稱'; }
                     };
                 },
-                preConfirm: () => getV()
+                preConfirm: () => {
+                    const vals = getV();
+                    const repair = readRepair();
+                    if (repair.error) { Swal.showValidationMessage(repair.error); return false; }
+                    if (!(vals[0] && vals[1] && vals[4])) {
+                        Swal.showValidationMessage('請填寫同行名稱、成本、客戶名稱');
+                        return false;
+                    }
+                    return { vals, repair };
+                }
             });
-            if (v && v[0] && v[1] && v[4]) { addOne(v); }
+            if (packed && packed.vals) addOne(packed.vals, packed.repair);
         }
         /** 表單客戶有填就覆寫結帳區（A：不論結帳區是否已有名稱） */
         function applyFormCustomerToCheckout(name) {
@@ -4558,13 +4730,16 @@
             if (!rows.length) return;
             const rowsHTML = rows.map((r, idx) => {
                 const costHint = r.cost > 0 ? `<span class="text-slate-500 text-[10px] ml-1">本 ${Number(r.cost).toLocaleString()}</span>` : '';
+                const stockHint = (r.kind === 'inv' && r.item && Number(r.item.stock) > 0)
+                    ? `<span class="text-slate-500 text-[10px] ml-1">庫 ${Number(r.item.stock)}</span>` : '';
                 return `<div class="flex items-center gap-2 py-1.5 border-b border-slate-700 text-left">
-                    <div class="flex-1 min-w-0 text-sm text-slate-300 truncate">${booksEscape(r.name)}${costHint}</div>
+                    <div class="flex-1 min-w-0 text-sm text-slate-300 truncate">${booksEscape(r.name)}${costHint}${stockHint}</div>
                     <button type="button" class="text-xs px-2 py-1 rounded bg-red-900/50 text-red-400 border border-red-700 shrink-0" onclick="var el=document.getElementById('multi-acc-price-${idx}');if(el)el.value='0'">贈</button>
-                    <input id="multi-acc-price-${idx}" type="number" class="swal2-input !my-0 !w-20 !text-sm" placeholder="售價" value="${r.defPrice}">
+                    <input id="multi-acc-price-${idx}" type="number" class="swal2-input !my-0 !w-16 !text-sm" placeholder="售價" value="${r.defPrice}">
+                    <input id="multi-acc-qty-${idx}" type="number" min="1" class="swal2-input !my-0 !w-14 !text-sm" placeholder="量" value="1">
                 </div>`;
             }).join('');
-            const { value: prices } = await Swal.fire({
+            const { value: packed } = await Swal.fire({
                 title: `共 ${rows.length} 件配件`,
                 html: `<div class="flex gap-2 mb-2">
                         <button type="button" id="multi-acc-all-gift" class="flex-1 text-xs py-2 rounded bg-red-900/50 text-red-400 border border-red-700">全部贈</button>
@@ -4595,19 +4770,26 @@
                     };
                 },
                 preConfirm: () => {
-                    const vals = rows.map((_, idx) => {
+                    const vals = rows.map((r, idx) => {
                         const raw = document.getElementById('multi-acc-price-' + idx)?.value;
                         if (raw === '' || raw == null) return null;
                         const n = parseInt(raw, 10);
-                        return isNaN(n) ? null : n;
+                        let q = parseInt(document.getElementById('multi-acc-qty-' + idx)?.value, 10);
+                        if (isNaN(q) || q < 1) q = 1;
+                        if (r.kind === 'inv' && r.item && Number(r.item.stock) > 0 && q > Number(r.item.stock)) {
+                            Swal.showValidationMessage(`${r.name} 庫存不足（庫 ${r.item.stock}）`);
+                            return null;
+                        }
+                        return isNaN(n) ? null : { price: n, qty: q };
                     });
-                    if (vals.some(v => v == null || v < 0)) { Swal.showValidationMessage('每件請填售價，贈品填 0'); return false; }
+                    if (vals.some(v => !v || v.price == null || v.price < 0)) { Swal.showValidationMessage('每件請填售價與數量，贈品售價填 0'); return false; }
                     return vals;
                 }
             });
-            if (!prices) return;
+            if (!packed) return;
             rows.forEach((r, idx) => {
-                const p = prices[idx];
+                const p = packed[idx].price;
+                const q = packed[idx].qty;
                 const isGift = p === 0;
                 if (r.kind === 'tpl') {
                     Cart.push({
@@ -4616,7 +4798,7 @@
                         name: isGift ? (r.name + ' (贈)') : r.name,
                         price: p,
                         cost: r.cost,
-                        quantity: 1,
+                        quantity: q,
                         itemId: 'CP-' + Date.now() + '-' + idx,
                         originalPrice: Number(r.defPrice) || p,
                         isGift
@@ -4628,7 +4810,7 @@
                     ...i,
                     name: isGift ? (i.name + ' (贈)') : i.name,
                     price: p,
-                    quantity: 1,
+                    quantity: q,
                     itemId: i.id,
                     originalPrice: Number(r.defPrice) || p,
                     isGift
