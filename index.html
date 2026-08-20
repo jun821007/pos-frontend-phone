@@ -144,7 +144,20 @@
             #cart-panel.mobile-cart-open #cart-footer-draggable {
                 transform: translateY(-170px);
             }
+            #cart-panel.mobile-cart-open.is-amending #cart-footer-draggable {
+                transform: translateY(-230px);
+            }
         }
+        /* 桌機右邊結帳：補 key 時 footer 往上，避免確認鈕被擋 */
+        @media (min-width: 768px) {
+            #cart-panel.is-amending #cart-footer-draggable {
+                transform: translateY(-28px);
+            }
+            #cart-panel.is-amending .cart-footer-wrap {
+                padding-bottom: 0.5rem;
+            }
+        }
+        #amend-banner { line-height: 1.25; }
         /* 手機版：總金額與確認結帳同一行，省高度讓按鈕一定露出 */
         @media (max-width: 767px) {
             #cart-panel .cart-footer-wrap .cart-total-row-mobile { gap: 10px; }
@@ -233,8 +246,8 @@
                         <span class="w-8 h-0.5 rounded bg-slate-600"></span><span>可上下拖曳</span><span class="w-8 h-0.5 rounded bg-slate-600"></span>
                     </div>
                     <div class="cart-footer-wrap p-2 md:p-4 bg-slate-800 border-t border-slate-700 space-y-2 md:space-y-3 pb-safe">
-                    <div id="amend-banner" class="hidden text-[11px] rounded-lg border border-cyan-700 bg-cyan-950/40 text-cyan-200 px-2 py-1.5 flex items-center justify-between gap-2">
-                        <span id="amend-banner-text">補 key 中</span>
+                    <div id="amend-banner" class="hidden text-[11px] rounded-lg border border-cyan-700 bg-cyan-950/40 text-cyan-200 px-2 py-1 flex items-center justify-between gap-2">
+                        <span id="amend-banner-text" class="truncate min-w-0">補 key 中</span>
                         <button type="button" onclick="cancelAmendOrder()" class="shrink-0 text-cyan-300 underline">取消</button>
                     </div>
                     <div class="grid grid-cols-2 gap-1.5 md:gap-2"><input type="text" id="cust-name" class="w-full py-1.5 md:p-2 rounded-lg input-dark text-xs md:text-sm text-center" placeholder="客戶名稱"><div class="flex items-center justify-center py-1.5 md:p-2 bg-slate-700/50 rounded-lg"><span id="staff-name" class="text-[10px] md:text-xs font-bold">--</span></div></div>
