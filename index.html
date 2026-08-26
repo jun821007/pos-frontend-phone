@@ -2198,7 +2198,7 @@
             const details = [
                 ...(report.incomeDetails || []).map(r => ({ ...r, income: r.amount, outgo: '', memo: false })),
                 ...(report.expenseDetails || []).map(r => ({ ...r, income: '', outgo: r.amount, memo: !!r.memo }))
-            ].sort((a, b) => (a.ts || 0) - (b.ts || 0) || String(a.orderId || '').localeCompare(String(b.orderId || '')));
+            ].sort((a, b) => (b.ts || 0) - (a.ts || 0) || String(b.orderId || '').localeCompare(String(a.orderId || '')));
             const mCards = details.length
                 ? details.map(r => {
                     const isMemo = !!r.memo;
