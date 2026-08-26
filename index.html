@@ -397,7 +397,7 @@
                     <button type="button" id="books-end-session" onclick="endBooksSession()" class="hidden px-3 py-1.5 rounded-lg bg-slate-800 border border-yellow-600 text-yellow-400 text-sm font-bold">結束登錄</button>
                 </div>
                 <span id="books-session-hint" class="text-xs text-yellow-500/90"></span>
-                <span class="books-hint text-[11px] text-slate-500">二手機成本加在庫存，賣掉才算毛利。記帳「收購／額外維修成本」只記付了多少、方便對帳，不扣淨利。</span>
+                <span class="books-hint text-[11px] text-slate-500">二手機／配件成本加在庫存，賣掉才算毛利。進貨與記帳「收購／額外維修成本」只記付了多少（備查），不扣淨利。</span>
             </div>
             <div id="books-period-label" class="text-xs text-slate-400 mb-2 shrink-0"></div>
             <div id="books-tables" class="flex-1 overflow-auto min-h-0"></div>
@@ -1954,6 +1954,7 @@
             if (t === 'salary' || /薪資|抽成/.test(name)) return '薪資';
             if (t === 'repair_parts' || /維修料件/.test(name)) return '維修料件';
             if (t === 'transfer_acc' || /調貨配件/.test(name)) return '調貨配件';
+            if (t === 'restock' || /\[配件進貨\]/.test(name)) return '配件進貨';
             if (t === 'loss' || /虧損/.test(name)) return '虧損';
             if (t === 'net_card' || /\[網卡\]/.test(name)) return '網卡';
             if (t === 'extra_repair' || /額外維修成本/.test(name)) return '額外維修成本';
@@ -1963,14 +1964,14 @@
             return '其他支出';
         }
         function isBooksManualExpense(i) {
-            return ['expense', 'company_food', 'company_misc', 'ship_exp', 'net_card', 'extra_repair', 'salary', 'loss', 'buy_used', 'buy_new', 'repair_parts', 'transfer_acc'].includes(i.type);
+            return ['expense', 'company_food', 'company_misc', 'ship_exp', 'net_card', 'extra_repair', 'salary', 'loss', 'buy_used', 'buy_new', 'repair_parts', 'transfer_acc', 'restock'].includes(i.type);
         }
         function isBooksOutflowType(i) {
-            return isBooksManualExpense(i) || i.type === 'restock' || i.type === 'inventory';
+            return isBooksManualExpense(i) || i.type === 'inventory';
         }
         const BOOKS_EXPENSE_KEYS = ['調貨配件', '網卡', '公司吃喝', '公司雜支', '運費', '薪資', '虧損', '其他支出'];
-        const BOOKS_MEMO_KEYS = ['維修料件', '收購二手機', '收購新機', '額外維修成本'];
-        const BOOKS_MEMO_DEDUCT_KEYS = ['收購二手機', '收購新機', '額外維修成本']; // 這三項才算進「如扣備查本期淨利」
+        const BOOKS_MEMO_KEYS = ['維修料件', '收購二手機', '收購新機', '額外維修成本', '配件進貨'];
+        const BOOKS_MEMO_DEDUCT_KEYS = ['收購二手機', '收購新機', '額外維修成本', '配件進貨']; // 如扣備查：付機／料錢／進貨現金
         function isBooksMemoSubject(subj) {
             return BOOKS_MEMO_KEYS.includes(subj);
         }
@@ -2004,7 +2005,7 @@
         }
         function buildBooksReport(rows, rangeStart, rangeEnd, periodLabel) {
             const profit = emptyBooksProfit();
-            const expense = { '維修料件': 0, '額外維修成本': 0, '調貨配件': 0, '收購二手機': 0, '收購新機': 0, '網卡': 0, '公司吃喝': 0, '公司雜支': 0, '運費': 0, '薪資': 0, '虧損': 0, '其他支出': 0 };
+            const expense = { '維修料件': 0, '額外維修成本': 0, '調貨配件': 0, '收購二手機': 0, '收購新機': 0, '配件進貨': 0, '網卡': 0, '公司吃喝': 0, '公司雜支': 0, '運費': 0, '薪資': 0, '虧損': 0, '其他支出': 0 };
             const incomeDetails = [];
             const expenseDetails = [];
             let pendingPot = 0;
@@ -2183,12 +2184,13 @@
             const memoLabel = k => {
                 if (k.indexOf('收購') >= 0) return k + '（付機備查）';
                 if (k === '額外維修成本') return k + '（料錢備查）';
+                if (k === '配件進貨') return k + '（進貨備查）';
                 return k + '（付料備查）';
             };
             const memoTotal = Number(report.memoTotal ?? report.partsMemo) || 0;
             const memoDeduct = Number(report.memoDeduct ?? memoTotal) || 0;
             const netAfterMemo = Number(report.netAfterMemo ?? ((Number(report.net) || 0) - memoDeduct));
-            const memoNetRow = `<div class="books-kv tot"><span class="lab mute">備查合計</span><span class="num mute">${money(memoTotal)}</span></div><div class="books-kv tot"><span class="lab">如扣備查本期淨利<span class="text-[10px] text-slate-500">（含收購、料錢）</span></span><span class="num net">${money(netAfterMemo)}</span></div>`;
+            const memoNetRow = `<div class="books-kv tot"><span class="lab mute">備查合計</span><span class="num mute">${money(memoTotal)}</span></div><div class="books-kv tot"><span class="lab">如扣備查本期淨利<span class="text-[10px] text-slate-500">（含收購、料錢、進貨）</span></span><span class="num net">${money(netAfterMemo)}</span></div>`;
             const mMemo = BOOKS_MEMO_KEYS.map(k => `<div class="books-kv"><span class="lab mute">${memoLabel(k)}</span><span class="num mute">${se(k)}</span></div>`).join('');
             const monthly = Array.isArray(report.monthly) ? report.monthly : Array.from({ length: 12 }, (_, i) => ({ month: i + 1, profit: 0, expense: 0, net: 0 }));
             const mMonthly = monthly.map(x => `<div class="books-kv"><span class="lab">${x.month}月</span><span class="num inc">${money(x.profit)}</span></div>`).join('');
@@ -2230,7 +2232,7 @@
                 `<tr class="sec"><td colspan="2">備查（不扣淨利）</td></tr>`,
                 ...BOOKS_MEMO_KEYS.map(k => `<tr><td class="mute">${memoLabel(k)}</td><td class="num mute">${se(k)}</td></tr>`),
                 `<tr class="tot"><td class="mute">備查合計</td><td class="num mute">${money(memoTotal)}</td></tr>`,
-                `<tr class="tot"><td>如扣備查本期淨利（含收購、料錢）</td><td class="num net">${money(netAfterMemo)}</td></tr>`,
+                `<tr class="tot"><td>如扣備查本期淨利（含收購、料錢、進貨）</td><td class="num net">${money(netAfterMemo)}</td></tr>`,
                 `<tr><td class="mute">未入帳潛在毛利（未列入）</td><td class="num mute">${money(report.pendingPot)}</td></tr>`
             ].join('');
             const detBody = details.length
@@ -2310,6 +2312,7 @@
                                     <option value="收購新機">收購新機（備查）</option>
                                     <option value="額外維修成本">額外維修成本（備查）</option>
                                     <option value="維修料件">維修料件（備查）</option>
+                                    <option value="配件進貨">配件進貨（備查）</option>
                                 </select>
                                 <div class="text-[11px] text-slate-500">備查不列入支出合計</div>
                             </div>
@@ -2797,7 +2800,7 @@
             const memoTotal = Number(report.memoTotal ?? report.partsMemo) || 0;
             const memoDeduct = Number(report.memoDeduct ?? memoTotal) || 0;
             lines.push([report.periodLabel, '備查', '備查合計', Math.round(memoTotal)].map(csvCell).join(','));
-            lines.push([report.periodLabel, '彙總', '如扣備查本期淨利（含收購、料錢）', Math.round(report.netAfterMemo ?? ((Number(report.net) || 0) - memoDeduct))].map(csvCell).join(','));
+            lines.push([report.periodLabel, '彙總', '如扣備查本期淨利（含收購、料錢、進貨）', Math.round(report.netAfterMemo ?? ((Number(report.net) || 0) - memoDeduct))].map(csvCell).join(','));
             if (report.mode === 'year' && Array.isArray(report.monthly)) {
                 lines.push('');
                 lines.push(['月份', '純毛利', '支出', '淨利'].map(csvCell).join(','));
@@ -4265,7 +4268,7 @@
 
         async function submitRestock() { 
             if(RestockCart.length===0) return; 
-            const confirm = await Swal.fire({ title: '確定要送出進貨清單？', text: '送出後無法撤回。進貨只入庫，不會進帳目支出。', showCancelButton: true, confirmButtonText: '確定送出', cancelButtonText: '取消', background: '#1e293b', color: 'white' });
+            const confirm = await Swal.fire({ title: '確定要送出進貨清單？', text: '送出後無法撤回。會入庫，並記「配件進貨」備查（不扣淨利，賣出才算成本）。', showCancelButton: true, confirmButtonText: '確定送出', cancelButtonText: '取消', background: '#1e293b', color: 'white' });
             if (!confirm.isConfirmed) return;
             const btn = document.getElementById('btn-submit-restock');
             if(btn){ btn.disabled=true; btn.textContent='送出中...'; }
