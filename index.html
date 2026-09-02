@@ -4552,9 +4552,10 @@
                     } 
                 });
                 if (v && v[0] && v[5]) { 
+                    const repairIssue = String(v[2] || '').trim();
                     Cart.push({ 
                         type: 'repair', 
-                        name: '維修:庫存電池 ' + item.name, 
+                        name: '維修:庫存電池 ' + item.name + (repairIssue ? '｜' + repairIssue : ''), 
                         modelName: v[0] || '',           // 型號
                         imei: v[1] || '',                // 序號（IMEI）
                         reason: v[2] || '',              // 更換物品（故障原因）
@@ -4605,9 +4606,10 @@
                     } 
                 });
                 if (v && v[0] && v[6]) { 
+                    const repairIssue = String(v[2] || '').trim();
                     Cart.push({ 
                         type: 'repair', 
-                        name: '維修:' + v[0], 
+                        name: '維修:' + v[0] + (repairIssue ? '｜' + repairIssue : ''), 
                         modelName: v[0], 
                         imei: v[1] || '',           // 序號（IMEI）
                         reason: v[2] || '',         // 更換物品（故障原因）
