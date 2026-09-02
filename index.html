@@ -801,6 +801,34 @@
 
         function loadBlacklist() { try { const s = localStorage.getItem('pos_blacklist_v32'); if (s) BlackList = JSON.parse(s); } catch(e) { console.error('Load blacklist fail', e); } }
         function saveBlacklist() { localStorage.setItem('pos_blacklist_v32', JSON.stringify(BlackList)); }
+        function blacklistItemKey(orderId, itemId) {
+            return String(orderId) + '_' + String(itemId);
+        }
+        function clearBlacklistForOrderItems(orderId, itemIds) {
+            const oid = String(orderId);
+            const ids = new Set((itemIds || []).map((x) => String(x)));
+            const before = BlackList.items.length;
+            BlackList.items = BlackList.items.filter((k) => {
+                const idx = String(k).indexOf('_');
+                if (idx < 0) return true;
+                const o = String(k).slice(0, idx);
+                const iid = String(k).slice(idx + 1);
+                return !(o === oid && ids.has(iid));
+            });
+            if (BlackList.items.length !== before) saveBlacklist();
+        }
+        /** 伺服器已恢復為有效品項時，清掉本機退貨黑名單（補 key 併入後常見） */
+        function pruneBlacklistFromLedger() {
+            const activeKeys = new Set();
+            (DB.sales || []).concat(DB.history || []).forEach((i) => {
+                const st = String(i.status || '');
+                if (st === 'Returned' || st === 'Deleted') return;
+                if (i.orderId != null && i.itemId != null) activeKeys.add(blacklistItemKey(i.orderId, i.itemId));
+            });
+            const before = BlackList.items.length;
+            BlackList.items = BlackList.items.filter((k) => !activeKeys.has(String(k)));
+            if (BlackList.items.length !== before) saveBlacklist();
+        }
 
         async function doLogin() { 
             const u = document.getElementById('login-user').value.trim(); 
@@ -903,6 +931,7 @@
                 }
                 DB.inv = d.inventory || []; 
                 DB.sales = d.todaySales || []; 
+                pruneBlacklistFromLedger();
                 DB.companyTemplates = d.companyTemplates || []; 
                 await loadPosPrefs();
                 console.log('庫存資料筆數:', DB.inv.length);
@@ -2993,6 +3022,7 @@
         }
         const REPAIR_EXTRA_HTML = '<textarea id="r-notes" class="swal2-textarea" placeholder="備註（選填）" rows="2"></textarea><label class="block text-left text-xs text-slate-300 mt-2 px-2"><input type="checkbox" id="r-deferred" class="mr-1 accent-yellow-500">客戶尚未取件（留機，取件時收款）</label><label class="block text-left text-xs text-slate-400 mt-2 mb-1 px-2">圖（最多6張）<span id="r-photo-count" class="float-right text-yellow-500/80">0 / 6</span></label><div id="r-photo-paste" tabindex="0" class="swal2-input text-sm min-h-[48px] flex items-center justify-center text-center text-slate-400 cursor-pointer outline-none focus:border-yellow-500 mx-2">點此貼上圖片</div><div id="r-photo-preview" class="px-2 flex flex-wrap min-h-[8px]"></div><div class="px-2 flex gap-2 mb-1"><button type="button" id="r-pick-album" class="flex-1 py-2 rounded-lg bg-slate-700 text-white text-sm border border-slate-600">相簿</button><button type="button" id="r-pick-camera" class="flex-1 py-2 rounded-lg bg-slate-700 text-white text-sm border border-slate-600">拍照</button></div><input id="r-photos" type="file" accept="image/*" multiple class="hidden"><input id="r-photos-cam" type="file" accept="image/*" capture="environment" class="hidden">';
         function renderReport() {
+            pruneBlacklistFromLedger();
             let stats = { cash:0, pending:0, profit:0, pot:0, exp:0, gift:0 };
             const div = document.getElementById('today-list');
             const searchEl = document.getElementById('report-search');
@@ -3282,6 +3312,7 @@
                 const res = await API.getHistory(s, e);
                 Swal.close(); 
                 DB.history = res || [];
+                pruneBlacklistFromLedger();
                 renderHistoryList(); 
             } catch(err) {
                 Swal.close();
@@ -3290,6 +3321,7 @@
             }
         }
         function renderHistoryList() {
+            pruneBlacklistFromLedger();
             const div = document.getElementById('history-list');
             const searchEl = document.getElementById('history-search');
             const tokens = ledgerFilterTokens(searchEl ? searchEl.value : '');
@@ -4372,6 +4404,7 @@
                     Swal.update({ html: amend ? '寫入成功，正在併入原單...' : '寫入成功，正在載入帳務...' });
                     try {
                         if (amend) {
+                            clearBlacklistForOrderItems(mergedOrderId, items.map(it => it.itemId));
                             const ok = await reloadTodaySalesWithRetry(mergedOrderId, items.map(it => it.itemId));
                             await refreshLedgerAfterCheckout();
                             await fetchData();
