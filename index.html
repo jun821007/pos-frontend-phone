@@ -1736,19 +1736,28 @@
                 const iidEsc = String(it.itemId || '').replace(/\\/g, '\\\\').replace(/'/g, "\\'");
                 const isIncludedLine = it.type === 'phone' && Number(it.salePrice) === 0 && (it.itemName || '').includes(' + ');
                 const saleNum = Number(it.salePrice) || 0;
+                const isPendingGift = !isIncludedLine && (saleNum === 0 && safeCost > 0 || /\(贈\)/.test(String(it.itemName || it.name || '')));
                 const priceHtml = isIncludedLine
                     ? '<span class="text-slate-500 text-[10px]">含於上筆</span>'
                     : editablePending
-                        ? `<button type="button" onclick="event.stopPropagation(); editPendingItemAmount('${oidEsc}', '${iidEsc}', ${saleNum}, ${safeCost})" class="text-yellow-500 hover:text-yellow-300 underline decoration-dotted decoration-yellow-600/50" title="點擊修改金額">$${saleNum.toLocaleString()}</button>`
-                        : `$${saleNum.toLocaleString()}`;
-                const priceCls = isIncludedLine ? 'text-slate-500 text-[10px]' : 'text-yellow-500';
+                        ? `<button type="button" onclick="event.stopPropagation(); editPendingItemAmount('${oidEsc}', '${iidEsc}', ${saleNum}, ${safeCost})" class="text-yellow-500 hover:text-yellow-300 underline decoration-dotted decoration-yellow-600/50" title="點擊修改金額">${isPendingGift ? '<span class="text-red-400">贈</span>' : '$' + saleNum.toLocaleString()}</button>`
+                        : (isPendingGift ? '<span class="text-red-400">贈</span>' : `$${saleNum.toLocaleString()}`);
+                const giftBtnHtml = editablePending && !isIncludedLine
+                    ? `<button type="button" onclick="event.stopPropagation(); togglePendingItemGift('${oidEsc}', '${iidEsc}', ${isPendingGift}, ${saleNum}, ${safeCost})" class="text-xs border px-1 rounded shrink-0 ${isPendingGift ? 'text-red-400 border-red-400' : 'text-slate-500 border-slate-600'}" title="${isPendingGift ? '改為收費' : '改為贈品'}">贈</button>`
+                    : '';
+                const priceColHtml = isIncludedLine
+                    ? priceHtml
+                    : editablePending
+                        ? `<div class="flex items-center justify-end gap-1">${giftBtnHtml}${priceHtml}</div>`
+                        : priceHtml;
+                const priceCls = isIncludedLine ? 'text-slate-500 text-[10px]' : (isPendingGift ? 'text-red-400' : 'text-yellow-500');
                 return `
                 <div id="item-row-${it.itemId}" class="p-3 bg-slate-900 border-b border-slate-800 last:border-0 grid grid-cols-12 gap-2 items-center text-xs">
                     <div class="col-span-5">
                         <div class="text-slate-200 font-bold">${dName}</div>
                         <div class="text-[10px] text-slate-500 mt-0.5">${formatDate(it.time)}</div>
                     </div>
-                    <div class="col-span-3 text-right font-mono ${priceCls}">${priceHtml}</div>
+                    <div class="col-span-3 text-right font-mono ${priceCls}">${priceColHtml}</div>
                     <div class="col-span-2 cp-box">
                         <span class="cp-cost">本 ${safeCost.toLocaleString()}</span>
                         <span class="${pc} font-bold">利 ${p.toLocaleString()}</span>
@@ -3563,26 +3572,77 @@
             }
         }
 
+        async function applyPendingItemSale(orderId, itemId, newSale, currentSale) {
+            if (newSale === Number(currentSale)) return true;
+            Swal.fire({ title: '更新中...', allowOutsideClick: false, didOpen: () => { Swal.showLoading(); } });
+            const res = await API.handleTransaction({
+                action: 'update_amount',
+                orderId,
+                itemId,
+                salePrice: newSale,
+                person: User.name
+            });
+            Swal.close();
+            if (res && res.status === 'error') {
+                Swal.fire({ icon: 'error', title: '更新失敗', text: res.msg || '請重試', background: '#1e293b', color: 'white' });
+                return false;
+            }
+            await loadPending();
+            fetchData();
+            Swal.fire({ icon: 'success', title: newSale === 0 ? '已改為贈品' : '金額已更新', toast: true, position: 'top', timer: 1500, showConfirmButton: false, background: '#1e293b', color: 'white' });
+            return true;
+        }
+
+        async function togglePendingItemGift(orderId, itemId, isCurrentlyGift, currentSale, cost) {
+            if (isCurrentlyGift) {
+                return editPendingItemAmount(orderId, itemId, currentSale, cost);
+            }
+            const item = (OrderRegistry[orderId]?.items || []).find(it => String(it.itemId) === String(itemId));
+            const name = stripLedgerName(item?.itemName || item?.name || '品項');
+            const r = await Swal.fire({
+                title: '改為贈品？',
+                html: `<div class="text-left text-sm"><div class="text-slate-300 font-bold">${name}</div><div class="text-xs text-slate-500 mt-2">售價改為 0，成本仍計入贈品扣項</div></div>`,
+                icon: 'question',
+                showCancelButton: true,
+                confirmButtonText: '確認贈',
+                cancelButtonText: '取消',
+                background: '#1e293b',
+                color: 'white'
+            });
+            if (!r.isConfirmed) return;
+            try {
+                await applyPendingItemSale(orderId, itemId, 0, currentSale);
+            } catch (e) {
+                console.error('改為贈品失敗:', e);
+                Swal.fire({ icon: 'error', title: '更新失敗', text: e.message || '請重試', background: '#1e293b', color: 'white' });
+            }
+        }
+
         async function editPendingItemAmount(orderId, itemId, currentSale, cost) {
             const item = (OrderRegistry[orderId]?.items || []).find(it => String(it.itemId) === String(itemId));
             const name = stripLedgerName(item?.itemName || item?.name || '品項');
             const costNum = Number(cost) || 0;
+            const curSale = Number(currentSale) || 0;
+            const isGiftNow = curSale === 0 && costNum > 0;
             const { value: newSale, isConfirmed } = await Swal.fire({
-                title: '修改金額',
+                title: isGiftNow ? '改為收費' : '修改金額',
                 html: `<div class="text-left text-sm"><div class="text-slate-300 mb-3 font-bold">${name}</div>
                     <label class="text-xs text-slate-500 block text-left mb-1">售價</label>
-                    <input id="sw-pending-sale" type="number" min="0" step="1" class="swal2-input" value="${Number(currentSale) || 0}">
-                    <div class="text-xs text-slate-500 mt-3">成本 ${costNum.toLocaleString()} · 利潤 <span id="sw-pending-profit" class="text-green-400">${((Number(currentSale) || 0) - costNum).toLocaleString()}</span></div></div>`,
+                    <div class="flex items-center gap-2"><input id="sw-pending-sale" type="number" min="0" step="1" class="swal2-input !my-0 flex-1" value="${isGiftNow ? '' : curSale}" placeholder="${isGiftNow ? '請輸入售價' : '0'}">
+                    <button type="button" id="sw-pending-gift-btn" class="shrink-0 px-3 py-2 rounded bg-red-900/50 text-red-400 border border-red-700 text-sm">贈</button></div>
+                    <div class="text-xs text-slate-500 mt-3">成本 ${costNum.toLocaleString()} · 利潤 <span id="sw-pending-profit" class="text-green-400">${(curSale - costNum).toLocaleString()}</span></div></div>`,
                 didOpen: () => {
                     const inp = document.getElementById('sw-pending-sale');
                     const profitEl = document.getElementById('sw-pending-profit');
-                    if (inp && profitEl) {
-                        inp.addEventListener('input', () => {
-                            const p = (Number(inp.value) || 0) - costNum;
-                            profitEl.textContent = p.toLocaleString();
-                            profitEl.className = p >= 0 ? 'text-green-400' : 'text-red-400';
-                        });
-                    }
+                    const giftBtn = document.getElementById('sw-pending-gift-btn');
+                    const refreshProfit = () => {
+                        if (!inp || !profitEl) return;
+                        const p = (Number(inp.value) || 0) - costNum;
+                        profitEl.textContent = p.toLocaleString();
+                        profitEl.className = p >= 0 ? 'text-green-400' : 'text-red-400';
+                    };
+                    if (inp && profitEl) inp.addEventListener('input', refreshProfit);
+                    if (giftBtn && inp) giftBtn.addEventListener('click', () => { inp.value = '0'; refreshProfit(); });
                 },
                 showCancelButton: true,
                 confirmButtonText: '儲存',
@@ -3592,31 +3652,15 @@
                 preConfirm: () => {
                     const v = document.getElementById('sw-pending-sale')?.value;
                     if (v === '' || v === null || isNaN(Number(v)) || Number(v) < 0) {
-                        Swal.showValidationMessage('請輸入有效金額');
+                        Swal.showValidationMessage('請輸入有效金額（贈品按「贈」或填 0）');
                         return false;
                     }
                     return Math.round(Number(v));
                 }
             });
             if (!isConfirmed || newSale === undefined) return;
-            if (newSale === Number(currentSale)) return;
             try {
-                Swal.fire({ title: '更新中...', allowOutsideClick: false, didOpen: () => { Swal.showLoading(); } });
-                const res = await API.handleTransaction({
-                    action: 'update_amount',
-                    orderId,
-                    itemId,
-                    salePrice: newSale,
-                    person: User.name
-                });
-                Swal.close();
-                if (res && res.status === 'error') {
-                    Swal.fire({ icon: 'error', title: '更新失敗', text: res.msg || '請重試', background: '#1e293b', color: 'white' });
-                    return;
-                }
-                await loadPending();
-                fetchData();
-                Swal.fire({ icon: 'success', title: '金額已更新', toast: true, position: 'top', timer: 1500, showConfirmButton: false, background: '#1e293b', color: 'white' });
+                await applyPendingItemSale(orderId, itemId, newSale, currentSale);
             } catch (e) {
                 console.error('修改金額失敗:', e);
                 Swal.fire({ icon: 'error', title: '更新失敗', text: e.message || '請重試', background: '#1e293b', color: 'white' });
