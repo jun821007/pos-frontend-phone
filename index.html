@@ -235,6 +235,7 @@
                             </div>
                         </div>
                     </div>
+                    <div id="fav-sub-scroll" class="hidden flex gap-2 overflow-x-auto no-scrollbar py-1"></div>
                 </div>
                 <div id="item-grid" class="flex-1 overflow-y-auto content-start pb-24 md:pb-4 p-0 phone-list"></div>
             </div>
@@ -703,7 +704,7 @@
         let ItemRegistry = {};
         let OrderRegistry = {};
         let User = { name: '', isAdmin: false };
-        let UI = { tab: 'phone', sub: '', rsMode: 'inventory', rsCat: 'all', multiSelect: false, selectedPhones: new Set(), selectedAcc: new Set(), selectedPendingOrders: new Set(), pendingOrderMeta: {}, pendingOrdersByCustomer: {}, allPendingOrderIds: [], pendingTab: 'unpaid', statsCollapsed: { report: true, history: true }, categoryOrder: null, favAccessoryIds: null, posPrefsLoaded: false, booksMode: 'month', lastBooksReport: null, lastFundData: null, booksContinuous: false, booksLooping: false, lastBooksEntryYmd: null, lastBooksVendor: '', booksSessionCount: 0, amendTarget: null };
+        let UI = { tab: 'phone', sub: '', rsMode: 'inventory', rsCat: 'all', multiSelect: false, selectedPhones: new Set(), selectedAcc: new Set(), selectedPendingOrders: new Set(), pendingOrderMeta: {}, pendingOrdersByCustomer: {}, allPendingOrderIds: [], pendingTab: 'unpaid', statsCollapsed: { report: true, history: true }, categoryOrder: null, favAccessoryIds: null, favSubCat: '', posPrefsLoaded: false, booksMode: 'month', lastBooksReport: null, lastFundData: null, booksContinuous: false, booksLooping: false, lastBooksEntryYmd: null, lastBooksVendor: '', booksSessionCount: 0, amendTarget: null };
         let cartFooterTranslateY = 0;
         const CART_FOOTER_DRAG_MAX_UP = 360;
         const CART_FOOTER_DRAG_MAX_DOWN = 0;
@@ -1112,7 +1113,7 @@
         function switchMainTab(t) {
             if (UI.tab !== t) cancelMultiSelect();
             UI.tab = t; document.querySelectorAll('.main-tab').forEach(e => e.classList.remove('active')); document.getElementById('tab-'+t).classList.add('active'); const sub = document.getElementById('sub-cat-scroll'); sub.innerHTML = '';
-            if (t === 'phone') { ['庫存中','客訂中','寄賣中'].forEach(s => sub.appendChild(createPill(s, () => filterItems('status', s)))); if(sub.firstChild) sub.firstChild.click(); renderMultiSelectBar(); } else if (t === 'accessory') { const favBtn = document.createElement('div'); favBtn.className = 'pill-btn border-amber-500 text-amber-400 shrink-0'; favBtn.innerHTML = '⭐ 常用'; favBtn.setAttribute('title','常用品'); favBtn.onclick = () => { document.querySelectorAll('.pill-btn').forEach(b=>b.classList.remove('active')); favBtn.classList.add('active'); renderFavAccessoryGrid(); }; sub.appendChild(favBtn); const btn = document.createElement('div'); btn.className = 'pill-btn border-blue-500 text-blue-400'; btn.innerHTML = '🏢 公司貨'; btn.onclick = () => { document.querySelectorAll('.pill-btn').forEach(b=>b.classList.remove('active')); btn.classList.add('active'); renderCompanyAccessoryGrid(); }; sub.appendChild(btn); const transferBtn = document.createElement('div'); transferBtn.className = 'pill-btn border-purple-500 text-purple-400'; transferBtn.innerHTML = '🚚 調貨'; transferBtn.onclick = () => { document.querySelectorAll('.pill-btn').forEach(b=>b.classList.remove('active')); transferBtn.classList.add('active'); renderDirectTransferGrid(); }; sub.appendChild(transferBtn); const cats = getOrderedCategories(); cats.forEach(c => sub.appendChild(createPill(c, () => filterItems('cat', c)))); if(sub.firstChild) sub.firstChild.click(); renderMultiSelectBar(); } else { renderServiceGrid(); renderMultiSelectBar(); }
+            if (t === 'phone') { ['庫存中','客訂中','寄賣中'].forEach(s => sub.appendChild(createPill(s, () => filterItems('status', s)))); if(sub.firstChild) sub.firstChild.click(); renderMultiSelectBar(); } else if (t === 'accessory') { hideFavSubNav(); const favBtn = document.createElement('div'); favBtn.className = 'pill-btn border-amber-500 text-amber-400 shrink-0'; favBtn.innerHTML = '⭐ 常用'; favBtn.setAttribute('title','常用品'); favBtn.onclick = () => openFavAccessoryView(); sub.appendChild(favBtn); const btn = document.createElement('div'); btn.className = 'pill-btn border-blue-500 text-blue-400'; btn.innerHTML = '🏢 公司貨'; btn.onclick = () => { hideFavSubNav(); document.querySelectorAll('#sub-cat-scroll .pill-btn').forEach(b=>b.classList.remove('active')); btn.classList.add('active'); renderCompanyAccessoryGrid(); }; sub.appendChild(btn); const transferBtn = document.createElement('div'); transferBtn.className = 'pill-btn border-purple-500 text-purple-400'; transferBtn.innerHTML = '🚚 調貨'; transferBtn.onclick = () => { hideFavSubNav(); document.querySelectorAll('#sub-cat-scroll .pill-btn').forEach(b=>b.classList.remove('active')); transferBtn.classList.add('active'); renderDirectTransferGrid(); }; sub.appendChild(transferBtn); const cats = getOrderedCategories(); cats.forEach(c => sub.appendChild(createPill(c, () => filterItems('cat', c)))); if(sub.firstChild) sub.firstChild.click(); renderMultiSelectBar(); } else { hideFavSubNav(); renderServiceGrid(); renderMultiSelectBar(); }
         }
         function createPill(t, f) { const d = document.createElement('div'); d.className = 'pill-btn'; d.innerText = t; d.onclick = () => { document.querySelectorAll('.pill-btn').forEach(b=>b.classList.remove('active')); d.classList.add('active'); f(); }; return d; }
         
@@ -1127,6 +1128,7 @@
             }
         }
         function filterItems(mode, val) {
+            hideFavSubNav();
             const term = document.getElementById('search-input').value.toLowerCase();
             const grid = document.getElementById('item-grid');
             grid.innerHTML = '';
@@ -3704,6 +3706,48 @@
                 Swal.fire({ icon:'warning', title:'常用已暫存在本機', text: e.message || '雲端同步失敗，稍後再試', toast:true, position:'top', timer:2000, showConfirmButton:false, background:'#1e293b', color:'white' });
             }
         }
+        function hideFavSubNav() {
+            UI.favSubCat = '';
+            const bar = document.getElementById('fav-sub-scroll');
+            if (bar) { bar.classList.add('hidden'); bar.innerHTML = ''; }
+        }
+        function getFavCategoriesWithItems() {
+            const fav = getFavAccessories();
+            const cats = new Set();
+            DB.inv.filter(i => i.type === 'accessory' && fav.includes(String(i.id)) && !i.isHidden).forEach(i => {
+                if (i.category) cats.add(i.category);
+            });
+            return getOrderedCategories().filter(c => cats.has(c));
+        }
+        function renderFavSubNav() {
+            const bar = document.getElementById('fav-sub-scroll');
+            if (!bar) return;
+            const cats = getFavCategoriesWithItems();
+            bar.innerHTML = '';
+            if (!cats.length) { bar.classList.add('hidden'); return; }
+            bar.classList.remove('hidden');
+            const mk = (label, val) => {
+                const d = document.createElement('div');
+                d.className = 'pill-btn shrink-0' + ((val === '' && !UI.favSubCat) || UI.favSubCat === val ? ' active' : '');
+                d.innerText = label;
+                d.onclick = () => {
+                    document.querySelectorAll('#fav-sub-scroll .pill-btn').forEach(b => b.classList.remove('active'));
+                    d.classList.add('active');
+                    UI.favSubCat = val;
+                    renderFavAccessoryGrid();
+                };
+                return d;
+            };
+            bar.appendChild(mk('全部', ''));
+            cats.forEach(c => bar.appendChild(mk(c, c)));
+        }
+        function openFavAccessoryView() {
+            document.querySelectorAll('#sub-cat-scroll .pill-btn').forEach(b => b.classList.remove('active'));
+            const favBtn = document.querySelector('#sub-cat-scroll .pill-btn');
+            if (favBtn) favBtn.classList.add('active');
+            UI.favSubCat = '';
+            renderFavSubNav();
+            renderFavAccessoryGrid();
         function renderFavAccessoryGrid(){
             const grid=document.getElementById('item-grid');
             setItemGridMode('grid');
@@ -3711,9 +3755,10 @@
             const fav=getFavAccessories();
             const catOrder=getOrderedCategories();
             const catIndex=new Map(catOrder.map((c, idx)=>[c, idx]));
-            const list=DB.inv
-                .filter(i=>i.type==='accessory'&&fav.includes(String(i.id))&&!i.isHidden)
-                .sort((a,b)=>{
+            let list=DB.inv
+                .filter(i=>i.type==='accessory'&&fav.includes(String(i.id))&&!i.isHidden);
+            if (UI.favSubCat) list = list.filter(i => i.category === UI.favSubCat);
+            list = list.sort((a,b)=>{
                     const ia=catIndex.has(a.category)?catIndex.get(a.category):9999;
                     const ib=catIndex.has(b.category)?catIndex.get(b.category):9999;
                     if(ia!==ib) return ia-ib;
@@ -3723,7 +3768,7 @@
                     return String(a.name||'').localeCompare(String(b.name||''),'zh-TW');
                 });
             if(list.length===0){
-                grid.innerHTML='<div class="col-span-full text-center text-slate-500 mt-10">尚無常用品，在各分類中點擊配件旁的 ⭐ 可加入</div>';
+                grid.innerHTML=`<div class="col-span-full text-center text-slate-500 mt-10">${UI.favSubCat ? '此分類尚無常用品' : '尚無常用品，在各分類中點擊配件旁的 ⭐ 可加入'}</div>`;
                 return;
             }
             list.forEach(i=>{
@@ -4796,19 +4841,30 @@
                     };
                 },
                 preConfirm: () => {
-                    const vals = rows.map((r, idx) => {
+                    const vals = [];
+                    for (let idx = 0; idx < rows.length; idx++) {
+                        const r = rows[idx];
                         const raw = document.getElementById('multi-acc-price-' + idx)?.value;
-                        if (raw === '' || raw == null) return null;
-                        const n = parseInt(raw, 10);
-                        let q = parseInt(document.getElementById('multi-acc-qty-' + idx)?.value, 10);
-                        if (isNaN(q) || q < 1) q = 1;
-                        if (r.kind === 'inv' && r.item && Number(r.item.stock) > 0 && q > Number(r.item.stock)) {
-                            Swal.showValidationMessage(`${r.name} 庫存不足（庫 ${r.item.stock}）`);
-                            return null;
+                        if (raw === '' || raw == null) {
+                            Swal.showValidationMessage(`${r.name}：請填售價（贈品填 0）`);
+                            return false;
                         }
-                        return isNaN(n) ? null : { price: n, qty: q };
-                    });
-                    if (vals.some(v => !v || v.price == null || v.price < 0)) { Swal.showValidationMessage('每件請填售價與數量，贈品售價填 0'); return false; }
+                        const n = parseInt(raw, 10);
+                        if (isNaN(n) || n < 0) {
+                            Swal.showValidationMessage(`${r.name}：請填售價（贈品填 0）`);
+                            return false;
+                        }
+                        let q = parseInt(document.getElementById('multi-acc-qty-' + idx)?.value, 10);
+                        if (isNaN(q) || q < 1) {
+                            Swal.showValidationMessage(`${r.name}：數量至少 1`);
+                            return false;
+                        }
+                        if (r.kind === 'inv' && r.item && Number(r.item.stock) > 0 && q > Number(r.item.stock)) {
+                            Swal.showValidationMessage(`${r.name} 庫存不足（庫 ${r.item.stock}，你填 ${q}）`);
+                            return false;
+                        }
+                        vals.push({ price: n, qty: q });
+                    }
                     return vals;
                 }
             });
