@@ -1348,12 +1348,28 @@
         function formatAccessoryCopyLabel(it) { return formatCopyLabelWithQty(it); }
         function isSettlementGiftItem(it) {
             const sale = Number(it.salePrice) || 0;
-            const name = String(it.itemName || it.name || '');
             if (sale <= 0) return true;
             if (it.isGift) return true;
-            if (/\(贈\)/.test(name)) return true;
             if (isMultiPhoneExtraLine(it)) return true;
             return false;
+        }
+        function stripSettlementRepairSuffix(name) {
+            return String(name || '').replace(/\s*\+[^+]+(\(贈\))?\s*/gi, ' ').replace(/\s+/g, ' ').trim();
+        }
+        function stripSettlementDealerNoise(name, dealerName) {
+            let s = stripSettlementRepairSuffix(stripLedgerName(name));
+            s = s.replace(/#\S+/g, ' ').replace(/\s+/g, ' ').trim();
+            s = s.replace(/^軟體\s*/i, '').replace(/^二手(?:機)?\s*/i, '').replace(/^新機\s*/i, '').replace(/\s*同行\s*/gi, ' ').trim();
+            if (dealerName) {
+                const esc = String(dealerName).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+                s = s.replace(new RegExp('^' + esc + '\\s+', 'i'), '').trim();
+                s = s.replace(new RegExp('(?:^|\\s)' + esc + '(?=\\s|$)', 'i'), ' ').trim();
+            }
+            const modelRe = /\b(ipad\s*\d*|ipad\d+|iphone\s*\d+|iphone\d+|galaxy|pixel|samsung|三星|vivo|oppo|小米|紅米|華為|榮耀|realme|nokia|sony|asus|note|tab|\d+\s*(?:pro|max|plus|mini|ultra)?)/i;
+            const m = s.match(modelRe);
+            if (m && m.index > 0) s = s.slice(m.index).trim();
+            s = s.replace(/\b(64|128|256|512|1024|1)\s*[gG]\b/g, '$1');
+            return s.replace(/\s+/g, ' ').trim();
         }
         function getSettlementQty(it) {
             let q = parseInt(String(it.quantity != null && it.quantity !== '' ? it.quantity : ''), 10);
@@ -1365,47 +1381,12 @@
             return (!isFinite(q) || q < 1) ? 1 : q;
         }
         function formatSettlementCustomerLabel(it) {
-            let name = stripLedgerName(it.itemName || it.name || '');
-            name = name.replace(/#\S+/g, ' ').replace(/\s*x\d+\s*$/i, ' ').replace(/\s+/g, ' ').trim();
-            // 拿掉「同行 xxx」
-            name = name.replace(/^同行\s+\S+\s*/i, '').replace(/^同行\s*/i, '').trim();
-            const dealer = String(it.dealerName || '').trim();
-            if (dealer) {
-                const esc = dealer.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-                name = name.replace(new RegExp('(?:^|\\s)' + esc + '(?=\\s|$)', 'i'), ' ').replace(/\s+/g, ' ').trim();
-            }
             const t = it.type || '';
-            // 容量寫法：256g → 256；保留 5G（避免被誤砍）
-            const normalizeStorage = (s) => s.replace(/\b(64|128|256|512|1024|1)\s*[gG]\b/g, '$1');
-            const stripLeadingPeerName = (s) => {
-                const parts = String(s || '').trim().split(/\s+/).filter(Boolean);
-                if (parts.length < 2) return s;
-                const first = parts[0];
-                // 有數字或常見品牌 → 當型號保留；否則當同行名稱去掉
-                if (/\d/.test(first)) return parts.join(' ');
-                if (/^(iphone|ipad|galaxy|pixel|samsung|三星|vivo|oppo|小米|紅米|華為|榮耀|realme|nokia|sony|asus|a|y|c|note|tab)/i.test(first)) {
-                    return parts.join(' ');
-                }
-                return parts.slice(1).join(' ');
-            };
-            if (t === 'new_phone') {
-                name = name.replace(/^新機\s*/i, '').trim();
-                name = stripLeadingPeerName(name);
-                name = normalizeStorage(name);
-                name = ('新機 ' + name).replace(/\s+/g, ' ').trim();
-            } else if (t === 'phone' || t === 'peer_phone' || t === 'software_phone') {
-                name = name.replace(/^二手(?:機)?\s*/i, '').trim();
-                name = stripLeadingPeerName(name);
-                name = normalizeStorage(name);
-                name = ('二手 ' + name).replace(/\s+/g, ' ').trim();
-            } else if (t === 'direct_transfer') {
-                name = name.replace(/^調貨[：:]\s*/i, '').replace(/^同行\s+\S+\s*/i, '').trim();
-                name = stripLeadingPeerName(name);
-            } else if (t === 'repair') {
+            if (t === 'repair') {
                 const { main, issue } = parseRepairLedgerParts(it.itemName || it.name || '');
-                name = issue ? `${main} ${issue}` : main;
+                return issue ? `${main} ${issue}` : main;
             }
-            return name || '品項';
+            return stripSettlementDealerNoise(it.itemName || it.name || '', it.dealerName || '') || '品項';
         }
         function buildSettlementCopyText(items) {
             const lines = [];
@@ -1736,7 +1717,7 @@
                 const iidEsc = String(it.itemId || '').replace(/\\/g, '\\\\').replace(/'/g, "\\'");
                 const isIncludedLine = it.type === 'phone' && Number(it.salePrice) === 0 && (it.itemName || '').includes(' + ');
                 const saleNum = Number(it.salePrice) || 0;
-                const isPendingGift = !isIncludedLine && (saleNum === 0 && safeCost > 0 || /\(贈\)/.test(String(it.itemName || it.name || '')));
+                const isPendingGift = !isIncludedLine && saleNum === 0 && safeCost > 0;
                 const priceHtml = isIncludedLine
                     ? '<span class="text-slate-500 text-[10px]">含於上筆</span>'
                     : editablePending
