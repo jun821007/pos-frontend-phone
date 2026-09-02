@@ -148,13 +148,25 @@
                 transform: translateY(-230px);
             }
         }
-        /* 桌機右邊結帳：補 key 時 footer 往上，避免確認鈕被擋 */
+        /* 補 key：footer 可捲動、隱藏重複欄位，確認鈕 sticky */
+        #cart-panel.is-amending #cart-footer-draggable {
+            transform: none !important;
+            min-height: 0;
+        }
+        #cart-panel.is-amending .cart-footer-wrap {
+            max-height: min(46vh, 320px);
+            overflow-y: auto;
+            -webkit-overflow-scrolling: touch;
+        }
+        #cart-panel.is-amending .cart-confirm-btn-mobile {
+            position: sticky;
+            bottom: 0;
+            z-index: 5;
+            margin-top: 4px;
+        }
         @media (min-width: 768px) {
-            #cart-panel.is-amending #cart-footer-draggable {
-                transform: translateY(-28px);
-            }
-            #cart-panel.is-amending .cart-footer-wrap {
-                padding-bottom: 0.5rem;
+            #cart-panel.is-amending .amend-hide-when-active {
+                display: none !important;
             }
         }
         #amend-banner { line-height: 1.25; }
@@ -216,7 +228,8 @@
         <div id="amend-header-bar" class="hidden shrink-0 px-3 py-1.5 bg-cyan-950/80 border-b border-cyan-800 flex items-center justify-between gap-2 text-xs text-cyan-200 z-20">
             <span id="amend-header-text" class="truncate min-w-0 font-semibold">補 key 中</span>
             <div class="flex items-center gap-2 shrink-0">
-                <button type="button" onclick="toggleMobileCart('pos', true); switchView('pos');" class="text-cyan-300 underline">開啟購物車</button>
+                <button type="button" id="amend-header-confirm" onclick="confirmCheckout()" class="px-3 py-1.5 rounded-lg bg-yellow-500 hover:bg-yellow-400 text-black font-bold text-xs shrink-0">確認併入</button>
+                <button type="button" onclick="toggleMobileCart('pos', true); switchView('pos');" class="md:hidden text-cyan-300 underline">購物車</button>
                 <button type="button" onclick="cancelAmendOrder()" class="text-slate-400 underline">取消</button>
             </div>
         </div>
@@ -246,7 +259,7 @@
                 </div>
                 <div id="item-grid" class="flex-1 overflow-y-auto content-start pb-24 md:pb-4 p-0 phone-list"></div>
             </div>
-            <div id="cart-panel" class="hidden md:flex w-80 bg-slate-900 border-l border-slate-800 flex-col h-full max-h-[100dvh] md:max-h-none min-h-0 z-30 absolute md:static inset-0 md:inset-auto">
+            <div id="cart-panel" class="hidden md:flex w-80 bg-slate-900 border-l border-slate-800 flex-col h-full max-h-[100dvh] md:max-h-none min-h-0 overflow-hidden z-30 absolute md:static inset-0 md:inset-auto">
                 <div class="p-3 border-b border-slate-800 flex justify-between items-center bg-slate-800/50 shrink-0"><h2 class="font-bold text-white">結帳清單</h2><button onclick="toggleMobileCart('pos',false)" class="md:hidden text-slate-400 p-2"><i class="fa-solid fa-chevron-down"></i></button><button onclick="clearCart()" class="text-xs text-red-400 hidden md:block">清空</button></div>
                 <div id="cart-items" class="flex-1 min-h-0 overflow-y-auto p-3 space-y-2"></div>
                 <div id="cart-footer-draggable" class="shrink-0">
@@ -258,8 +271,8 @@
                         <span id="amend-banner-text" class="truncate min-w-0">補 key 中</span>
                         <button type="button" onclick="cancelAmendOrder()" class="shrink-0 text-cyan-300 underline">取消</button>
                     </div>
-                    <div class="grid grid-cols-2 gap-1.5 md:gap-2"><input type="text" id="cust-name" class="w-full py-1.5 md:p-2 rounded-lg input-dark text-xs md:text-sm text-center" placeholder="客戶名稱"><div class="flex items-center justify-center py-1.5 md:p-2 bg-slate-700/50 rounded-lg"><span id="staff-name" class="text-[10px] md:text-xs font-bold">--</span></div></div>
-                    <div class="flex gap-1 md:gap-2 items-center text-center text-[10px] md:text-xs">
+                    <div class="grid grid-cols-2 gap-1.5 md:gap-2 amend-hide-when-active"><input type="text" id="cust-name" class="w-full py-1.5 md:p-2 rounded-lg input-dark text-xs md:text-sm text-center" placeholder="客戶名稱"><div class="flex items-center justify-center py-1.5 md:p-2 bg-slate-700/50 rounded-lg"><span id="staff-name" class="text-[10px] md:text-xs font-bold">--</span></div></div>
+                    <div class="flex gap-1 md:gap-2 items-center text-center text-[10px] md:text-xs amend-hide-when-active">
                         <div class="grid grid-cols-3 flex-1 min-w-0 gap-1 md:gap-2">
                         <label><input type="radio" name="pay" value="cash" checked class="peer hidden"><div class="py-1.5 md:p-2 rounded border border-slate-600 peer-checked:bg-green-600 peer-checked:text-white cursor-pointer">現金</div></label>
                         <label><input type="radio" name="pay" value="linepay" class="peer hidden"><div class="py-1.5 md:p-2 rounded border border-slate-600 peer-checked:bg-green-500 peer-checked:text-black cursor-pointer">Line Pay</div></label>
@@ -4168,6 +4181,8 @@
                 if (custEl) { custEl.readOnly = false; custEl.classList.remove('opacity-60'); }
                 payRadios.forEach(r => { r.disabled = false; });
                 confirmBtns.forEach(b => { b.textContent = '確認結帳'; });
+                const hdrConfirm = document.getElementById('amend-header-confirm');
+                if (hdrConfirm) hdrConfirm.textContent = '確認併入';
                 resetCartFooterDrag();
                 return;
             }
@@ -4191,6 +4206,8 @@
                 r.disabled = true;
             });
             confirmBtns.forEach(b => { b.textContent = '確認併入'; });
+            const hdrConfirm = document.getElementById('amend-header-confirm');
+            if (hdrConfirm) hdrConfirm.textContent = '確認併入';
             resetCartFooterDrag();
         }
         function cancelAmendOrder() {
