@@ -888,7 +888,7 @@
                 console.log('配件資料:', DB.inv.filter(i => i.type === 'accessory').length);
                 document.getElementById('sync-status').innerHTML = '<span class="text-green-500">● 已同步</span>'; 
                 if(UI.tab === 'phone') switchMainTab('phone'); 
-                else if(UI.tab === 'accessory') { const a = document.querySelector('.pill-btn.active'); if(a) { const t = a.innerText; if(t.includes('常用')) renderFavAccessoryGrid(); else if(t === '公司貨') renderCompanyAccessoryGrid(); else if(t === '調貨') renderDirectTransferGrid(); else filterItems(null, t); } }
+                else if(UI.tab === 'accessory') { const a = document.querySelector('#sub-cat-scroll .pill-btn.active'); if(a) { const t = a.innerText; if(t.includes('常用')) { renderFavSubNav(); renderFavAccessoryGrid(); } else if(t === '公司貨') renderCompanyAccessoryGrid(); else if(t === '調貨') renderDirectTransferGrid(); else filterItems(null, t); } }
                 renderReport(); 
             } catch(e) { 
                 console.error('Data Parse Error', e); 
@@ -1115,7 +1115,7 @@
             UI.tab = t; document.querySelectorAll('.main-tab').forEach(e => e.classList.remove('active')); document.getElementById('tab-'+t).classList.add('active'); const sub = document.getElementById('sub-cat-scroll'); sub.innerHTML = '';
             if (t === 'phone') { ['庫存中','客訂中','寄賣中'].forEach(s => sub.appendChild(createPill(s, () => filterItems('status', s)))); if(sub.firstChild) sub.firstChild.click(); renderMultiSelectBar(); } else if (t === 'accessory') { hideFavSubNav(); const favBtn = document.createElement('div'); favBtn.className = 'pill-btn border-amber-500 text-amber-400 shrink-0'; favBtn.innerHTML = '⭐ 常用'; favBtn.setAttribute('title','常用品'); favBtn.onclick = () => openFavAccessoryView(); sub.appendChild(favBtn); const btn = document.createElement('div'); btn.className = 'pill-btn border-blue-500 text-blue-400'; btn.innerHTML = '🏢 公司貨'; btn.onclick = () => { hideFavSubNav(); document.querySelectorAll('#sub-cat-scroll .pill-btn').forEach(b=>b.classList.remove('active')); btn.classList.add('active'); renderCompanyAccessoryGrid(); }; sub.appendChild(btn); const transferBtn = document.createElement('div'); transferBtn.className = 'pill-btn border-purple-500 text-purple-400'; transferBtn.innerHTML = '🚚 調貨'; transferBtn.onclick = () => { hideFavSubNav(); document.querySelectorAll('#sub-cat-scroll .pill-btn').forEach(b=>b.classList.remove('active')); transferBtn.classList.add('active'); renderDirectTransferGrid(); }; sub.appendChild(transferBtn); const cats = getOrderedCategories(); cats.forEach(c => sub.appendChild(createPill(c, () => filterItems('cat', c)))); if(sub.firstChild) sub.firstChild.click(); renderMultiSelectBar(); } else { hideFavSubNav(); renderServiceGrid(); renderMultiSelectBar(); }
         }
-        function createPill(t, f) { const d = document.createElement('div'); d.className = 'pill-btn'; d.innerText = t; d.onclick = () => { document.querySelectorAll('.pill-btn').forEach(b=>b.classList.remove('active')); d.classList.add('active'); f(); }; return d; }
+        function createPill(t, f) { const d = document.createElement('div'); d.className = 'pill-btn'; d.innerText = t; d.onclick = () => { document.querySelectorAll('#sub-cat-scroll .pill-btn').forEach(b=>b.classList.remove('active')); d.classList.add('active'); f(); }; return d; }
         
         function setItemGridMode(kind) {
             const grid = document.getElementById('item-grid');
@@ -3694,7 +3694,7 @@
             if (idx >= 0) fav.splice(idx, 1); else fav.push(sid);
             setFavAccessories(fav);
             const a = document.querySelector('.pill-btn.active');
-            if (a && a.innerText.includes('常用')) renderFavAccessoryGrid();
+            if (a && a.innerText.includes('常用')) { renderFavSubNav(); renderFavAccessoryGrid(); }
             else if (UI.tab === 'accessory' && a) filterItems(null, a.innerText);
             try {
                 const res = await API.savePosPrefs({ favAccessoryIds: fav });
@@ -3748,6 +3748,7 @@
             UI.favSubCat = '';
             renderFavSubNav();
             renderFavAccessoryGrid();
+        }
         function renderFavAccessoryGrid(){
             const grid=document.getElementById('item-grid');
             setItemGridMode('grid');
