@@ -3332,7 +3332,7 @@
             let html = '';
             if (filteredIncome.length > 0) {
                 html += `<div class="mb-3"><div class="px-3 py-2 text-xs font-semibold text-green-400/90 border-b border-slate-800 bg-slate-900/40">收入 · ${filteredIncome.length} 筆</div>`;
-                filteredIncome.forEach(g => { html += renderOrderRow(g); });
+                filteredIncome.forEach(g => { html += renderOrderRow(g, { allowAmend: canAmendOrderGroup(g) }); });
                 html += '</div>';
             }
             if (filteredExpense.length > 0) {
@@ -4148,9 +4148,41 @@
             UI.amendTarget = null;
             updateAmendBanner();
         }
+        function canAmendOrderGroup(g) {
+            const todayYmd = ymdTaipei(new Date());
+            const sample = (g && g.items && g.items[0]) || g || {};
+            const orderDay = ymdTaipei(parseLedgerDate(sample.time));
+            return !!orderDay && orderDay === todayYmd;
+        }
+        function getOrderItemsForAmend(orderId) {
+            const oid = String(orderId);
+            const ok = (i) => String(i.orderId) === oid && i.status !== 'Returned' && i.status !== 'Deleted';
+            const fromSales = (DB.sales || []).filter(ok);
+            if (fromSales.length) return fromSales;
+            return (DB.history || []).filter(ok);
+        }
+        async function refreshLedgerAfterCheckout() {
+            try {
+                const fd = await API.getTodaySalesOnly();
+                if (fd && fd.status !== 'error') DB.sales = fd.todaySales || [];
+                renderReport();
+                const histView = document.getElementById('view-history');
+                if (histView && !histView.classList.contains('hidden')) {
+                    const elS = document.getElementById('h-start');
+                    const elE = document.getElementById('h-end');
+                    if (elS && elE && elS.value && elE.value) {
+                        const res = await API.getHistory(elS.value, elE.value);
+                        DB.history = Array.isArray(res) ? res : (res.history || []);
+                        renderHistoryList();
+                    }
+                }
+            } catch (e) {
+                console.error('刷新帳務失敗:', e);
+            }
+        }
         function startAmendOrder(orderId) {
             const g = OrderRegistry[orderId];
-            const salesItems = (DB.sales || []).filter(i => String(i.orderId) === String(orderId) && i.status !== 'Returned' && i.status !== 'Deleted');
+            const salesItems = getOrderItemsForAmend(orderId);
             if (!salesItems.length && !(g && g.items && g.items.length)) {
                 Swal.fire({ icon: 'warning', title: '找不到該單', background: '#1e293b', color: 'white' });
                 return;
@@ -4250,7 +4282,7 @@
                 });
                 Swal.fire({ title: '結帳處理中...', html: '正在寫入資料，請勿關閉視窗', allowOutsideClick: false, didOpen: () => { Swal.showLoading(); } }); 
                 try {
-                    const result = await API.checkoutOrder({ orderId: oid, customer: cust, payMethod: pay, person: User.name, items: items });
+                    const result = await API.checkoutOrder({ orderId: oid, customer: cust, payMethod: pay, person: User.name, items: items, isAmend: !!amend });
                     if (result.status === 'error') { 
                         Swal.fire({icon:'error', title:'結帳失敗', text: result.msg || '請截圖通知管理員', background: '#1e293b'}); 
                         return; 
@@ -4263,23 +4295,17 @@
                     renderCart(); 
                     toggleMobileCart('pos', false);
                     try { const activeBtn = document.querySelector('.pill-btn.active'); if(activeBtn) filterItems(null, activeBtn.innerText); } catch(e) {}
-                    Swal.update({ html: '寫入成功，正在載入今日帳務...' });
+                    Swal.update({ html: '寫入成功，正在載入帳務...' });
                     try {
-                        const fd = await API.getTodaySalesOnly();
-                        if (fd.status === 'error') { 
-                            Swal.fire({icon:'warning', title:'結帳已寫入', text: '今日帳務同步失敗，請手動重新整理', background: '#1e293b'}); 
-                            return; 
-                        }
-                        DB.sales = fd.todaySales || [];
+                        await refreshLedgerAfterCheckout();
                         if (UI.tab === 'phone') switchMainTab('phone');
-                        renderReport();
                         document.getElementById('sync-status').innerHTML = '<span class="text-green-500">● 已同步</span>';
                         await fetchData();
-                        Swal.fire({icon:'success', title:'結帳完成', timer: 1500, background: '#1e293b'});
+                        Swal.fire({ icon: 'success', title: amend ? '已併入原單' : '結帳完成', timer: 1500, background: '#1e293b' });
                     } catch(e) { 
-                        console.error('載入今日帳務失敗:', e);
+                        console.error('載入帳務失敗:', e);
                         await fetchData();
-                        Swal.fire({icon:'success', title:'結帳完成', text: '若今日帳務未更新請手動重新整理', timer: 2000, background: '#1e293b'});
+                        Swal.fire({icon:'success', title: amend ? '已併入原單' : '結帳完成', text: '若帳務未更新請手動重新整理', timer: 2000, background: '#1e293b'});
                     }
                 } catch(e) {
                     console.error('結帳失敗:', e);
