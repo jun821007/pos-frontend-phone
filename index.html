@@ -4130,6 +4130,14 @@
                 if (t && t.orderId) UI.amendTarget = t;
             } catch (e) { /* ignore */ }
         }
+        function getActiveAmendTarget() {
+            restoreAmendTarget();
+            return UI.amendTarget;
+        }
+        function isActiveLedgerRow(r) {
+            const st = String((r && r.status) || '');
+            return st !== 'Returned' && st !== 'Deleted';
+        }
         async function reloadTodaySalesWithRetry(orderId, newItemIds, maxTry = 5, delayMs = 800) {
             const wantIds = (newItemIds || []).map(x => String(x)).filter(Boolean);
             for (let i = 0; i < maxTry; i++) {
@@ -4141,7 +4149,7 @@
                         const rows = (DB.sales || []).filter(x => String(x.orderId) === String(orderId));
                         if (wantIds.length === 0) {
                             if (rows.length > 0) return true;
-                        } else if (wantIds.every(id => rows.some(r => String(r.itemId) === id))) {
+                        } else if (wantIds.every(id => rows.some(r => String(r.itemId) === id && isActiveLedgerRow(r)))) {
                             return true;
                         }
                     }
@@ -4232,15 +4240,12 @@
                 const fd = await API.getTodaySalesOnly();
                 if (fd && fd.status !== 'error') DB.sales = fd.todaySales || [];
                 renderReport();
-                const histView = document.getElementById('view-history');
-                if (histView && !histView.classList.contains('hidden')) {
-                    const elS = document.getElementById('h-start');
-                    const elE = document.getElementById('h-end');
-                    if (elS && elE && elS.value && elE.value) {
-                        const res = await API.getHistory(elS.value, elE.value);
-                        DB.history = Array.isArray(res) ? res : (res.history || []);
-                        renderHistoryList();
-                    }
+                const elS = document.getElementById('h-start');
+                const elE = document.getElementById('h-end');
+                if (elS && elE && elS.value && elE.value) {
+                    const res = await API.getHistory(elS.value, elE.value);
+                    DB.history = Array.isArray(res) ? res : (res.history || []);
+                    renderHistoryList();
                 }
             } catch (e) {
                 console.error('刷新帳務失敗:', e);
@@ -4275,7 +4280,7 @@
         async function confirmCheckout() { 
             try {
                 if(Cart.length === 0) return;
-                const amend = UI.amendTarget;
+                const amend = getActiveAmendTarget();
                 const payableTotal = Cart.reduce((sum, item) => {
                     if (item.deferredPickup && item.type === 'repair') return sum;
                     return sum + (Number(item.price) || 0) * (Number(item.quantity) || 1);
@@ -4368,14 +4373,18 @@
                     try {
                         if (amend) {
                             const ok = await reloadTodaySalesWithRetry(mergedOrderId, items.map(it => it.itemId));
+                            await refreshLedgerAfterCheckout();
                             await fetchData();
                             openReport();
                             expandOrderInReport(mergedOrderId);
                             document.getElementById('sync-status').innerHTML = '<span class="text-green-500">● 已同步</span>';
+                            const reactivated = Number(result.reactivatedCount || 0) > 0;
                             Swal.fire({
                                 icon: ok ? 'success' : 'warning',
                                 title: ok ? '已併入原單' : '已寫入，帳務同步中',
-                                text: ok ? `${mergedOrderId} 已更新，請展開該單確認` : '若今日／歷史未看到新品項，請按同步或稍後再試',
+                                text: ok
+                                    ? `${mergedOrderId} 已更新，請展開該單確認`
+                                    : (reactivated ? '已恢復被退貨的品項，請按同步後再看' : '若今日／歷史未看到新品項，請按同步或稍後再試'),
                                 timer: ok ? 2200 : 3500,
                                 background: '#1e293b'
                             });
