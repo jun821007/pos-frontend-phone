@@ -4037,8 +4037,16 @@
                 if (!isDeferredRepair) t += s; 
                 cn += item.quantity; 
                 let g = item.isGift ? 'text-red-400 border-red-400' : 'text-slate-500 border-slate-600'; 
-                let nameLine = item.name; 
-                if (item.isGift && !nameLine.includes('贈')) nameLine += ' <span class="text-red-400 text-xs border border-red-400 px-1 rounded">贈</span>';
+                let nameLine;
+                if (item.type === 'repair') {
+                    let raw = String(item.name || '');
+                    const reason = String(item.reason || '').trim();
+                    if (reason && raw.indexOf('｜') === -1 && !raw.includes(reason)) raw += '｜' + reason;
+                    nameLine = '<span class="text-purple-400 text-xs">(維)</span> ' + formatRepairDisplayHtml(raw);
+                } else {
+                    nameLine = item.name;
+                }
+                if (item.isGift && !String(item.name || '').includes('贈')) nameLine += ' <span class="text-red-400 text-xs border border-red-400 px-1 rounded">贈</span>';
                 if (isDeferredRepair) nameLine += ' <span class="text-amber-300 text-xs border border-amber-600 px-1 rounded">待取件</span>';
                 if (item.type === 'phone' || item.type === 'new_phone' || item.type === 'peer_phone') { 
                     if (item.stock_id) nameLine += ' <span class="text-slate-400 text-xs">#' + item.stock_id + '</span>'; 
@@ -4189,7 +4197,7 @@
                         batteryName: item.batteryName||'',
                         category: item.category||'', 
                         dealerName: item.dealerName||'', 
-                        customer: item.customer||'',
+                        customer: item.customer || cust,
                         customerPhone: normalizeTaiwanPhone(item.customerPhone||''),
                         repairNotes: item.repairNotes||'',
                         photoUrls: item.photoUrls||'',
@@ -4337,16 +4345,35 @@
                 if(btn){ btn.disabled=false; btn.textContent='確認送出'; }
             }
         }
+        function getCheckoutCustomerPrefill() {
+            if (UI.amendTarget && UI.amendTarget.customer) return String(UI.amendTarget.customer).trim();
+            const el = document.getElementById('cust-name');
+            return el ? String(el.value || '').trim() : '';
+        }
+        function resolveFormCustomer(nameFromField) {
+            const n = String(nameFromField || '').trim();
+            return n || getCheckoutCustomerPrefill();
+        }
+        function applyFormCustomerToCheckout(name) {
+            const n = resolveFormCustomer(name);
+            if (!n) return;
+            const el = document.getElementById('cust-name');
+            if (el) el.value = n;
+        }
         async function modalNewPhone(keepDealer, keepCustomer) {
             const gn = id => document.getElementById(id);
-            const html = `<input id="n1" class="swal2-input" placeholder="同行名稱" value="${(keepDealer||'').replace(/"/g,'&quot;')}"><input id="n2" class="swal2-input" type="number" placeholder="成本"><input id="n3" class="swal2-input" placeholder="IMEI"><input id="n4" class="swal2-input" type="number" placeholder="銷售金額"><input id="n5" class="swal2-input" placeholder="客戶名稱" value="${(keepCustomer||'').replace(/"/g,'&quot;')}"><input id="n6" class="swal2-input" placeholder="型號（流水用）"><input id="n7" class="swal2-input" placeholder="容量（流水用）"><input id="n8" class="swal2-input" placeholder="顏色（流水用）"><div id="n-err" class="text-red-400 text-xs mt-1 min-h-[1rem]"></div><button type="button" id="n-add-btn" class="mt-2 w-full py-2 rounded bg-slate-600 text-white text-sm">＋ 新增（加入此筆並繼續填）</button>`;
+            const prefillCustomer = resolveFormCustomer(keepCustomer);
+            const custReadonly = !!(UI.amendTarget && UI.amendTarget.customer);
+            const html = `<input id="n1" class="swal2-input" placeholder="同行名稱" value="${(keepDealer||'').replace(/"/g,'&quot;')}"><input id="n2" class="swal2-input" type="number" placeholder="成本"><input id="n3" class="swal2-input" placeholder="IMEI"><input id="n4" class="swal2-input" type="number" placeholder="銷售金額"><input id="n5" class="swal2-input" placeholder="客戶名稱" value="${prefillCustomer.replace(/"/g,'&quot;')}"${custReadonly ? ' readonly' : ''}><input id="n6" class="swal2-input" placeholder="型號（流水用）"><input id="n7" class="swal2-input" placeholder="容量（流水用）"><input id="n8" class="swal2-input" placeholder="顏色（流水用）"><div id="n-err" class="text-red-400 text-xs mt-1 min-h-[1rem]"></div><button type="button" id="n-add-btn" class="mt-2 w-full py-2 rounded bg-slate-600 text-white text-sm">＋ 新增（加入此筆並繼續填）</button>`;
             const addOne = (v) => {
                 const spec = [v[5],v[6],v[7]].filter(Boolean).join(' ');
-                Cart.push({type:'new_phone',name:'新機 '+v[0]+(spec?' '+spec:''),dealerName:v[0],cost:Number(v[1]),price:Number(v[3]),imei:v[2],customer:v[4],quantity:1,itemId:'NP-'+Date.now()+'-'+Math.random().toString(36).slice(2,9)});
-                applyFormCustomerToCheckout(v[4]);
+                const cust = resolveFormCustomer(v[4]);
+                Cart.push({type:'new_phone',name:'新機 '+v[0]+(spec?' '+spec:''),dealerName:v[0],cost:Number(v[1]),price:Number(v[3]),imei:v[2],customer:cust,quantity:1,itemId:'NP-'+Date.now()+'-'+Math.random().toString(36).slice(2,9)});
+                applyFormCustomerToCheckout(cust);
                 renderCart();
             };
             const getV = () => [gn('n1'),gn('n2'),gn('n3'),gn('n4'),gn('n5'),gn('n6'),gn('n7'),gn('n8')].map(el=>el?el.value:'').map(s=>typeof s==='string'?s.trim():'');
+            const canAddNew = (vals) => vals[1] && resolveFormCustomer(vals[4]);
             const { value: v } = await Swal.fire({
                 title: '新機',
                 html,
@@ -4358,7 +4385,7 @@
                 didOpen: () => {
                     gn('n-add-btn').onclick = () => {
                         const vals = getV();
-                        if (vals[1] && vals[4]) {
+                        if (canAddNew(vals)) {
                             addOne(vals);
                             if (gn('n-err')) gn('n-err').textContent = '已加入';
                             gn('n2').value = ''; gn('n3').value = ''; gn('n4').value = ''; gn('n6').value = ''; gn('n7').value = ''; gn('n8').value = '';
@@ -4367,10 +4394,12 @@
                 },
                 preConfirm: () => getV()
             });
-            if (v && v[1] && v[4]) { addOne(v); }
+            if (v && canAddNew(v)) { addOne(v); }
         }
         async function modalPeerTransfer(keepDealer, keepCustomer) {
             const gp = id => document.getElementById(id);
+            const prefillCustomer = resolveFormCustomer(keepCustomer);
+            const custReadonly = !!(UI.amendTarget && UI.amendTarget.customer);
             const BATTERY_CATS = ['已加工成品電池', '成品大容量電池', '原廠拆機電池0循環'];
             const batteries = (DB.inv || []).filter(i => i.type === 'accessory' && i.category && BATTERY_CATS.includes(i.category) && Number(i.stock) > 0);
             const batOpts = batteries.map(b => `<option value="b${b.id}">${booksEscape((b.category || '電池') + ' - ' + b.name)}（庫 ${b.stock}／本 ${Number(b.cost)||0}）</option>`).join('');
@@ -4379,7 +4408,7 @@
                 <input id="p2" class="swal2-input" type="number" placeholder="成本">
                 <input id="p3" class="swal2-input" placeholder="IMEI">
                 <input id="p4" class="swal2-input" type="number" placeholder="銷售金額">
-                <input id="p5" class="swal2-input" placeholder="客戶名稱" value="${(keepCustomer||'').replace(/"/g,'&quot;')}">
+                <input id="p5" class="swal2-input" placeholder="客戶名稱" value="${prefillCustomer.replace(/"/g,'&quot;')}"${custReadonly ? ' readonly' : ''}>
                 <input id="p6" class="swal2-input" placeholder="型號（流水用）">
                 <input id="p7" class="swal2-input" placeholder="容量（流水用）">
                 <input id="p8" class="swal2-input" placeholder="顏色（流水用）">
@@ -4434,6 +4463,7 @@
             };
             const addOne = (v, repair) => {
                 const spec = [v[5], v[6], v[7]].filter(Boolean).join(' ');
+                const cust = resolveFormCustomer(v[4]);
                 let name = '同行 ' + v[0] + (spec ? ' ' + spec : '');
                 const phoneCost = Number(v[1]) || 0;
                 const phoneSale = Number(v[3]) || 0;
@@ -4450,17 +4480,18 @@
                     cost: phoneCost + repairCost,
                     price: phoneSale + repairSale,
                     imei: v[2],
-                    customer: v[4],
+                    customer: cust,
                     quantity: 1,
                     itemId: 'PP-' + Date.now() + '-' + Math.random().toString(36).slice(2, 9),
                     isStockBattery: !!(repair && repair.isStockBattery),
                     batteryCat: (repair && repair.batteryCat) || '',
                     batteryName: (repair && repair.batteryName) || ''
                 });
-                applyFormCustomerToCheckout(v[4]);
+                applyFormCustomerToCheckout(cust);
                 renderCart();
             };
             const getV = () => [gp('p1'),gp('p2'),gp('p3'),gp('p4'),gp('p5'),gp('p6'),gp('p7'),gp('p8')].map(el=>el?el.value:'').map(s=>typeof s==='string'?s.trim():'');
+            const canAddPeer = (vals) => vals[0] && vals[1] && resolveFormCustomer(vals[4]);
             const { value: packed } = await Swal.fire({
                 title: '二手機',
                 html,
@@ -4478,7 +4509,7 @@
                         const vals = getV();
                         const repair = readRepair();
                         if (repair.error) { if (gp('p-err')) gp('p-err').textContent = repair.error; return; }
-                        if (vals[0] && vals[1] && vals[4]) {
+                        if (canAddPeer(vals)) {
                             addOne(vals, repair);
                             if (gp('p-err')) gp('p-err').textContent = '已加入';
                             gp('p2').value = ''; gp('p3').value = ''; gp('p4').value = ''; gp('p6').value = ''; gp('p7').value = ''; gp('p8').value = '';
@@ -4495,21 +4526,14 @@
                     const vals = getV();
                     const repair = readRepair();
                     if (repair.error) { Swal.showValidationMessage(repair.error); return false; }
-                    if (!(vals[0] && vals[1] && vals[4])) {
+                    if (!canAddPeer(vals)) {
                         Swal.showValidationMessage('請填寫同行名稱、成本、客戶名稱');
                         return false;
                     }
                     return { vals, repair };
                 }
             });
-            if (packed && packed.vals) addOne(packed.vals, packed.repair);
-        }
-        /** 表單客戶有填就覆寫結帳區（A：不論結帳區是否已有名稱） */
-        function applyFormCustomerToCheckout(name) {
-            const n = String(name || '').trim();
-            if (!n) return;
-            const el = document.getElementById('cust-name');
-            if (el) el.value = n;
+            if (packed && packed.vals && canAddPeer(packed.vals)) addOne(packed.vals, packed.repair);
         }
         async function modalRepair() {
             const { value: t } = await Swal.fire({ input: 'select', inputOptions: { 'gen': '一般', 'stock': '庫存電池' }, background: '#1e293b', color: 'white' });
