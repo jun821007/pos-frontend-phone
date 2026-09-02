@@ -213,6 +213,13 @@
             <div class="flex items-center gap-2"><span class="font-bold text-slate-100 text-lg">POS</span><span id="user-badge" class="text-[10px] bg-slate-800 text-yellow-500 px-2 py-0.5 rounded-full border border-slate-700">未登入</span></div>
             <div id="sync-status" class="text-xs text-slate-500 flex items-center gap-2"><span class="loader"></span> 載入中</div>
         </header>
+        <div id="amend-header-bar" class="hidden shrink-0 px-3 py-1.5 bg-cyan-950/80 border-b border-cyan-800 flex items-center justify-between gap-2 text-xs text-cyan-200 z-20">
+            <span id="amend-header-text" class="truncate min-w-0 font-semibold">補 key 中</span>
+            <div class="flex items-center gap-2 shrink-0">
+                <button type="button" onclick="toggleMobileCart('pos', true); switchView('pos');" class="text-cyan-300 underline">開啟購物車</button>
+                <button type="button" onclick="cancelAmendOrder()" class="text-slate-400 underline">取消</button>
+            </div>
+        </div>
 
         <div id="view-pos" class="view-section flex-1 flex flex-col md:flex-row overflow-hidden relative">
             <div class="flex-1 flex flex-col h-full overflow-hidden">
@@ -867,6 +874,8 @@
                     }
                 }); 
             } 
+            restoreAmendTarget();
+            updateAmendBanner();
             fetchData(); 
         }
         async function fetchData() { 
@@ -4086,12 +4095,62 @@
             document.getElementById('mob-count').innerText = cn; 
             const f = document.getElementById('mobile-float-bar-pos'); 
             if(cn > 0) f.classList.remove('translate-y-24'); 
-            else f.classList.add('translate-y-24'); 
+            else f.classList.add('translate-y-24');
+            promptAmendCheckoutIfNeeded();
         }
         function toggleGift(idx) { let item = Cart[idx]; if(item.isGift) { item.isGift = false; item.price = item.originalPrice; item.name = item.name.replace(' (贈)',''); } else { item.isGift = true; item.price = 0; item.name += ' (贈)'; } renderCart(); }
         function clearCart() { Cart=[]; renderCart(); }
         function clearRestockCart() { RestockCart=[]; renderRestockCartList(); toggleMobileCart('restock', false); }
 
+        const AMEND_STORAGE_KEY = 'pos_amend_target_v1';
+        function saveAmendTarget(t) {
+            try {
+                if (t) sessionStorage.setItem(AMEND_STORAGE_KEY, JSON.stringify(t));
+                else sessionStorage.removeItem(AMEND_STORAGE_KEY);
+            } catch (e) { /* ignore */ }
+        }
+        function restoreAmendTarget() {
+            try {
+                const raw = sessionStorage.getItem(AMEND_STORAGE_KEY);
+                if (!raw) return;
+                const t = JSON.parse(raw);
+                if (t && t.orderId) UI.amendTarget = t;
+            } catch (e) { /* ignore */ }
+        }
+        async function reloadTodaySalesWithRetry(orderId, newItemIds, maxTry = 5, delayMs = 800) {
+            const wantIds = (newItemIds || []).map(x => String(x)).filter(Boolean);
+            for (let i = 0; i < maxTry; i++) {
+                try {
+                    const fd = await API.getTodaySalesOnly();
+                    if (fd && fd.status !== 'error') {
+                        DB.sales = fd.todaySales || [];
+                        renderReport();
+                        const rows = (DB.sales || []).filter(x => String(x.orderId) === String(orderId));
+                        if (wantIds.length === 0) {
+                            if (rows.length > 0) return true;
+                        } else if (wantIds.every(id => rows.some(r => String(r.itemId) === id))) {
+                            return true;
+                        }
+                    }
+                } catch (e) { console.warn('reloadTodaySalesWithRetry', e); }
+                if (i < maxTry - 1) await new Promise(r => setTimeout(r, delayMs));
+            }
+            return false;
+        }
+        function expandOrderInReport(orderId) {
+            const gid = 'group-' + orderId;
+            const wrap = document.getElementById(gid);
+            if (!wrap) return;
+            const acc = wrap.querySelector('.order-accordion-content');
+            if (acc) acc.classList.add('open');
+            try { wrap.scrollIntoView({ behavior: 'smooth', block: 'nearest' }); } catch (e) {}
+        }
+        function promptAmendCheckoutIfNeeded() {
+            if (!UI.amendTarget || Cart.length === 0) return;
+            updateAmendBanner();
+            const f = document.getElementById('mobile-float-bar-pos');
+            if (f) f.classList.remove('translate-y-24');
+        }
         function updateAmendBanner() {
             const banner = document.getElementById('amend-banner');
             const text = document.getElementById('amend-banner-text');
@@ -4101,6 +4160,9 @@
             const confirmBtns = document.querySelectorAll('button[onclick="confirmCheckout()"]');
             const cartPanel = document.getElementById('cart-panel');
             if (!t) {
+                saveAmendTarget(null);
+                const hdr = document.getElementById('amend-header-bar');
+                if (hdr) hdr.classList.add('hidden');
                 if (banner) banner.classList.add('hidden');
                 if (cartPanel) cartPanel.classList.remove('is-amending');
                 if (custEl) { custEl.readOnly = false; custEl.classList.remove('opacity-60'); }
@@ -4109,8 +4171,14 @@
                 resetCartFooterDrag();
                 return;
             }
+            saveAmendTarget(t);
             const payLabel = t.payMethod === 'linepay' ? 'Line Pay' : (t.payMethod === 'credit' ? '掛帳' : '現金');
-            if (text) text.textContent = `補 key → ${t.orderId}　${t.customer}　${payLabel}`;
+            const msg = `補 key → ${t.orderId}　${t.customer}　${payLabel}`;
+            if (text) text.textContent = msg;
+            const hdr = document.getElementById('amend-header-bar');
+            const hdrText = document.getElementById('amend-header-text');
+            if (hdr) hdr.classList.remove('hidden');
+            if (hdrText) hdrText.textContent = msg;
             if (banner) banner.classList.remove('hidden');
             if (cartPanel) cartPanel.classList.add('is-amending');
             if (custEl) {
@@ -4178,6 +4246,7 @@
                 return;
             }
             UI.amendTarget = { orderId: String(orderId), customer, payMethod };
+            saveAmendTarget(UI.amendTarget);
             Cart = [];
             renderCart();
             updateAmendBanner();
@@ -4271,22 +4340,40 @@
                     Cart = [];
                     if (peerMarkChecked) savePeerMark(oid);
                     if (markEl) markEl.checked = false;
+                    const mergedOrderId = oid;
                     UI.amendTarget = null;
+                    saveAmendTarget(null);
                     updateAmendBanner();
                     renderCart(); 
                     toggleMobileCart('pos', false);
                     try { const activeBtn = document.querySelector('.pill-btn.active'); if(activeBtn) filterItems(null, activeBtn.innerText); } catch(e) {}
-                    Swal.update({ html: '寫入成功，正在載入帳務...' });
+                    Swal.update({ html: amend ? '寫入成功，正在併入原單...' : '寫入成功，正在載入帳務...' });
                     try {
-                        await refreshLedgerAfterCheckout();
-                        if (UI.tab === 'phone') switchMainTab('phone');
-                        document.getElementById('sync-status').innerHTML = '<span class="text-green-500">● 已同步</span>';
-                        await fetchData();
-                        Swal.fire({ icon: 'success', title: amend ? '已併入原單' : '結帳完成', timer: 1500, background: '#1e293b' });
+                        if (amend) {
+                            const ok = await reloadTodaySalesWithRetry(mergedOrderId, items.map(it => it.itemId));
+                            await fetchData();
+                            openReport();
+                            expandOrderInReport(mergedOrderId);
+                            document.getElementById('sync-status').innerHTML = '<span class="text-green-500">● 已同步</span>';
+                            Swal.fire({
+                                icon: ok ? 'success' : 'warning',
+                                title: ok ? '已併入原單' : '已寫入，帳務同步中',
+                                text: ok ? `${mergedOrderId} 已更新，請展開該單確認` : '若今日／歷史未看到新品項，請按同步或稍後再試',
+                                timer: ok ? 2200 : 3500,
+                                background: '#1e293b'
+                            });
+                        } else {
+                            await refreshLedgerAfterCheckout();
+                            if (UI.tab === 'phone') switchMainTab('phone');
+                            document.getElementById('sync-status').innerHTML = '<span class="text-green-500">● 已同步</span>';
+                            await fetchData();
+                            Swal.fire({ icon: 'success', title: '結帳完成', timer: 1500, background: '#1e293b' });
+                        }
                     } catch(e) { 
                         console.error('載入帳務失敗:', e);
                         await fetchData();
-                        Swal.fire({icon:'success', title: amend ? '已併入原單' : '結帳完成', text: '若帳務未更新請手動重新整理', timer: 2000, background: '#1e293b'});
+                        if (amend) openReport();
+                        Swal.fire({icon:'success', title: amend ? '已併入原單' : '結帳完成', text: '若帳務未更新請按「同步」', timer: 2500, background: '#1e293b'});
                     }
                 } catch(e) {
                     console.error('結帳失敗:', e);
