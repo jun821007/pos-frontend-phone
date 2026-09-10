@@ -2003,6 +2003,103 @@
         function saveSalaryPresets(presets) {
             localStorage.setItem(SALARY_PRESET_KEY, JSON.stringify(presets || loadSalaryPresets()));
         }
+
+        function salaryLedgerRows() {
+            return (DB.sales || []).concat(DB.history || []).concat(DB.pending || []);
+        }
+        function salaryNameTag(kind) {
+            if (kind === 'repair') return '維修';
+            if (kind === 'used') return '二手機';
+            if (kind === 'acc') return '配件';
+            return kind;
+        }
+        function isSalaryAlreadyPaid(orderId, kind) {
+            const oid = String(orderId);
+            const tag = salaryNameTag(kind);
+            const marker = '[薪資][' + tag + '] ' + oid;
+            return salaryLedgerRows().some((row) => {
+                if (String(row.type || '') !== 'salary') return false;
+                if (row.status === 'Returned' || row.status === 'Deleted') return false;
+                const name = String(row.itemName || row.name || '');
+                if (name.includes(marker)) return true;
+                if (String(row.orderId || '') === ('SAL-' + oid + '-' + kind)) return true;
+                return false;
+            });
+        }
+        function getOrderGroupForSalary(orderId) {
+            const oid = String(orderId);
+            if (OrderRegistry[oid] && OrderRegistry[oid].items && OrderRegistry[oid].items.length) {
+                const items = OrderRegistry[oid].items;
+                const sample = items[0] || {};
+                return {
+                    orderId: oid,
+                    customer: OrderRegistry[oid].customer || sample.customer || '過路客',
+                    status: sample.status || 'Completed',
+                    time: sample.time,
+                    items
+                };
+            }
+            const pools = [(DB.sales || []), (DB.pending || []), (DB.history || [])];
+            for (let p = 0; p < pools.length; p++) {
+                const rows = pools[p];
+                const hit = rows.filter((i) => String(i.orderId) === oid && i.status !== 'Returned' && i.status !== 'Deleted');
+                if (hit.length) {
+                    return {
+                        orderId: oid,
+                        customer: hit[0].customer || '過路客',
+                        status: hit[0].status || 'Completed',
+                        time: hit[0].time,
+                        items: hit
+                    };
+                }
+            }
+            return null;
+        }
+        function salaryItemProfit(it) {
+            const sale = Number(it.salePrice) || 0;
+            const cost = Number(it.cost) || 0;
+            const isMultiExtra = it.type === 'phone' && sale === 0 && String(it.itemName || '').includes(' + ');
+            if (isMultiExtra) return 0;
+            if (it.profit !== undefined && it.profit !== null && it.profit !== '') return Number(it.profit) || 0;
+            return sale - cost;
+        }
+        function calcOrderSalaryBreakdown(g, presets) {
+            const p = presets || loadSalaryPresets();
+            const out = [];
+            SALARY_KIND_META.forEach(({ key, label, types }) => {
+                const items = (g.items || []).filter((it) => types.includes(it.type));
+                if (!items.length) return;
+                const profit = items.reduce((s, it) => s + salaryItemProfit(it), 0);
+                const rule = p[key] || { mode: 'percent', value: 0 };
+                let amount = 0;
+                let formula = '';
+                if (rule.mode === 'fixed') {
+                    amount = Math.max(0, Math.round(Number(rule.value) || 0));
+                    formula = '固定 $' + amount.toLocaleString();
+                } else {
+                    const pct = Number(rule.value) || 0;
+                    amount = Math.max(0, Math.round(profit * pct / 100));
+                    formula = '毛利 $' + Math.round(profit).toLocaleString() + ' × ' + pct + '% = $' + amount.toLocaleString();
+                }
+                const paid = isSalaryAlreadyPaid(g.orderId, key);
+                out.push({ kind: key, label, profit, amount, formula, paid, hasItems: true });
+            });
+            return out;
+        }
+        function buildSalaryCopyText(lines) {
+            const ymd = ymdTaipei(new Date()).replace(/-/g, '/');
+            const rows = [];
+            rows.push('【薪資明細】' + ymd);
+            let total = 0;
+            (lines || []).forEach((line, idx) => {
+                rows.push((idx + 1) + '. ' + line.orderId + '　' + (line.customer || '') + '　' + line.label + '　$' + (Number(line.amount || 0).toLocaleString()));
+                if (line.formula) rows.push('   ' + line.formula);
+                total += Number(line.amount) || 0;
+            });
+            rows.push('合計：$' + total.toLocaleString());
+            return rows.join('\n');
+        }
+
         function openSalary() {
             if (!(User && User.isAdmin)) {
                 Swal.fire({ icon: 'error', title: '僅管理員可查看薪資', background: '#1e293b', color: 'white' });
@@ -2291,6 +2388,8 @@
             }
         }
         window.openOrderSalaryPay = openOrderSalaryPay;
+        window.getOrderGroupForSalary = getOrderGroupForSalary;
+        window.calcOrderSalaryBreakdown = calcOrderSalaryBreakdown;
         async function payOrderSalaryPicks(picks) {
             if (!picks || !picks.length) return;
             Swal.fire({ title: '發放中...', background: '#1e293b', color: 'white', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
