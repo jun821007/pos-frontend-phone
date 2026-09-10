@@ -214,6 +214,7 @@
         <button type="button" id="d-nav-pending" onclick="openPending()" class="nav-btn w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-slate-500 hover:text-yellow-400 transition"><i class="fa-solid fa-wallet w-5 text-center text-lg shrink-0"></i><span class="nav-label text-sm font-semibold">未結</span></button>
         <button type="button" id="d-nav-restock" onclick="switchView('restock')" class="nav-btn w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-slate-500 hover:text-yellow-400 transition"><i class="fa-solid fa-dolly w-5 text-center text-lg shrink-0"></i><span class="nav-label text-sm font-semibold">進貨</span></button>
         <button type="button" id="d-nav-books" onclick="openBooks()" style="display:none" class="nav-btn w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-slate-500 hover:text-yellow-400 transition"><i class="fa-solid fa-book w-5 text-center text-lg shrink-0"></i><span class="nav-label text-sm font-semibold">記帳</span></button>
+        <button type="button" id="d-nav-salary" onclick="openSalary()" style="display:none" class="nav-btn w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-slate-500 hover:text-yellow-400 transition"><i class="fa-solid fa-sack-dollar w-5 text-center text-lg shrink-0"></i><span class="nav-label text-sm font-semibold">薪資</span></button>
         <button type="button" id="d-nav-setting" onclick="switchView('setting')" class="nav-btn w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-slate-500 hover:text-yellow-400 transition"><i class="fa-solid fa-gear w-5 text-center text-lg shrink-0"></i><span class="nav-label text-sm font-semibold">設定</span></button>
         <div class="mt-auto pt-4 border-t border-slate-800/80">
             <button type="button" onclick="softRefresh()" title="重新同步庫存與帳務" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-blue-400 hover:bg-slate-800 transition text-left"><i class="fa-solid fa-sync w-5 text-center text-lg shrink-0"></i><span class="text-sm font-semibold">同步</span></button>
@@ -425,6 +426,19 @@
             <div id="books-tables" class="flex-1 overflow-auto min-h-0"></div>
         </div>
 
+        <div id="view-salary" class="hidden view-section flex-1 flex flex-col overflow-hidden books-page">
+            <div class="books-toolbar shrink-0 mb-2">
+                <div class="books-toolbar-top">
+                    <h2>薪資配給</h2>
+                    <div class="books-toolbar-actions">
+                        <button type="button" onclick="saveSalaryPresetsFromForm()" class="px-3 py-2 rounded-lg bg-yellow-600 text-black text-sm font-bold">儲存預設</button>
+                    </div>
+                </div>
+                <p class="text-xs text-slate-400">設定維修／二手機／配件的預設算法。今日／未結點「薪資」套用；未結只能預覽，已入帳才會寫入薪支。同單同類型不可重複發放。</p>
+            </div>
+            <div id="salary-preset-form" class="flex-1 overflow-auto min-h-0 space-y-3 pb-8"></div>
+        </div>
+
         <div id="view-fund" class="hidden view-section flex-1 flex flex-col overflow-hidden books-page">
             <div class="books-toolbar shrink-0 mb-2">
                 <div class="books-toolbar-top">
@@ -539,7 +553,7 @@
         </div>
     </main>
 
-    <nav class="md:hidden fixed bottom-0 w-full h-16 bg-slate-950 border-t border-slate-800 flex z-50"><div onclick="switchView('pos')" id="m-nav-pos" class="mobile-nav-item active"><i class="fa-solid fa-cash-register"></i>收銀</div><div onclick="openReport()" id="m-nav-report" class="mobile-nav-item"><i class="fa-solid fa-file-invoice-dollar"></i>今日</div><div onclick="openPending()" id="m-nav-pending" class="mobile-nav-item"><i class="fa-solid fa-wallet"></i>未結</div><div onclick="openHistory()" id="m-nav-history" class="mobile-nav-item"><i class="fa-solid fa-chart-pie"></i>歷史</div><div onclick="switchView('restock')" id="m-nav-restock" class="mobile-nav-item"><i class="fa-solid fa-dolly"></i>進貨</div><div onclick="openBooks()" id="m-nav-books" class="mobile-nav-item" style="display:none"><i class="fa-solid fa-book"></i>記帳</div><div onclick="switchView('setting')" id="m-nav-setting" class="mobile-nav-item"><i class="fa-solid fa-gear"></i>設定</div></nav>
+    <nav class="md:hidden fixed bottom-0 w-full h-16 bg-slate-950 border-t border-slate-800 flex z-50"><div onclick="switchView('pos')" id="m-nav-pos" class="mobile-nav-item active"><i class="fa-solid fa-cash-register"></i>收銀</div><div onclick="openReport()" id="m-nav-report" class="mobile-nav-item"><i class="fa-solid fa-file-invoice-dollar"></i>今日</div><div onclick="openPending()" id="m-nav-pending" class="mobile-nav-item"><i class="fa-solid fa-wallet"></i>未結</div><div onclick="openHistory()" id="m-nav-history" class="mobile-nav-item"><i class="fa-solid fa-chart-pie"></i>歷史</div><div onclick="switchView('restock')" id="m-nav-restock" class="mobile-nav-item"><i class="fa-solid fa-dolly"></i>進貨</div><div onclick="openBooks()" id="m-nav-books" class="mobile-nav-item" style="display:none"><i class="fa-solid fa-book"></i>記帳</div><div onclick="openSalary()" id="m-nav-salary" class="mobile-nav-item" style="display:none"><i class="fa-solid fa-sack-dollar"></i>薪資</div><div onclick="switchView('setting')" id="m-nav-setting" class="mobile-nav-item"><i class="fa-solid fa-gear"></i>設定</div></nav>
 
     <script>
         // 版本號：自動以日期產生（每次載入即更新）
@@ -954,8 +968,8 @@
         }
 
         function switchView(v) { 
-            if ((v === 'books' || v === 'fund') && !(User && User.isAdmin)) {
-                Swal.fire({ icon: 'error', title: '僅管理員可查看記帳', background: '#1e293b', color: 'white' });
+            if ((v === 'books' || v === 'fund' || v === 'salary') && !(User && User.isAdmin)) {
+                Swal.fire({ icon: 'error', title: '僅管理員可查看', background: '#1e293b', color: 'white' });
                 return;
             }
             const ev = document.getElementById('view-'+v); if (!ev) return;
@@ -1835,6 +1849,7 @@
                         <div class="flex items-center gap-1">${statusHtml}${payBadge}</div>
                         ${g.status === 'Pending' ? `<button onclick="event.stopPropagation(); settle('${g.orderId}', ${g.total})" class="text-[10px] bg-green-900 text-green-200 px-1.5 rounded border border-green-700 hover:bg-green-800">入帳</button>` : ''}
                         ${opts.allowAmend ? `<button onclick="event.stopPropagation(); startAmendOrder('${oidEsc}')" class="text-[10px] bg-cyan-900 text-cyan-200 px-1.5 rounded border border-cyan-700 hover:bg-cyan-800">補 key</button>` : ''}
+                        ${(User && User.isAdmin) ? `<button onclick="event.stopPropagation(); openOrderSalaryPay('${oidEsc}')" class="text-[10px] bg-amber-900 text-amber-200 px-1.5 rounded border border-amber-700 hover:bg-amber-800">薪資</button>` : ''}
                         <button onclick="event.stopPropagation(); confirmDeleteOrder('${g.orderId}')" class="text-[10px] bg-red-900 text-red-200 px-1.5 rounded border border-red-700 hover:bg-red-800">刪單</button>
                     </div>
                 </div>
@@ -1929,17 +1944,367 @@
 
         function applyBooksNavVisibility() {
             const show = !!(User && User.isAdmin);
-            const desk = document.getElementById('d-nav-books');
-            if (desk) {
-                desk.classList.toggle('hidden', !show);
-                desk.style.display = show ? 'flex' : 'none';
+            ['d-nav-books', 'm-nav-books', 'd-nav-salary', 'm-nav-salary'].forEach((id) => {
+                const el = document.getElementById(id);
+                if (!el) return;
+                el.classList.toggle('hidden', !show);
+                el.style.display = show ? (id.startsWith('d-') ? 'flex' : 'flex') : 'none';
+            });
+        }
+
+        const SALARY_PRESET_KEY = 'pos_salary_presets_v1';
+        const SALARY_KIND_META = [
+            { key: 'repair', label: '維修', types: ['repair'] },
+            { key: 'used', label: '二手機', types: ['phone', 'peer_phone'] },
+            { key: 'acc', label: '配件', types: ['accessory', 'direct_transfer'] }
+        ];
+        function defaultSalaryPresets() {
+            return {
+                repair: { mode: 'percent', value: 30 },
+                used: { mode: 'fixed', value: 500 },
+                acc: { mode: 'percent', value: 20 }
+            };
+        }
+        function loadSalaryPresets() {
+            const base = defaultSalaryPresets();
+            try {
+                const raw = localStorage.getItem(SALARY_PRESET_KEY);
+                if (!raw) return base;
+                const parsed = JSON.parse(raw) || {};
+                SALARY_KIND_META.forEach(({ key }) => {
+                    const row = parsed[key] || {};
+                    const mode = row.mode === 'fixed' ? 'fixed' : 'percent';
+                    const value = Number(row.value);
+                    base[key] = { mode, value: Number.isFinite(value) ? value : base[key].value };
+                });
+            } catch (e) {}
+            return base;
+        }
+        function saveSalaryPresets(presets) {
+            localStorage.setItem(SALARY_PRESET_KEY, JSON.stringify(presets || loadSalaryPresets()));
+        }
+        function openSalary() {
+            if (!(User && User.isAdmin)) {
+                Swal.fire({ icon: 'error', title: '僅管理員可查看薪資', background: '#1e293b', color: 'white' });
+                return;
             }
-            const mob = document.getElementById('m-nav-books');
-            if (mob) {
-                mob.classList.toggle('hidden', !show);
-                mob.style.display = show ? 'flex' : 'none';
+            switchView('salary');
+            renderSalaryPresetForm();
+        }
+        function renderSalaryPresetForm() {
+            const box = document.getElementById('salary-preset-form');
+            if (!box) return;
+            const presets = loadSalaryPresets();
+            box.innerHTML = SALARY_KIND_META.map(({ key, label }) => {
+                const p = presets[key] || { mode: 'percent', value: 0 };
+                const isPct = p.mode !== 'fixed';
+                return `<div class="rounded-xl border border-slate-700 bg-slate-900/60 p-4">
+                    <div class="text-sm font-bold text-white mb-3">${label}</div>
+                    <div class="flex flex-wrap gap-3 mb-3 text-sm text-slate-300">
+                        <label class="inline-flex items-center gap-2 cursor-pointer"><input type="radio" name="sal-mode-${key}" value="percent" class="accent-yellow-500" ${isPct ? 'checked' : ''}>毛利 %</label>
+                        <label class="inline-flex items-center gap-2 cursor-pointer"><input type="radio" name="sal-mode-${key}" value="fixed" class="accent-yellow-500" ${!isPct ? 'checked' : ''}>固定額</label>
+                    </div>
+                    <input id="sal-val-${key}" type="number" class="w-full input-dark p-2.5 rounded-lg text-sm" value="${Number(p.value) || 0}" placeholder="${isPct ? '例如 30' : '例如 500'}">
+                    <div class="text-[11px] text-slate-500 mt-2">${isPct ? '發放金額 = 該類毛利 × 百分比' : '發放金額 = 固定額（該類有品項時）'}</div>
+                </div>`;
+            }).join('') + `<div class="text-xs text-slate-500 px-1">預設存在本機瀏覽器。今日／未結訂單右側「薪資」可套用並複製明細給員工。</div>`;
+        }
+        function saveSalaryPresetsFromForm() {
+            if (!(User && User.isAdmin)) return;
+            const next = defaultSalaryPresets();
+            SALARY_KIND_META.forEach(({ key }) => {
+                const modeEl = document.querySelector(`input[name="sal-mode-${key}"]:checked`);
+                const valEl = document.getElementById('sal-val-' + key);
+                const mode = modeEl && modeEl.value === 'fixed' ? 'fixed' : 'percent';
+                const value = Number(valEl && valEl.value);
+                next[key] = { mode, value: Number.isFinite(value) ? value : 0 };
+            });
+            saveSalaryPresets(next);
+            Swal.fire({ icon: 'success', title: '已儲存預設', toast: true, position: 'top', timer: 1400, showConfirmButton: false, background: '#1e293b' });
+            renderSalaryPresetForm();
+        }
+        function salaryLedgerRows() {
+            return (DB.sales || []).concat(DB.history || []).concat(DB.pending || []);
+        }
+        function salaryPaidKey(orderId, kind) {
+            return String(orderId) + '_' + String(kind);
+        }
+        function salaryNameTag(kind) {
+            if (kind === 'repair') return '維修';
+            if (kind === 'used') return '二手機';
+            if (kind === 'acc') return '配件';
+            return kind;
+        }
+        function isSalaryAlreadyPaid(orderId, kind) {
+            const oid = String(orderId);
+            const tag = salaryNameTag(kind);
+            const marker = `[薪資][${tag}] ${oid}`;
+            return salaryLedgerRows().some((row) => {
+                if (String(row.type || '') !== 'salary') return false;
+                if (row.status === 'Returned' || row.status === 'Deleted') return false;
+                const name = String(row.itemName || row.name || '');
+                if (name.includes(marker)) return true;
+                if (String(row.orderId || '') === ('SAL-' + oid + '-' + kind)) return true;
+                return false;
+            });
+        }
+        function getOrderGroupForSalary(orderId) {
+            const oid = String(orderId);
+            if (OrderRegistry[oid] && OrderRegistry[oid].items && OrderRegistry[oid].items.length) {
+                const items = OrderRegistry[oid].items;
+                const sample = items[0] || {};
+                return {
+                    orderId: oid,
+                    customer: OrderRegistry[oid].customer || sample.customer || '過路客',
+                    status: sample.status || 'Completed',
+                    items
+                };
+            }
+            const pools = [(DB.sales || []), (DB.pending || []), (DB.history || [])];
+            for (const rows of pools) {
+                const hit = rows.filter((i) => String(i.orderId) === oid && i.status !== 'Returned' && i.status !== 'Deleted');
+                if (hit.length) {
+                    return {
+                        orderId: oid,
+                        customer: hit[0].customer || '過路客',
+                        status: hit[0].status || 'Completed',
+                        items: hit
+                    };
+                }
+            }
+            return null;
+        }
+        function salaryItemProfit(it) {
+            const sale = Number(it.salePrice) || 0;
+            const cost = Number(it.cost) || 0;
+            const isMultiExtra = it.type === 'phone' && sale === 0 && String(it.itemName || '').includes(' + ');
+            if (isMultiExtra) return 0;
+            if (it.profit !== undefined && it.profit !== null && it.profit !== '') return Number(it.profit) || 0;
+            return sale - cost;
+        }
+        function calcOrderSalaryBreakdown(g, presets) {
+            const p = presets || loadSalaryPresets();
+            const out = [];
+            SALARY_KIND_META.forEach(({ key, label, types }) => {
+                const items = (g.items || []).filter((it) => types.includes(it.type));
+                if (!items.length) return;
+                const profit = items.reduce((s, it) => s + salaryItemProfit(it), 0);
+                const rule = p[key] || { mode: 'percent', value: 0 };
+                let amount = 0;
+                let formula = '';
+                if (rule.mode === 'fixed') {
+                    amount = Math.max(0, Math.round(Number(rule.value) || 0));
+                    formula = `固定 $${amount.toLocaleString()}`;
+                } else {
+                    const pct = Number(rule.value) || 0;
+                    amount = Math.max(0, Math.round(profit * pct / 100));
+                    formula = `毛利 $${Math.round(profit).toLocaleString()} × ${pct}% = $${amount.toLocaleString()}`;
+                }
+                const paid = isSalaryAlreadyPaid(g.orderId, key);
+                out.push({ kind: key, label, profit, amount, formula, paid, hasItems: true });
+            });
+            return out;
+        }
+        function buildSalaryCopyText(lines) {
+            const ymd = ymdTaipei(new Date()).replace(/-/g, '/');
+            const rows = [];
+            rows.push(`【薪資明細】${ymd}`);
+            let total = 0;
+            (lines || []).forEach((line, idx) => {
+                rows.push(`${idx + 1}. ${line.orderId}　${line.customer || ''}　${line.label}　$${Number(line.amount || 0).toLocaleString()}`);
+                rows.push(`   ${line.formula || ''}`);
+                total += Number(line.amount) || 0;
+            });
+            rows.push(`合計：$${total.toLocaleString()}`);
+            return rows.join('\n');
+        }
+        async function copyTextToClipboard(text) {
+            try {
+                if (navigator.clipboard && navigator.clipboard.writeText) {
+                    await navigator.clipboard.writeText(text);
+                    return true;
+                }
+            } catch (e) {}
+            try {
+                const ta = document.createElement('textarea');
+                ta.value = text;
+                document.body.appendChild(ta);
+                ta.select();
+                document.execCommand('copy');
+                document.body.removeChild(ta);
+                return true;
+            } catch (e) {
+                return false;
             }
         }
+        async function openOrderSalaryPay(orderId) {
+            if (!(User && User.isAdmin)) {
+                Swal.fire({ icon: 'error', title: '僅管理員可發薪資', background: '#1e293b', color: 'white' });
+                return;
+            }
+            const g = getOrderGroupForSalary(orderId);
+            if (!g) {
+                Swal.fire({ icon: 'warning', title: '找不到該單', background: '#1e293b', color: 'white' });
+                return;
+            }
+            const presets = loadSalaryPresets();
+            const rows = calcOrderSalaryBreakdown(g, presets);
+            if (!rows.length) {
+                Swal.fire({ icon: 'info', title: '此單無可發薪資類別', text: '沒有維修／二手機／配件品項', background: '#1e293b', color: 'white' });
+                return;
+            }
+            const canPay = String(g.status) === 'Completed';
+            const htmlRows = rows.map((r) => {
+                const disabled = r.paid ? 'disabled' : '';
+                const checked = (!r.paid && r.amount > 0) ? 'checked' : '';
+                const paidHint = r.paid ? '<span class="text-red-400 text-[11px]">已發過</span>' : '';
+                return `<label class="flex items-start gap-2 py-2 border-b border-slate-700 text-left ${r.paid ? 'opacity-50' : ''}">
+                    <input type="checkbox" class="sal-kind-cb accent-yellow-500 mt-1" data-kind="${r.kind}" ${disabled} ${checked}>
+                    <div class="min-w-0 flex-1">
+                        <div class="text-sm text-white font-bold">${r.label}　$${r.amount.toLocaleString()} ${paidHint}</div>
+                        <div class="text-[11px] text-slate-400">${r.formula}</div>
+                        <input type="number" class="sal-amt-input swal2-input !my-1 !w-full !text-sm" data-kind="${r.kind}" value="${r.amount}" ${r.paid ? 'disabled' : ''}>
+                    </div>
+                </label>`;
+            }).join('');
+            const tip = canPay
+                ? '<div class="text-[11px] text-slate-400 text-left px-1 mb-1">已入帳：確認後寫入薪支。同類型不可重複。</div>'
+                : '<div class="text-[11px] text-amber-400 text-left px-1 mb-1">尚未入帳：只能預覽／複製明細，入帳後才能發放。</div>';
+            const result = await Swal.fire({
+                title: `薪資　${g.orderId}`,
+                html: `${tip}<div class="text-xs text-slate-400 text-left mb-2">${g.customer || ''}</div>${htmlRows}`,
+                background: '#1e293b',
+                color: 'white',
+                showCancelButton: true,
+                showDenyButton: true,
+                showConfirmButton: canPay,
+                confirmButtonText: '確認發放',
+                denyButtonText: '複製明細',
+                cancelButtonText: '關閉',
+                confirmButtonColor: '#ca8a04',
+                preConfirm: () => {
+                    if (!canPay) {
+                        Swal.showValidationMessage('請先入帳後再發放');
+                        return false;
+                    }
+                    const picks = [];
+                    document.querySelectorAll('.sal-kind-cb:checked').forEach((cb) => {
+                        const kind = cb.getAttribute('data-kind');
+                        const inp = document.querySelector(`.sal-amt-input[data-kind="${kind}"]`);
+                        const amount = Math.round(Number(inp && inp.value) || 0);
+                        const meta = rows.find((x) => x.kind === kind);
+                        if (!meta || meta.paid) return;
+                        if (amount <= 0) return;
+                        picks.push({
+                            kind,
+                            label: meta.label,
+                            amount,
+                            formula: meta.formula,
+                            orderId: g.orderId,
+                            customer: g.customer
+                        });
+                    });
+                    if (!picks.length) {
+                        Swal.showValidationMessage('請勾選要發的類別並填金額');
+                        return false;
+                    }
+                    return picks;
+                },
+                preDeny: () => {
+                    const picks = [];
+                    document.querySelectorAll('.sal-kind-cb').forEach((cb) => {
+                        if (!cb.checked && !cb.disabled) return;
+                        const kind = cb.getAttribute('data-kind');
+                        if (!cb.checked) return;
+                        const inp = document.querySelector(`.sal-amt-input[data-kind="${kind}"]`);
+                        const amount = Math.round(Number(inp && inp.value) || 0);
+                        const meta = rows.find((x) => x.kind === kind);
+                        if (!meta || amount <= 0) return;
+                        picks.push({
+                            kind,
+                            label: meta.label,
+                            amount,
+                            formula: meta.formula,
+                            orderId: g.orderId,
+                            customer: g.customer
+                        });
+                    });
+                    if (!picks.length) {
+                        // fallback: all unpaid with amount
+                        rows.filter((r) => !r.paid && r.amount > 0).forEach((meta) => {
+                            picks.push({
+                                kind: meta.kind,
+                                label: meta.label,
+                                amount: meta.amount,
+                                formula: meta.formula,
+                                orderId: g.orderId,
+                                customer: g.customer
+                            });
+                        });
+                    }
+                    return picks;
+                }
+            });
+            if (result.isDenied) {
+                const picks = Array.isArray(result.value) ? result.value : [];
+                const text = buildSalaryCopyText(picks.length ? picks : rows.filter((r) => r.amount > 0).map((r) => ({
+                    orderId: g.orderId, customer: g.customer, label: r.label, amount: r.amount, formula: r.formula
+                })));
+                const ok = await copyTextToClipboard(text);
+                Swal.fire({ icon: ok ? 'success' : 'info', title: ok ? '已複製明細' : '請手動複製', text: ok ? '' : text, background: '#1e293b', color: 'white' });
+                return;
+            }
+            if (!result.isConfirmed || !result.value) return;
+            await payOrderSalaryPicks(result.value);
+        }
+        async function payOrderSalaryPicks(picks) {
+            if (!picks || !picks.length) return;
+            Swal.fire({ title: '發放中...', background: '#1e293b', color: 'white', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
+            const paidLines = [];
+            for (const pick of picks) {
+                if (isSalaryAlreadyPaid(pick.orderId, pick.kind)) continue;
+                const tag = salaryNameTag(pick.kind);
+                const items = [{
+                    type: 'salary',
+                    name: `[薪資][${tag}] ${pick.orderId} ${pick.customer || ''}`.trim(),
+                    cost: Number(pick.amount) || 0,
+                    quantity: 1
+                }];
+                const oid = 'SAL-' + pick.orderId + '-' + pick.kind;
+                const entryDate = ymdTaipei(new Date());
+                try {
+                    const r = await API.handleRestock({
+                        items,
+                        person: User.name,
+                        orderId: oid,
+                        vendorName: '薪資',
+                        entryDate
+                    });
+                    if (r.status === 'error') {
+                        Swal.fire({ icon: 'error', title: '發放失敗', text: r.msg || pick.label, background: '#1e293b', color: 'white' });
+                        return;
+                    }
+                    paidLines.push(pick);
+                } catch (e) {
+                    Swal.fire({ icon: 'error', title: '發放失敗', text: (e && e.message) || '', background: '#1e293b', color: 'white' });
+                    return;
+                }
+            }
+            await fetchData();
+            if (!document.getElementById('view-report').classList.contains('hidden')) renderReport();
+            if (!document.getElementById('view-pending').classList.contains('hidden')) renderPendingList();
+            if (!document.getElementById('view-history').classList.contains('hidden')) renderHistoryList();
+            const text = buildSalaryCopyText(paidLines);
+            const copied = await copyTextToClipboard(text);
+            Swal.fire({
+                icon: 'success',
+                title: '已寫入薪支',
+                text: copied ? '明細已複製，可直接貼給員工' : text,
+                background: '#1e293b',
+                color: 'white'
+            });
+        }
+
         function setBooksMode(mode) {
             UI.booksMode = mode === 'bimonth' ? 'bimonth' : (mode === 'year' ? 'year' : 'month');
             const m = document.getElementById('books-mode-month');
@@ -2047,6 +2412,19 @@
             const m = String(ymd || '').match(/\d{4}[\/\-](\d{1,2})/);
             const n = m ? Number(m[1]) : 0;
             return (n >= 1 && n <= 12) ? n : 0;
+        }
+        function booksAvgDivisorDays(period) {
+            if (!period || !period.startYmd || !period.endYmd) return 1;
+            const todayYmd = ymdTaipei(new Date());
+            const startYm = period.startYmd.slice(0, 7);
+            const todayYm = todayYmd.slice(0, 7);
+            const y = Number(period.startYmd.slice(0, 4));
+            const m = Number(period.startYmd.slice(5, 7));
+            const daysInMonth = new Date(y, m, 0).getDate();
+            if (startYm < todayYm) return Math.max(1, daysInMonth);
+            if (startYm > todayYm) return 1;
+            const day = Number(todayYmd.slice(8, 10)) || 1;
+            return Math.max(1, Math.min(day, daysInMonth));
         }
         function buildBooksReport(rows, rangeStart, rangeEnd, periodLabel) {
             const profit = emptyBooksProfit();
@@ -2161,9 +2539,14 @@
                 if (mi) monthly[mi - 1].expense += Number(r.amount) || 0;
             });
             monthly.forEach(x => { x.net = x.profit - x.expense; });
+            const period = booksPeriodRange();
+            const avgDays = (UI.booksMode === 'month') ? booksAvgDivisorDays(period) : 0;
+            const avgNet = avgDays > 0 ? Math.round(net / avgDays) : 0;
             return {
                 periodLabel,
                 mode: UI.booksMode || 'month',
+                avgDays,
+                avgNet,
                 profit,
                 expense,
                 profitTotal,
@@ -2274,6 +2657,7 @@
                 ...BOOKS_EXPENSE_KEYS.map(k => `<tr><td>${k}</td><td class="num exp">${se(k)}</td></tr>`),
                 `<tr class="tot"><td>支出合計</td><td class="num exp">${money(report.expenseTotal)}</td></tr>`,
                 `<tr class="tot"><td>本期淨利</td><td class="num net">${money(report.net)}</td></tr>`,
+                ...((!isYear && report.mode === 'month' && Number(report.avgDays) > 0) ? [`<tr class="tot"><td>日均淨利（÷${Number(report.avgDays)} 天）</td><td class="num net">${money(report.avgNet)}</td></tr>`] : []),
                 `<tr class="sec"><td colspan="2">備查（不扣淨利）</td></tr>`,
                 ...BOOKS_MEMO_KEYS.map(k => `<tr><td class="mute">${memoLabel(k)}</td><td class="num mute">${se(k)}</td></tr>`),
                 `<tr class="tot"><td class="mute">備查合計</td><td class="num mute">${money(memoTotal)}</td></tr>`,
@@ -2304,6 +2688,7 @@
                         <div class="books-hero-card inc"><span>${isYear ? '年純毛利' : '純毛利'}</span><b>${money(report.profitTotal)}</b></div>
                         <div class="books-hero-card exp"><span>${isYear ? '年支出' : '支出'}</span><b>${money(report.expenseTotal)}</b></div>
                         <div class="books-hero-card net"><span>${isYear ? '年淨利' : '本期淨利'}</span><b>${money(report.net)}</b></div>
+                        ${(!isYear && report.mode === 'month' && Number(report.avgDays) > 0) ? `<div class="books-hero-card net"><span>日均淨利（÷${Number(report.avgDays)} 天）</span><b>${money(report.avgNet)}</b></div>` : ''}
                     </div>
                     ${isYear ? `<div class="books-sec">各月收入（純毛利）</div>${mMonthly}<div class="books-kv tot"><span class="lab">年純毛利合計</span><span class="num inc">${money(report.profitTotal)}</span></div>` : ''}
                     <div class="books-sec">收入</div>
@@ -2348,6 +2733,7 @@
                                     <option value="其他純毛利">其他收入</option>
                                     <option value="調貨配件">調貨配件</option>
                                     <option value="薪資">薪資</option>
+                                    <option value="分潤支出">分潤支出</option>
                                     <option value="公司吃喝">公司吃喝</option>
                                     <option value="公司雜支">公司雜支</option>
                                     <option value="運費">運費</option>
