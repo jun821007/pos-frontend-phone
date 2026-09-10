@@ -430,17 +430,30 @@
             <div class="books-toolbar shrink-0 mb-2">
                 <div class="books-toolbar-top">
                     <h2>薪資</h2>
-                    <div class="books-toolbar-actions flex flex-wrap gap-2">
+                    <div class="books-toolbar-actions flex flex-wrap gap-2" id="salary-actions-unpaid">
                         <button type="button" onclick="copyAllSalaryQueue()" class="px-3 py-2 rounded-lg bg-slate-800 border border-slate-600 text-slate-100 text-sm font-bold">複製全部</button>
                         <button type="button" onclick="payReadySalaryQueue()" class="px-3 py-2 rounded-lg bg-yellow-600 text-black text-sm font-bold">發放要結</button>
                         <button type="button" onclick="clearSalaryQueue()" class="px-3 py-2 rounded-lg bg-slate-800 border border-red-900 text-red-300 text-sm">清空</button>
                     </div>
+                    <div class="books-toolbar-actions flex flex-wrap gap-2 hidden" id="salary-actions-paid">
+                        <input type="month" id="salary-paid-month" onchange="loadSalaryPaidLedger()" class="input-dark p-2 rounded text-sm">
+                        <button type="button" onclick="loadSalaryPaidLedger()" class="px-3 py-2 rounded-lg bg-yellow-600 text-black text-sm font-bold">載入</button>
+                        <button type="button" onclick="copySalaryPaidLedger()" class="px-3 py-2 rounded-lg bg-slate-800 border border-slate-600 text-slate-100 text-sm font-bold">複製本月</button>
+                    </div>
                 </div>
-                <p class="text-xs text-slate-400">從「今日／未結」按薪資加入清單。未結只列在此預覽；要結（已入帳）才可發放薪支。</p>
+                <div class="flex gap-2 mt-2">
+                    <button type="button" id="salary-tab-unpaid" onclick="setSalaryTab('unpaid')" class="flex-1 py-2 rounded-lg text-sm font-bold bg-yellow-600 text-black">未發</button>
+                    <button type="button" id="salary-tab-paid" onclick="setSalaryTab('paid')" class="flex-1 py-2 rounded-lg text-sm font-bold bg-slate-800 text-slate-300 border border-slate-600">已發流水</button>
+                </div>
+                <p id="salary-hint" class="text-xs text-slate-400 mt-2">從「今日／未結」按薪資加入清單。未結只預覽；要結才可發放。</p>
             </div>
-            <div class="grid grid-cols-2 gap-2 shrink-0 mb-3">
-                <div class="books-hero-card net"><span>要結總額</span><b id="salary-ready-total" class="text-yellow-400">0</b></div>
-                <div class="books-hero-card"><span>未結總額</span><b id="salary-pending-total" class="text-red-400">0</b></div>
+            <div class="grid grid-cols-2 gap-2 shrink-0 mb-3" id="salary-stats-unpaid">
+                <div class="books-hero-card net"><span>要結總額（可發）</span><b id="salary-ready-total" class="text-yellow-400">0</b></div>
+                <div class="books-hero-card"><span>未結總額（待入帳）</span><b id="salary-pending-total" class="text-red-400">0</b></div>
+            </div>
+            <div class="grid grid-cols-2 gap-2 shrink-0 mb-3 hidden" id="salary-stats-paid">
+                <div class="books-hero-card net"><span>本月已發合計</span><b id="salary-paid-total" class="text-green-400">0</b></div>
+                <div class="books-hero-card"><span>本月筆數</span><b id="salary-paid-count" class="text-slate-200">0</b></div>
             </div>
             <div class="flex text-[11px] text-slate-500 px-1 pb-1 border-b border-slate-800 shrink-0 gap-2">
                 <div class="w-24 shrink-0">時間</div>
@@ -449,6 +462,7 @@
                 <div class="w-14 text-right shrink-0">操作</div>
             </div>
             <div id="salary-queue-list" class="flex-1 overflow-auto min-h-0 pb-4"></div>
+            <div id="salary-paid-list" class="hidden flex-1 overflow-auto min-h-0 pb-4"></div>
             <details class="shrink-0 mt-2 border border-slate-700 rounded-xl bg-slate-900/50">
                 <summary class="cursor-pointer px-3 py-2 text-sm text-slate-300 font-bold">預設算法（維修／二手機／配件）</summary>
                 <div id="salary-preset-form" class="p-3 space-y-3 border-t border-slate-800"></div>
@@ -756,7 +770,7 @@
         let ItemRegistry = {};
         let OrderRegistry = {};
         let User = { name: '', isAdmin: false };
-        let UI = { tab: 'phone', sub: '', rsMode: 'inventory', rsCat: 'all', multiSelect: false, selectedPhones: new Set(), selectedAcc: new Set(), selectedPendingOrders: new Set(), pendingOrderMeta: {}, pendingOrdersByCustomer: {}, allPendingOrderIds: [], pendingTab: 'unpaid', statsCollapsed: { report: true, history: true }, categoryOrder: null, favAccessoryIds: null, favSubCat: '', posPrefsLoaded: false, booksMode: 'month', lastBooksReport: null, lastFundData: null, booksContinuous: false, booksLooping: false, lastBooksEntryYmd: null, lastBooksVendor: '', booksSessionCount: 0, amendTarget: null };
+        let UI = { tab: 'phone', sub: '', rsMode: 'inventory', rsCat: 'all', multiSelect: false, selectedPhones: new Set(), selectedAcc: new Set(), selectedPendingOrders: new Set(), pendingOrderMeta: {}, pendingOrdersByCustomer: {}, allPendingOrderIds: [], pendingTab: 'unpaid', statsCollapsed: { report: true, history: true }, categoryOrder: null, favAccessoryIds: null, favSubCat: '', posPrefsLoaded: false, booksMode: 'month', lastBooksReport: null, lastFundData: null, booksContinuous: false, booksLooping: false, lastBooksEntryYmd: null, lastBooksVendor: '', booksSessionCount: 0, amendTarget: null, salaryTab: 'unpaid', salaryPaidRows: [] };
         let cartFooterTranslateY = 0;
         const CART_FOOTER_DRAG_MAX_UP = 360;
         const CART_FOOTER_DRAG_MAX_DOWN = 0;
@@ -2106,8 +2120,150 @@
                 return;
             }
             switchView('salary');
+            const monthEl = document.getElementById('salary-paid-month');
+            if (monthEl && !monthEl.value) monthEl.value = ymdTaipei(new Date()).slice(0, 7);
             renderSalaryPresetForm();
-            renderSalaryQueue();
+            setSalaryTab(UI.salaryTab || 'unpaid');
+        }
+        function setSalaryTab(tab) {
+            UI.salaryTab = tab === 'paid' ? 'paid' : 'unpaid';
+            const unpaid = UI.salaryTab === 'unpaid';
+            const tabU = document.getElementById('salary-tab-unpaid');
+            const tabP = document.getElementById('salary-tab-paid');
+            if (tabU) tabU.className = unpaid ? 'flex-1 py-2 rounded-lg text-sm font-bold bg-yellow-600 text-black' : 'flex-1 py-2 rounded-lg text-sm font-bold bg-slate-800 text-slate-300 border border-slate-600';
+            if (tabP) tabP.className = !unpaid ? 'flex-1 py-2 rounded-lg text-sm font-bold bg-yellow-600 text-black' : 'flex-1 py-2 rounded-lg text-sm font-bold bg-slate-800 text-slate-300 border border-slate-600';
+            const actU = document.getElementById('salary-actions-unpaid');
+            const actP = document.getElementById('salary-actions-paid');
+            if (actU) actU.classList.toggle('hidden', !unpaid);
+            if (actP) actP.classList.toggle('hidden', unpaid);
+            const stU = document.getElementById('salary-stats-unpaid');
+            const stP = document.getElementById('salary-stats-paid');
+            if (stU) stU.classList.toggle('hidden', !unpaid);
+            if (stP) stP.classList.toggle('hidden', unpaid);
+            const listU = document.getElementById('salary-queue-list');
+            const listP = document.getElementById('salary-paid-list');
+            if (listU) listU.classList.toggle('hidden', !unpaid);
+            if (listP) listP.classList.toggle('hidden', unpaid);
+            const hint = document.getElementById('salary-hint');
+            if (hint) hint.textContent = unpaid
+                ? '從「今日／未結」按薪資加入清單。未結只預覽；要結才可發放。'
+                : '已寫入薪支的流水（依月份）。可複製明細給員工。';
+            if (unpaid) renderSalaryQueue();
+            else loadSalaryPaidLedger();
+        }
+        function parseSalaryPaidMeta(row) {
+            const name = String(row.itemName || row.name || '');
+            let kindLabel = '薪資';
+            const mTag = name.match(/\[薪資\]\[([^\]]+)\]/);
+            if (mTag) kindLabel = mTag[1];
+            else if (/抽成|薪水/.test(name)) kindLabel = '薪資/抽成';
+            let orderId = '';
+            const mOrd = name.match(/ORD\d+/);
+            if (mOrd) orderId = mOrd[0];
+            else if (String(row.orderId || '').startsWith('SAL-')) {
+                const parts = String(row.orderId).split('-');
+                if (parts.length >= 2) orderId = parts[1];
+            } else if (row.orderId) orderId = String(row.orderId);
+            const customer = String(row.customer || '').replace(/^薪資$/, '').trim();
+            return { kindLabel, orderId, customer, name };
+        }
+        async function loadSalaryPaidLedger() {
+            const box = document.getElementById('salary-paid-list');
+            if (!box) return;
+            const monthEl = document.getElementById('salary-paid-month');
+            let ym = (monthEl && monthEl.value) || ymdTaipei(new Date()).slice(0, 7);
+            if (monthEl && !monthEl.value) monthEl.value = ym;
+            if (!/^\d{4}-\d{2}$/.test(ym)) {
+                box.innerHTML = '<div class="text-center text-slate-500 py-10">請選擇月份</div>';
+                return;
+            }
+            const y = Number(ym.slice(0, 4));
+            const m = Number(ym.slice(5, 7));
+            const startYmd = ym + '-01';
+            const last = new Date(y, m, 0).getDate();
+            const endYmd = ym + '-' + String(last).padStart(2, '0');
+            box.innerHTML = '<div class="text-center mt-10"><span class="loader"></span></div>';
+            try {
+                const res = await API.getHistory(startYmd, endYmd);
+                const rows = Array.isArray(res) ? res : (res.history || []);
+                const paid = rows.filter((i) => {
+                    if (String(i.type || '') !== 'salary') return false;
+                    if (i.status === 'Returned' || i.status === 'Deleted') return false;
+                    return true;
+                }).sort((a, b) => {
+                    const ta = parseLedgerDate(a.time)?.getTime() || 0;
+                    const tb = parseLedgerDate(b.time)?.getTime() || 0;
+                    return tb - ta;
+                });
+                UI.salaryPaidRows = paid;
+                renderSalaryPaidLedger();
+            } catch (e) {
+                console.error(e);
+                box.innerHTML = '<div class="text-center text-red-400 py-10">載入失敗</div>';
+            }
+        }
+        function renderSalaryPaidLedger() {
+            const box = document.getElementById('salary-paid-list');
+            if (!box) return;
+            const paid = UI.salaryPaidRows || [];
+            let total = 0;
+            paid.forEach((r) => { total += Math.abs(Number(r.cost) || 0); });
+            const totEl = document.getElementById('salary-paid-total');
+            const cntEl = document.getElementById('salary-paid-count');
+            if (totEl) totEl.textContent = Math.round(total).toLocaleString();
+            if (cntEl) cntEl.textContent = String(paid.length);
+            if (!paid.length) {
+                box.innerHTML = '<div class="text-center text-slate-500 py-16 text-sm">本月尚無已發薪資流水</div>';
+                return;
+            }
+            box.innerHTML = paid.map((row, idx) => {
+                const meta = parseSalaryPaidMeta(row);
+                const amt = Math.abs(Number(row.cost) || 0);
+                const timeTxt = salaryEsc(formatDate(row.time) || '');
+                const detail = `${salaryEsc(meta.kindLabel)}　${salaryEsc(meta.customer || '')}<div class="text-[11px] text-slate-500 mt-0.5">${salaryEsc(meta.orderId || row.orderId || '')}　${salaryEsc(meta.name)}</div>`;
+                return `<div class="flex items-start gap-2 py-2.5 border-b border-slate-800">
+                    <div class="w-24 shrink-0 text-[11px] text-slate-400 leading-tight pt-0.5">${timeTxt}<div class="mt-1"><span class="text-[10px] text-green-300 border border-green-800 px-1 rounded">已發</span></div></div>
+                    <div class="flex-1 min-w-0 text-sm text-slate-100">${detail}<div class="text-[11px] text-slate-500 mt-0.5">${salaryEsc(row.person || '')}</div></div>
+                    <div class="w-20 shrink-0 text-right font-mono text-green-400 text-sm pt-0.5">$${amt.toLocaleString()}</div>
+                    <div class="w-14 shrink-0 flex flex-col gap-1 items-end">
+                        <button type="button" onclick="copySalaryPaidRow(${idx})" class="text-[10px] px-1.5 py-1 rounded bg-slate-800 border border-slate-600 text-slate-200">複製</button>
+                    </div>
+                </div>`;
+            }).join('');
+        }
+        async function copySalaryPaidRow(idx) {
+            const row = (UI.salaryPaidRows || [])[idx];
+            if (!row) return;
+            const meta = parseSalaryPaidMeta(row);
+            const text = buildSalaryCopyText([{
+                orderId: meta.orderId || row.orderId || '',
+                customer: meta.customer || '',
+                label: meta.kindLabel + '（已發）',
+                amount: Math.abs(Number(row.cost) || 0),
+                formula: meta.name
+            }]);
+            const ok = await copyTextToClipboard(text);
+            Swal.fire({ icon: ok ? 'success' : 'info', title: ok ? '已複製' : '請手動複製', text: ok ? '' : text, toast: true, position: 'top', timer: 1600, showConfirmButton: false, background: '#1e293b' });
+        }
+        async function copySalaryPaidLedger() {
+            const paid = UI.salaryPaidRows || [];
+            if (!paid.length) {
+                Swal.fire({ icon: 'info', title: '本月無已發流水', background: '#1e293b', color: 'white' });
+                return;
+            }
+            const lines = paid.map((row) => {
+                const meta = parseSalaryPaidMeta(row);
+                return {
+                    orderId: meta.orderId || row.orderId || '',
+                    customer: meta.customer || '',
+                    label: meta.kindLabel + '（已發）',
+                    amount: Math.abs(Number(row.cost) || 0),
+                    formula: meta.name
+                };
+            });
+            const text = buildSalaryCopyText(lines);
+            const ok = await copyTextToClipboard(text);
+            Swal.fire({ icon: ok ? 'success' : 'info', title: ok ? '已複製本月已發' : '請手動複製', text: ok ? '' : text, background: '#1e293b', color: 'white' });
         }
         function renderSalaryPresetForm() {
             const box = document.getElementById('salary-preset-form');
@@ -2429,6 +2585,10 @@
             if (!document.getElementById('view-history').classList.contains('hidden')) renderHistoryList();
             const text = buildSalaryCopyText(paidLines);
             const copied = await copyTextToClipboard(text);
+            if (document.getElementById('view-salary') && !document.getElementById('view-salary').classList.contains('hidden')) {
+                renderSalaryQueue();
+                if (UI.salaryTab === 'paid') loadSalaryPaidLedger();
+            }
             Swal.fire({
                 icon: 'success',
                 title: '已寫入薪支',
