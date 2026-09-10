@@ -1866,7 +1866,7 @@
                         <div class="flex items-center gap-1">${statusHtml}${payBadge}</div>
                         ${g.status === 'Pending' ? `<button onclick="event.stopPropagation(); settle('${g.orderId}', ${g.total})" class="text-[10px] bg-green-900 text-green-200 px-1.5 rounded border border-green-700 hover:bg-green-800">入帳</button>` : ''}
                         ${opts.allowAmend ? `<button onclick="event.stopPropagation(); startAmendOrder('${oidEsc}')" class="text-[10px] bg-cyan-900 text-cyan-200 px-1.5 rounded border border-cyan-700 hover:bg-cyan-800">補 key</button>` : ''}
-                        ${(User && User.isAdmin) ? `<button onclick="event.stopPropagation(); openOrderSalaryPay('${oidEsc}')" class="text-[10px] bg-amber-900 text-amber-200 px-1.5 rounded border border-amber-700 hover:bg-amber-800">薪資</button>` : ''}
+                        ${(User && User.isAdmin) ? `<button type="button" onclick="event.preventDefault(); event.stopPropagation(); window.openOrderSalaryPay && window.openOrderSalaryPay('${oidEsc}')" class="text-[10px] bg-amber-900 text-amber-200 px-1.5 rounded border border-amber-700 hover:bg-amber-800 relative z-10">薪資</button>` : ''}
                         <button onclick="event.stopPropagation(); confirmDeleteOrder('${g.orderId}')" class="text-[10px] bg-red-900 text-red-200 px-1.5 rounded border border-red-700 hover:bg-red-800">刪單</button>
                     </div>
                 </div>
@@ -1969,6 +1969,9 @@
             });
         }
 
+        function salaryEsc(s) {
+            return String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+        }
         const SALARY_PRESET_KEY = 'pos_salary_presets_v1';
         const SALARY_KIND_META = [
             { key: 'repair', label: '維修', types: ['repair'] },
@@ -2103,11 +2106,11 @@
                         ? '<span class="text-[10px] text-yellow-300 border border-yellow-700 px-1 rounded">要結</span>'
                         : '<span class="text-[10px] text-red-300 border border-red-800 px-1 rounded">未結</span>');
                 const rid = salaryQueueRowId(row.orderId, row.kind);
-                const timeTxt = booksEscape(row.timeText || formatDate(row.time) || '');
-                const detail = `${booksEscape(row.label)}　${booksEscape(row.customer || '')}<div class="text-[11px] text-slate-500 mt-0.5">${booksEscape(row.orderId)}　${booksEscape(row.detail || '')}</div>`;
+                const timeTxt = salaryEsc(row.timeText || formatDate(row.time) || '');
+                const detail = `${salaryEsc(row.label)}　${salaryEsc(row.customer || '')}<div class="text-[11px] text-slate-500 mt-0.5">${salaryEsc(row.orderId)}　${salaryEsc(row.detail || '')}</div>`;
                 return `<div class="flex items-start gap-2 py-2.5 border-b border-slate-800 ${row.paid ? 'opacity-40' : ''}">
                     <div class="w-24 shrink-0 text-[11px] text-slate-400 leading-tight pt-0.5">${timeTxt}<div class="mt-1">${badge}</div></div>
-                    <div class="flex-1 min-w-0 text-sm text-slate-100">${detail}<div class="text-[11px] text-slate-500 mt-0.5">${booksEscape(row.formula || '')}</div></div>
+                    <div class="flex-1 min-w-0 text-sm text-slate-100">${detail}<div class="text-[11px] text-slate-500 mt-0.5">${salaryEsc(row.formula || '')}</div></div>
                     <div class="w-20 shrink-0 text-right font-mono text-yellow-400 text-sm pt-0.5">$${(Number(row.amount) || 0).toLocaleString()}</div>
                     <div class="w-14 shrink-0 flex flex-col gap-1 items-end">
                         <button type="button" onclick="copySalaryQueueRow('${rid.replace(/'/g, "\\'")}')" class="text-[10px] px-1.5 py-1 rounded bg-slate-800 border border-slate-600 text-slate-200">複製</button>
@@ -2196,91 +2199,98 @@
             return added;
         }
         async function openOrderSalaryPay(orderId) {
-            if (!(User && User.isAdmin)) {
-                Swal.fire({ icon: 'error', title: '僅管理員可發薪資', background: '#1e293b', color: 'white' });
-                return;
-            }
-            const g = getOrderGroupForSalary(orderId);
-            if (!g) {
-                Swal.fire({ icon: 'warning', title: '找不到該單', background: '#1e293b', color: 'white' });
-                return;
-            }
-            const presets = loadSalaryPresets();
-            const rows = calcOrderSalaryBreakdown(g, presets);
-            if (!rows.length) {
-                Swal.fire({ icon: 'info', title: '此單無可發薪資類別', text: '沒有維修／二手機／配件品項', background: '#1e293b', color: 'white' });
-                return;
-            }
-            const statusLabel = String(g.status) === 'Completed' ? '已入帳（要結）' : '未結';
-            const htmlRows = rows.map((r) => {
-                const disabled = r.paid ? 'disabled' : '';
-                const checked = (!r.paid && r.amount > 0) ? 'checked' : '';
-                const paidHint = r.paid ? '<span class="text-red-400 text-[11px]">已發過</span>' : '';
-                return `<label class="flex items-start gap-2 py-2 border-b border-slate-700 text-left ${r.paid ? 'opacity-50' : ''}">
-                    <input type="checkbox" class="sal-kind-cb accent-yellow-500 mt-1" data-kind="${r.kind}" ${disabled} ${checked}>
-                    <div class="min-w-0 flex-1">
-                        <div class="text-sm text-white font-bold">${r.label}　$${r.amount.toLocaleString()} ${paidHint}</div>
-                        <div class="text-[11px] text-slate-400">${r.formula}</div>
-                        <input type="number" class="sal-amt-input swal2-input !my-1 !w-full !text-sm" data-kind="${r.kind}" value="${r.amount}" ${r.paid ? 'disabled' : ''}>
-                    </div>
-                </label>`;
-            }).join('');
-            const result = await Swal.fire({
-                title: `加入薪資清單`,
-                html: `<div class="text-[11px] text-slate-400 text-left mb-1">${g.orderId}　${g.customer || ''}　${statusLabel}</div>
-                    <div class="text-[11px] text-amber-300/90 text-left mb-2">勾選分類後加入「薪資」頁；未結會顯示在未結總額。</div>${htmlRows}`,
-                background: '#1e293b',
-                color: 'white',
-                showCancelButton: true,
-                confirmButtonText: '加入清單',
-                cancelButtonText: '取消',
-                confirmButtonColor: '#ca8a04',
-                preConfirm: () => {
-                    const picks = [];
-                    document.querySelectorAll('.sal-kind-cb:checked').forEach((cb) => {
-                        const kind = cb.getAttribute('data-kind');
-                        const inp = document.querySelector(`.sal-amt-input[data-kind="${kind}"]`);
-                        const amount = Math.round(Number(inp && inp.value) || 0);
-                        const meta = rows.find((x) => x.kind === kind);
-                        if (!meta || meta.paid) return;
-                        if (amount <= 0) return;
-                        picks.push({ kind, label: meta.label, amount, formula: meta.formula });
-                    });
-                    if (!picks.length) {
-                        Swal.showValidationMessage('請勾選分類並填金額');
-                        return false;
-                    }
-                    return picks;
+            try {
+                if (!(User && User.isAdmin)) {
+                    Swal.fire({ icon: 'error', title: '僅管理員可發薪資', background: '#1e293b', color: 'white' });
+                    return;
                 }
-            });
-            if (!result.isConfirmed || !result.value) return;
-            const sample = (g.items && g.items[0]) || {};
-            const timeRaw = sample.time || g.time || '';
-            const entries = result.value.map((pick) => ({
-                orderId: String(g.orderId),
-                customer: g.customer || '過路客',
-                kind: pick.kind,
-                label: pick.label,
-                amount: pick.amount,
-                formula: pick.formula,
-                status: String(g.status || 'Pending'),
-                time: timeRaw,
-                timeText: formatDate(timeRaw),
-                detail: salaryDetailText(g, pick.kind),
-                paid: false
-            }));
-            const added = addSalaryQueueEntries(entries);
-            openSalary();
-            Swal.fire({
-                icon: 'success',
-                title: added ? `已加入 ${added} 筆` : '已在清單中',
-                toast: true,
-                position: 'top',
-                timer: 1600,
-                showConfirmButton: false,
-                background: '#1e293b'
-            });
+                const g = getOrderGroupForSalary(orderId);
+                if (!g) {
+                    Swal.fire({ icon: 'warning', title: '找不到該單', background: '#1e293b', color: 'white' });
+                    return;
+                }
+                const presets = loadSalaryPresets();
+                const rows = calcOrderSalaryBreakdown(g, presets).filter((r) => !r.paid && (Number(r.amount) || 0) > 0);
+                if (!rows.length) {
+                    const any = calcOrderSalaryBreakdown(g, presets);
+                    const msg = any.length ? '此單相關分類已發過或金額為 0' : '沒有維修／二手機／配件品項';
+                    Swal.fire({ icon: 'info', title: '無法加入薪資清單', text: msg, background: '#1e293b', color: 'white' });
+                    return;
+                }
+                // 多分類時可勾選；單分類直接加入並跳轉薪資頁
+                let picks = rows.map((r) => ({ kind: r.kind, label: r.label, amount: r.amount, formula: r.formula }));
+                if (rows.length > 1) {
+                    const htmlRows = rows.map((r) => {
+                        return `<label class="flex items-start gap-2 py-2 border-b border-slate-700 text-left">
+                            <input type="checkbox" class="sal-kind-cb accent-yellow-500 mt-1" data-kind="${r.kind}" checked>
+                            <div class="min-w-0 flex-1">
+                                <div class="text-sm text-white font-bold">${r.label}　$${r.amount.toLocaleString()}</div>
+                                <div class="text-[11px] text-slate-400">${r.formula}</div>
+                                <input type="number" class="sal-amt-input swal2-input" data-kind="${r.kind}" value="${r.amount}" style="margin:6px 0;width:100%;font-size:14px;">
+                            </div>
+                        </label>`;
+                    }).join('');
+                    const result = await Swal.fire({
+                        title: '加入薪資清單',
+                        html: `<div class="text-[11px] text-slate-400 text-left mb-2">${g.orderId}　${g.customer || ''}</div>${htmlRows}`,
+                        background: '#1e293b',
+                        color: 'white',
+                        showCancelButton: true,
+                        confirmButtonText: '加入清單',
+                        cancelButtonText: '取消',
+                        confirmButtonColor: '#ca8a04',
+                        preConfirm: () => {
+                            const out = [];
+                            document.querySelectorAll('.sal-kind-cb:checked').forEach((cb) => {
+                                const kind = cb.getAttribute('data-kind');
+                                const inp = document.querySelector('.sal-amt-input[data-kind="' + kind + '"]');
+                                const amount = Math.round(Number(inp && inp.value) || 0);
+                                const meta = rows.find((x) => x.kind === kind);
+                                if (!meta || amount <= 0) return;
+                                out.push({ kind, label: meta.label, amount, formula: meta.formula });
+                            });
+                            if (!out.length) {
+                                Swal.showValidationMessage('請勾選分類並填金額');
+                                return false;
+                            }
+                            return out;
+                        }
+                    });
+                    if (!result.isConfirmed || !result.value) return;
+                    picks = result.value;
+                }
+                const sample = (g.items && g.items[0]) || {};
+                const timeRaw = sample.time || g.time || '';
+                const entries = picks.map((pick) => ({
+                    orderId: String(g.orderId),
+                    customer: g.customer || '過路客',
+                    kind: pick.kind,
+                    label: pick.label,
+                    amount: pick.amount,
+                    formula: pick.formula,
+                    status: String(g.status || 'Pending'),
+                    time: timeRaw,
+                    timeText: formatDate(timeRaw),
+                    detail: salaryDetailText(g, pick.kind),
+                    paid: false
+                }));
+                const added = addSalaryQueueEntries(entries);
+                openSalary();
+                Swal.fire({
+                    icon: 'success',
+                    title: added ? ('已加入 ' + added + ' 筆') : '已在清單中',
+                    toast: true,
+                    position: 'top',
+                    timer: 1600,
+                    showConfirmButton: false,
+                    background: '#1e293b'
+                });
+            } catch (e) {
+                console.error('openOrderSalaryPay', e);
+                Swal.fire({ icon: 'error', title: '薪資開啟失敗', text: (e && e.message) ? e.message : String(e), background: '#1e293b', color: 'white' });
+            }
         }
+        window.openOrderSalaryPay = openOrderSalaryPay;
         async function payOrderSalaryPicks(picks) {
             if (!picks || !picks.length) return;
             Swal.fire({ title: '發放中...', background: '#1e293b', color: 'white', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
