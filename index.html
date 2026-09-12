@@ -445,7 +445,7 @@
                     <button type="button" id="salary-tab-unpaid" onclick="setSalaryTab('unpaid')" class="flex-1 py-2 rounded-lg text-sm font-bold bg-yellow-600 text-black">未發</button>
                     <button type="button" id="salary-tab-paid" onclick="setSalaryTab('paid')" class="flex-1 py-2 rounded-lg text-sm font-bold bg-slate-800 text-slate-300 border border-slate-600">已發流水</button>
                 </div>
-                <p id="salary-hint" class="text-xs text-slate-400 mt-2">從「今日／未結」按薪資加入清單。未結只預覽；要結才可發放。</p>
+                <p id="salary-hint" class="text-xs text-slate-400 mt-2">從「今日／未結」按薪資 → 手填金額加入清單。未結只預覽；要結才可發放。</p>
             </div>
             <div class="grid grid-cols-2 gap-2 shrink-0 mb-3" id="salary-stats-unpaid">
                 <div class="books-hero-card net"><span>要結總額（可發）</span><b id="salary-ready-total" class="text-yellow-400">0</b></div>
@@ -463,11 +463,6 @@
             </div>
             <div id="salary-queue-list" class="flex-1 overflow-auto min-h-0 pb-4"></div>
             <div id="salary-paid-list" class="hidden flex-1 overflow-auto min-h-0 pb-4"></div>
-            <details class="shrink-0 mt-2 border border-slate-700 rounded-xl bg-slate-900/50">
-                <summary class="cursor-pointer px-3 py-2 text-sm text-slate-300 font-bold">預設算法（維修／二手機／配件）</summary>
-                <div id="salary-preset-form" class="p-3 space-y-3 border-t border-slate-800"></div>
-                <div class="px-3 pb-3"><button type="button" onclick="saveSalaryPresetsFromForm()" class="w-full py-2 rounded-lg bg-yellow-600 text-black text-sm font-bold">儲存預設</button></div>
-            </details>
         </div>
 
         <div id="view-fund" class="hidden view-section flex-1 flex flex-col overflow-hidden books-page">
@@ -1986,37 +1981,11 @@
         function salaryEsc(s) {
             return String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
         }
-        const SALARY_PRESET_KEY = 'pos_salary_presets_v1';
         const SALARY_KIND_META = [
             { key: 'repair', label: '維修', types: ['repair'] },
             { key: 'used', label: '二手機', types: ['phone', 'peer_phone'] },
             { key: 'acc', label: '配件', types: ['accessory', 'direct_transfer'] }
         ];
-        function defaultSalaryPresets() {
-            return {
-                repair: { mode: 'percent', value: 30 },
-                used: { mode: 'fixed', value: 500 },
-                acc: { mode: 'percent', value: 20 }
-            };
-        }
-        function loadSalaryPresets() {
-            const base = defaultSalaryPresets();
-            try {
-                const raw = localStorage.getItem(SALARY_PRESET_KEY);
-                if (!raw) return base;
-                const parsed = JSON.parse(raw) || {};
-                SALARY_KIND_META.forEach(({ key }) => {
-                    const row = parsed[key] || {};
-                    const mode = row.mode === 'fixed' ? 'fixed' : 'percent';
-                    const value = Number(row.value);
-                    base[key] = { mode, value: Number.isFinite(value) ? value : base[key].value };
-                });
-            } catch (e) {}
-            return base;
-        }
-        function saveSalaryPresets(presets) {
-            localStorage.setItem(SALARY_PRESET_KEY, JSON.stringify(presets || loadSalaryPresets()));
-        }
 
         function salaryLedgerRows() {
             return (DB.sales || []).concat(DB.history || []).concat(DB.pending || []);
@@ -2069,34 +2038,13 @@
             }
             return null;
         }
-        function salaryItemProfit(it) {
-            const sale = Number(it.salePrice) || 0;
-            const cost = Number(it.cost) || 0;
-            const isMultiExtra = it.type === 'phone' && sale === 0 && String(it.itemName || '').includes(' + ');
-            if (isMultiExtra) return 0;
-            if (it.profit !== undefined && it.profit !== null && it.profit !== '') return Number(it.profit) || 0;
-            return sale - cost;
-        }
-        function calcOrderSalaryBreakdown(g, presets) {
-            const p = presets || loadSalaryPresets();
+        function calcOrderSalaryBreakdown(g) {
             const out = [];
             SALARY_KIND_META.forEach(({ key, label, types }) => {
                 const items = (g.items || []).filter((it) => types.includes(it.type));
                 if (!items.length) return;
-                const profit = items.reduce((s, it) => s + salaryItemProfit(it), 0);
-                const rule = p[key] || { mode: 'percent', value: 0 };
-                let amount = 0;
-                let formula = '';
-                if (rule.mode === 'fixed') {
-                    amount = Math.max(0, Math.round(Number(rule.value) || 0));
-                    formula = '固定 $' + amount.toLocaleString();
-                } else {
-                    const pct = Number(rule.value) || 0;
-                    amount = Math.max(0, Math.round(profit * pct / 100));
-                    formula = '毛利 $' + Math.round(profit).toLocaleString() + ' × ' + pct + '% = $' + amount.toLocaleString();
-                }
                 const paid = isSalaryAlreadyPaid(g.orderId, key);
-                out.push({ kind: key, label, profit, amount, formula, paid, hasItems: true });
+                out.push({ kind: key, label, amount: 0, formula: '手填', paid, hasItems: true });
             });
             return out;
         }
@@ -2122,7 +2070,6 @@
             switchView('salary');
             const monthEl = document.getElementById('salary-paid-month');
             if (monthEl && !monthEl.value) monthEl.value = ymdTaipei(new Date()).slice(0, 7);
-            renderSalaryPresetForm();
             setSalaryTab(UI.salaryTab || 'unpaid');
         }
         function setSalaryTab(tab) {
@@ -2146,7 +2093,7 @@
             if (listP) listP.classList.toggle('hidden', unpaid);
             const hint = document.getElementById('salary-hint');
             if (hint) hint.textContent = unpaid
-                ? '從「今日／未結」按薪資加入清單。未結只預覽；要結才可發放。'
+                ? '從「今日／未結」按薪資 → 手填金額加入清單。未結只預覽；要結才可發放。'
                 : '已寫入薪支的流水（依月份）。可複製明細給員工。';
             if (unpaid) renderSalaryQueue();
             else loadSalaryPaidLedger();
@@ -2264,37 +2211,6 @@
             const text = buildSalaryCopyText(lines);
             const ok = await copyTextToClipboard(text);
             Swal.fire({ icon: ok ? 'success' : 'info', title: ok ? '已複製本月已發' : '請手動複製', text: ok ? '' : text, background: '#1e293b', color: 'white' });
-        }
-        function renderSalaryPresetForm() {
-            const box = document.getElementById('salary-preset-form');
-            if (!box) return;
-            const presets = loadSalaryPresets();
-            box.innerHTML = SALARY_KIND_META.map(({ key, label }) => {
-                const p = presets[key] || { mode: 'percent', value: 0 };
-                const isPct = p.mode !== 'fixed';
-                return `<div class="rounded-xl border border-slate-700 bg-slate-950/40 p-3">
-                    <div class="text-sm font-bold text-white mb-2">${label}</div>
-                    <div class="flex flex-wrap gap-3 mb-2 text-sm text-slate-300">
-                        <label class="inline-flex items-center gap-2 cursor-pointer"><input type="radio" name="sal-mode-${key}" value="percent" class="accent-yellow-500" ${isPct ? 'checked' : ''}>毛利 %</label>
-                        <label class="inline-flex items-center gap-2 cursor-pointer"><input type="radio" name="sal-mode-${key}" value="fixed" class="accent-yellow-500" ${!isPct ? 'checked' : ''}>固定額</label>
-                    </div>
-                    <input id="sal-val-${key}" type="number" class="w-full input-dark p-2 rounded-lg text-sm" value="${Number(p.value) || 0}">
-                </div>`;
-            }).join('');
-        }
-        function saveSalaryPresetsFromForm() {
-            if (!(User && User.isAdmin)) return;
-            const next = defaultSalaryPresets();
-            SALARY_KIND_META.forEach(({ key }) => {
-                const modeEl = document.querySelector(`input[name="sal-mode-${key}"]:checked`);
-                const valEl = document.getElementById('sal-val-' + key);
-                const mode = modeEl && modeEl.value === 'fixed' ? 'fixed' : 'percent';
-                const value = Number(valEl && valEl.value);
-                next[key] = { mode, value: Number.isFinite(value) ? value : 0 };
-            });
-            saveSalaryPresets(next);
-            Swal.fire({ icon: 'success', title: '已儲存預設', toast: true, position: 'top', timer: 1400, showConfirmButton: false, background: '#1e293b' });
-            renderSalaryPresetForm();
         }
         const SALARY_QUEUE_KEY = 'pos_salary_queue_v1';
         function loadSalaryQueue() {
@@ -2462,56 +2378,56 @@
                     Swal.fire({ icon: 'warning', title: '找不到該單', background: '#1e293b', color: 'white' });
                     return;
                 }
-                const presets = loadSalaryPresets();
-                const rows = calcOrderSalaryBreakdown(g, presets).filter((r) => !r.paid && (Number(r.amount) || 0) > 0);
+                const allRows = calcOrderSalaryBreakdown(g);
+                const rows = allRows.filter((r) => !r.paid);
                 if (!rows.length) {
-                    const any = calcOrderSalaryBreakdown(g, presets);
-                    const msg = any.length ? '此單相關分類已發過或金額為 0' : '沒有維修／二手機／配件品項';
+                    const msg = allRows.length ? '此單相關分類已發過' : '沒有維修／二手機／配件品項';
                     Swal.fire({ icon: 'info', title: '無法加入薪資清單', text: msg, background: '#1e293b', color: 'white' });
                     return;
                 }
-                // 多分類時可勾選；單分類直接加入並跳轉薪資頁
-                let picks = rows.map((r) => ({ kind: r.kind, label: r.label, amount: r.amount, formula: r.formula }));
-                if (rows.length > 1) {
-                    const htmlRows = rows.map((r) => {
-                        return `<label class="flex items-start gap-2 py-2 border-b border-slate-700 text-left">
-                            <input type="checkbox" class="sal-kind-cb accent-yellow-500 mt-1" data-kind="${r.kind}" checked>
-                            <div class="min-w-0 flex-1">
-                                <div class="text-sm text-white font-bold">${r.label}　$${r.amount.toLocaleString()}</div>
-                                <div class="text-[11px] text-slate-400">${r.formula}</div>
-                                <input type="number" class="sal-amt-input swal2-input" data-kind="${r.kind}" value="${r.amount}" style="margin:6px 0;width:100%;font-size:14px;">
-                            </div>
-                        </label>`;
-                    }).join('');
-                    const result = await Swal.fire({
-                        title: '加入薪資清單',
-                        html: `<div class="text-[11px] text-slate-400 text-left mb-2">${g.orderId}　${g.customer || ''}</div>${htmlRows}`,
-                        background: '#1e293b',
-                        color: 'white',
-                        showCancelButton: true,
-                        confirmButtonText: '加入清單',
-                        cancelButtonText: '取消',
-                        confirmButtonColor: '#ca8a04',
-                        preConfirm: () => {
-                            const out = [];
-                            document.querySelectorAll('.sal-kind-cb:checked').forEach((cb) => {
-                                const kind = cb.getAttribute('data-kind');
-                                const inp = document.querySelector('.sal-amt-input[data-kind="' + kind + '"]');
-                                const amount = Math.round(Number(inp && inp.value) || 0);
-                                const meta = rows.find((x) => x.kind === kind);
-                                if (!meta || amount <= 0) return;
-                                out.push({ kind, label: meta.label, amount, formula: meta.formula });
-                            });
-                            if (!out.length) {
-                                Swal.showValidationMessage('請勾選分類並填金額');
-                                return false;
-                            }
-                            return out;
+                const htmlRows = rows.map((r) => {
+                    return `<label class="flex items-start gap-2 py-2 border-b border-slate-700 text-left">
+                        <input type="checkbox" class="sal-kind-cb accent-yellow-500 mt-1" data-kind="${r.kind}" checked>
+                        <div class="min-w-0 flex-1">
+                            <div class="text-sm text-white font-bold">${r.label}</div>
+                            <div class="text-[11px] text-slate-400 mb-1">請手填金額</div>
+                            <input type="number" inputmode="numeric" class="sal-amt-input swal2-input" data-kind="${r.kind}" value="" placeholder="金額" style="margin:0;width:100%;font-size:16px;">
+                        </div>
+                    </label>`;
+                }).join('');
+                const result = await Swal.fire({
+                    title: '手填薪資金額',
+                    html: `<div class="text-[11px] text-slate-400 text-left mb-2">${g.orderId}　${g.customer || ''}</div>${htmlRows}`,
+                    background: '#1e293b',
+                    color: 'white',
+                    showCancelButton: true,
+                    confirmButtonText: '加入清單',
+                    cancelButtonText: '取消',
+                    confirmButtonColor: '#ca8a04',
+                    focusConfirm: false,
+                    didOpen: () => {
+                        const first = document.querySelector('.sal-amt-input');
+                        if (first) first.focus();
+                    },
+                    preConfirm: () => {
+                        const out = [];
+                        document.querySelectorAll('.sal-kind-cb:checked').forEach((cb) => {
+                            const kind = cb.getAttribute('data-kind');
+                            const inp = document.querySelector('.sal-amt-input[data-kind="' + kind + '"]');
+                            const amount = Math.round(Number(inp && inp.value) || 0);
+                            const meta = rows.find((x) => x.kind === kind);
+                            if (!meta || amount <= 0) return;
+                            out.push({ kind, label: meta.label, amount, formula: '手填 $' + amount.toLocaleString() });
+                        });
+                        if (!out.length) {
+                            Swal.showValidationMessage('請勾選分類並手填金額（須大於 0）');
+                            return false;
                         }
-                    });
-                    if (!result.isConfirmed || !result.value) return;
-                    picks = result.value;
-                }
+                        return out;
+                    }
+                });
+                if (!result.isConfirmed || !result.value) return;
+                const picks = result.value;
                 const sample = (g.items && g.items[0]) || {};
                 const timeRaw = sample.time || g.time || '';
                 const entries = picks.map((pick) => ({
