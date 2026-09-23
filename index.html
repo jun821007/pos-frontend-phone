@@ -420,7 +420,7 @@
                     <button type="button" id="books-end-session" onclick="endBooksSession()" class="hidden px-3 py-1.5 rounded-lg bg-slate-800 border border-yellow-600 text-yellow-400 text-sm font-bold">結束登錄</button>
                 </div>
                 <span id="books-session-hint" class="text-xs text-yellow-500/90"></span>
-                <span class="books-hint text-[11px] text-slate-500">二手機／配件成本加在庫存，賣掉才算毛利。進貨與記帳「收購／額外維修成本」只記付了多少（備查），不扣淨利。</span>
+                <span class="books-hint text-[11px] text-slate-500">二手機／配件成本加在庫存，賣掉才算毛利。進貨與記帳「收購／額外維修成本／網卡」只記付了多少（備查），不扣淨利。運費不計毛利。</span>
             </div>
             <div id="books-period-label" class="text-xs text-slate-400 mb-2 shrink-0"></div>
             <div id="books-tables" class="flex-1 overflow-auto min-h-0"></div>
@@ -1541,8 +1541,14 @@
             return false;
         }
         function isCardCopyItem(it) {
+            if (it && it.type === 'esim') return true;
             const n = (it.itemName || it.name || '').toLowerCase();
             return n.includes('泰國註冊卡') || n.includes('網卡') || n.includes('esim');
+        }
+        function isPartsTransferItem(it) {
+            if (it && (it.transferKind === 'parts' || it.isPartsTransfer)) return true;
+            const n = String(it.itemName || it.name || '');
+            return /\[維修料件調貨\]/.test(n);
         }
         function calcGiftAllocation(normalized) {
             const G = normalized.reduce((s, it) => isGiftDeduction(it) ? s + (Number(it.cost) || 0) : s, 0);
@@ -1989,7 +1995,8 @@
             { key: 'transfer', label: '調貨', types: ['direct_transfer'] },
             { key: 'wrap', label: '包膜', types: ['wrap'] },
             { key: 'soft', label: '軟體', types: ['software', 'software_phone'] },
-            { key: 'ship', label: '運費', types: ['shipping'] }
+            { key: 'ship', label: '運費', types: ['shipping'] },
+            { key: 'card', label: '網卡', types: ['esim'] }
         ];
         const SALARY_KIND_SKIP_TYPES = new Set(['salary', 'expense', 'profit_share', 'fund', 'cash', 'withdraw']);
 
@@ -2582,12 +2589,14 @@
         }
         function booksCategoryOf(it) {
             const t = it.type;
+            if (t === 'shipping') return null; // 運費不計毛利
             if (t === 'phone' || t === 'peer_phone') return 'used';
             if (t === 'new_phone') return 'new';
             if (t === 'repair') return 'repair';
             if (t === 'software' || t === 'software_phone') return 'soft';
-            if (t === 'wrap' || t === 'esim' || t === 'shipping') return 'other';
-            if (isCardCopyItem(it)) return 'other';
+            if (t === 'wrap') return 'wrap';
+            if (t === 'esim' || isCardCopyItem(it)) return 'card';
+            if (isPartsTransferItem(it)) return 'parts_xfer';
             if (t === 'accessory' || t === 'direct_transfer') return 'acc';
             return 'other';
         }
@@ -2615,9 +2624,9 @@
         function isBooksOutflowType(i) {
             return isBooksManualExpense(i) || i.type === 'inventory';
         }
-        const BOOKS_EXPENSE_KEYS = ['調貨配件', '網卡', '公司吃喝', '公司雜支', '運費', '薪資', '分潤支出', '虧損', '其他支出'];
-        const BOOKS_MEMO_KEYS = ['維修料件', '收購二手機', '收購新機', '額外維修成本', '配件進貨'];
-        const BOOKS_MEMO_DEDUCT_KEYS = ['收購二手機', '收購新機', '額外維修成本', '配件進貨']; // 如扣備查：付機／料錢／進貨現金
+        const BOOKS_EXPENSE_KEYS = ['調貨配件', '公司吃喝', '公司雜支', '運費', '薪資', '分潤支出', '虧損', '其他支出'];
+        const BOOKS_MEMO_KEYS = ['維修料件', '收購二手機', '收購新機', '額外維修成本', '配件進貨', '網卡'];
+        const BOOKS_MEMO_DEDUCT_KEYS = ['收購二手機', '收購新機', '額外維修成本', '配件進貨', '網卡']; // 如扣備查：付機／料錢／進貨／網卡
         function isBooksMemoSubject(subj) {
             return BOOKS_MEMO_KEYS.includes(subj);
         }
@@ -2625,12 +2634,33 @@
             { key: 'used', label: '二手機' },
             { key: 'new', label: '新機' },
             { key: 'acc', label: '配件' },
+            { key: 'parts_xfer', label: '維修料件調貨' },
             { key: 'repair', label: '維修' },
             { key: 'soft', label: '軟體' },
+            { key: 'wrap', label: '包膜' },
+            { key: 'card', label: '網卡' },
             { key: 'other', label: '其他' }
         ];
         function emptyBooksProfit() {
-            return { used: 0, new: 0, repair: 0, acc: 0, soft: 0, other: 0 };
+            return { used: 0, new: 0, repair: 0, acc: 0, parts_xfer: 0, soft: 0, wrap: 0, card: 0, other: 0 };
+        }
+        function booksNewPhoneDetailName(g, items) {
+            const cust = String((g && g.customer) || '').trim();
+            const models = (items || []).map((it) => {
+                let n = stripLedgerName(it.itemName || it.name || '');
+                n = stripSettlementDealerNoise(n, it.dealerName || '');
+                n = n.replace(/^新機\s*/i, '').trim();
+                if (it.dealerName) {
+                    const d = String(it.dealerName).trim();
+                    if (d && n.indexOf(d) === 0) n = n.slice(d.length).trim();
+                }
+                return n;
+            }).filter(Boolean);
+            const uniq = [];
+            models.forEach((m) => { if (!uniq.includes(m)) uniq.push(m); });
+            const modelStr = uniq.join('、');
+            if (cust && modelStr) return cust + '　' + modelStr;
+            return cust || modelStr || '新機';
         }
         function csvCell(v) {
             const s = v == null ? '' : String(v);
@@ -2714,11 +2744,13 @@
                 if (!normalized.length) return;
                 const giftAlloc = calcGiftAllocation(normalized);
                 const catProfit = emptyBooksProfit();
-                const catNames = { used: [], new: [], acc: [], repair: [], soft: [], other: [] };
+                const catNames = { used: [], new: [], acc: [], parts_xfer: [], repair: [], soft: [], wrap: [], card: [], other: [] };
                 const catSale = emptyBooksProfit();
                 const catCost = emptyBooksProfit();
+                const newItemsForName = [];
                 normalized.forEach(it => {
                     const cat = booksCategoryOf(it);
+                    if (!cat) return;
                     const sale = Number(it.salePrice) || 0;
                     const cost = Number(it.cost) || 0;
                     if (!isGiftDeduction(it)) {
@@ -2726,6 +2758,7 @@
                         catSale[cat] += sale;
                         catCost[cat] += cost;
                         catNames[cat].push(stripLedgerName(it.itemName || it.name || '') || '-');
+                        if (cat === 'new') newItemsForName.push(it);
                     }
                 });
                 catProfit.used -= giftAlloc.used || 0;
@@ -2733,7 +2766,7 @@
                 catProfit.acc -= giftAlloc.acc || 0;
                 catProfit.repair -= giftAlloc.repair || 0;
                 catProfit.soft -= giftAlloc.soft || 0;
-                catProfit.other -= (giftAlloc.card || 0);
+                catProfit.card -= (giftAlloc.card || 0);
                 const countedAt = booksCountedWhen(normalized[0]) || parseLedgerDate(g.time);
                 const checkoutAt = parseLedgerDate(g.time);
                 const checkoutYmd = formatBooksYmd(checkoutAt);
@@ -2741,6 +2774,9 @@
                 BOOKS_PROFIT_KEYS.forEach(({ key, label }) => {
                     profit[key] += catProfit[key];
                     if (Math.abs(catProfit[key]) < 0.005 && catNames[key].length === 0) return;
+                    const detailName = key === 'new'
+                        ? booksNewPhoneDetailName(g, newItemsForName)
+                        : (catNames[key].join('、') || label);
                     incomeDetails.push({
                         date: countedYmd,
                         checkoutDate: checkoutYmd,
@@ -2748,7 +2784,7 @@
                         orderId: g.orderId,
                         kind: '收入',
                         subject: label + '純毛利',
-                        name: catNames[key].join('、') || label,
+                        name: detailName,
                         sale: catSale[key],
                         cost: catCost[key],
                         amount: catProfit[key],
@@ -2849,6 +2885,7 @@
                 if (k.indexOf('收購') >= 0) return k + '（付機備查）';
                 if (k === '額外維修成本') return k + '（料錢備查）';
                 if (k === '配件進貨') return k + '（進貨備查）';
+                if (k === '網卡') return k + '（進卡備查）';
                 return k + '（付料備查）';
             };
             const memoTotal = Number(report.memoTotal ?? report.partsMemo) || 0;
@@ -2872,6 +2909,7 @@
                     if (r.sale !== '' && r.sale != null) bits.push('售 ' + money(r.sale));
                     if (r.cost !== '' && r.cost != null) bits.push('成本 ' + money(r.cost));
                     if (r.checkoutDate && r.checkoutDate !== r.date) bits.push('結帳 ' + r.checkoutDate);
+                    if (r.customer) bits.push(r.customer);
                     if (r.orderId) bits.push(r.orderId);
                     if (r.person) bits.push(r.person);
                     if (isMemo) bits.push('不扣淨利');
@@ -2964,8 +3002,11 @@
                                     <option value="二手機純毛利">二手機</option>
                                     <option value="新機純毛利">新機</option>
                                     <option value="配件純毛利">配件</option>
+                                    <option value="維修料件調貨純毛利">維修料件調貨</option>
                                     <option value="維修純毛利">維修</option>
                                     <option value="軟體純毛利">軟體</option>
+                                    <option value="包膜純毛利">包膜</option>
+                                    <option value="網卡純毛利">網卡</option>
                                     <option value="其他純毛利">其他收入</option>
                                     <option value="調貨配件">調貨配件</option>
                                     <option value="薪資">薪資</option>
@@ -2973,13 +3014,13 @@
                                     <option value="公司吃喝">公司吃喝</option>
                                     <option value="公司雜支">公司雜支</option>
                                     <option value="運費">運費</option>
-                                    <option value="網卡">網卡</option>
                                     <option value="虧損">虧損</option>
                                     <option value="收購二手機">收購二手機（備查）</option>
                                     <option value="收購新機">收購新機（備查）</option>
                                     <option value="額外維修成本">額外維修成本（備查）</option>
                                     <option value="維修料件">維修料件（備查）</option>
                                     <option value="配件進貨">配件進貨（備查）</option>
+                                    <option value="網卡">網卡（備查）</option>
                                 </select>
                                 <div class="text-[11px] text-slate-500">備查不列入支出合計</div>
                             </div>
@@ -3133,7 +3174,7 @@
             const amountKinds = ['food', 'sim', 'extra_repair', 'company_misc', 'ship', 'salary', 'profit_share', 'loss', 'buy_used', 'buy_new'];
             let html = booksDateFieldHtml();
             if (kind === 'food') html += '<input id="bk-n" class="swal2-input" placeholder="摘要（如：便當）"><input id="bk-a" type="number" class="swal2-input" placeholder="金額">';
-            else if (kind === 'sim') html += '<input id="bk-n" class="swal2-input" placeholder="摘要（如：DTAC／eSIM）"><input id="bk-a" type="number" class="swal2-input" placeholder="金額">';
+            else if (kind === 'sim') html += '<div style="font-size:12px;color:#94a3b8;text-align:left;padding:4px 8px 0">只記進卡付了多少（備查），不扣本期淨利。賣出 eSIM／網卡的毛利另計「網卡純毛利」。</div><input id="bk-n" class="swal2-input" placeholder="摘要（如：DTAC／eSIM）"><input id="bk-a" type="number" class="swal2-input" placeholder="金額">';
             else if (kind === 'extra_repair') html += '<div style="font-size:12px;color:#94a3b8;text-align:left;padding:4px 8px 0">只記花了多少料錢／外修，方便對帳，不扣本期淨利。二手機請把這筆加進庫存成本，賣掉才算毛利。</div><input id="bk-n" class="swal2-input" placeholder="摘要（如：料錢、外修、廖）"><input id="bk-a" type="number" class="swal2-input" placeholder="金額">';
             else if (kind === 'company_misc') html += '<input id="bk-n" class="swal2-input" placeholder="摘要（如：文具、清潔）"><input id="bk-a" type="number" class="swal2-input" placeholder="金額">';
             else if (kind === 'ship') html += '<input id="bk-n" class="swal2-input" placeholder="摘要（如：黑貓／順豐／郵寄）"><input id="bk-a" type="number" class="swal2-input" placeholder="金額">';
@@ -4730,7 +4771,18 @@
                 }
             }
         }
-        function renderServiceGrid() { setItemGridMode('grid'); document.getElementById('item-grid').innerHTML = `<div onclick="modalRepair()" class="glass p-6 rounded-xl border-l-4 border-yellow-500 flex flex-col items-center justify-center gap-2"><i class="fa-solid fa-screwdriver-wrench text-4xl text-yellow-500"></i><span class="font-bold">維修登記</span></div><div onclick="modalWrap()" class="glass p-6 rounded-xl border-l-4 border-purple-500 flex flex-col items-center justify-center gap-2"><i class="fa-solid fa-wand-magic-sparkles text-4xl text-purple-500"></i><span class="font-bold">包膜服務</span></div><div onclick="modalNewPhone()" class="glass p-6 rounded-xl border-l-4 border-green-500 flex flex-col items-center justify-center gap-2"><i class="fa-solid fa-mobile-screen text-4xl text-green-500"></i><span class="font-bold">新機</span></div><div onclick="modalPeerTransfer()" class="glass p-6 rounded-xl border-l-4 border-blue-500 flex flex-col items-center justify-center gap-2"><i class="fa-solid fa-truck-fast text-4xl text-blue-500"></i><span class="font-bold">二手機</span></div><div onclick="modalESIM()" class="glass p-6 rounded-xl border-l-4 border-cyan-500 flex flex-col items-center justify-center gap-2"><i class="fa-solid fa-sim-card text-4xl text-cyan-500"></i><span class="font-bold">eSIM</span></div><div onclick="modalShipping()" class="glass p-6 rounded-xl border-l-4 border-slate-400 flex flex-col items-center justify-center gap-2"><i class="fa-solid fa-truck text-4xl text-slate-400"></i><span class="font-bold">運費</span></div><div onclick="modalSoftware()" class="glass p-6 rounded-xl border-l-4 border-indigo-500 flex flex-col items-center justify-center gap-2"><i class="fa-solid fa-mobile-screen-button text-4xl text-indigo-400"></i><span class="font-bold">軟體</span></div>`; }
+        function renderServiceGrid() {
+            setItemGridMode('grid');
+            document.getElementById('item-grid').innerHTML = `
+                <div onclick="modalRepair()" class="glass p-6 rounded-xl border-l-4 border-yellow-500 flex flex-col items-center justify-center gap-2"><i class="fa-solid fa-screwdriver-wrench text-4xl text-yellow-500"></i><span class="font-bold">維修登記</span></div>
+                <div onclick="modalWrap()" class="glass p-6 rounded-xl border-l-4 border-purple-500 flex flex-col items-center justify-center gap-2"><i class="fa-solid fa-wand-magic-sparkles text-4xl text-purple-500"></i><span class="font-bold">包膜服務</span></div>
+                <div onclick="modalNewPhone()" class="glass p-6 rounded-xl border-l-4 border-green-500 flex flex-col items-center justify-center gap-2"><i class="fa-solid fa-mobile-screen text-4xl text-green-500"></i><span class="font-bold">新機</span></div>
+                <div onclick="modalPeerTransfer()" class="glass p-6 rounded-xl border-l-4 border-blue-500 flex flex-col items-center justify-center gap-2"><i class="fa-solid fa-truck-fast text-4xl text-blue-500"></i><span class="font-bold">二手機</span></div>
+                <div onclick="modalServiceStockTransfer()" class="glass p-6 rounded-xl border-l-4 border-amber-500 flex flex-col items-center justify-center gap-2"><i class="fa-solid fa-boxes-packing text-4xl text-amber-400"></i><span class="font-bold">調貨</span><span class="text-[11px] text-slate-400">別人跟你調庫存</span></div>
+                <div onclick="modalESIM()" class="glass p-6 rounded-xl border-l-4 border-cyan-500 flex flex-col items-center justify-center gap-2"><i class="fa-solid fa-sim-card text-4xl text-cyan-500"></i><span class="font-bold">eSIM</span></div>
+                <div onclick="modalShipping()" class="glass p-6 rounded-xl border-l-4 border-slate-400 flex flex-col items-center justify-center gap-2"><i class="fa-solid fa-truck text-4xl text-slate-400"></i><span class="font-bold">運費</span></div>
+                <div onclick="modalSoftware()" class="glass p-6 rounded-xl border-l-4 border-indigo-500 flex flex-col items-center justify-center gap-2"><i class="fa-solid fa-mobile-screen-button text-4xl text-indigo-400"></i><span class="font-bold">軟體</span></div>`;
+        }
         async function addToCart(id) { const i = DB.inv.find(x => x.id == id); if(!i) return; let p = i.price, q = 1; let defPrice = i.defaultPrice > 0 ? i.defaultPrice : (i.price > 0 ? i.price : ''); if (i.type === 'accessory' || i.price === 0) { let isGift = false; const html = `<input id="sw-p" type="number" class="swal2-input" placeholder="單價" value="${defPrice}"><div class="flex items-center justify-center gap-2 mt-2"><button type="button" id="sw-gift-btn" class="px-3 py-2 rounded bg-red-900/50 text-red-400 border border-red-700 text-sm">贈</button><button type="button" id="sw-cost-btn" class="px-3 py-2 rounded bg-emerald-900/50 text-emerald-400 border border-emerald-700 text-sm">本</button><div style="display:flex;align-items:center;justify-content:center;gap:12px"><button type="button" onclick="var el=document.getElementById('sw-q');el.value=Math.max(1,parseInt(el.value||1)-1)" style="width:52px;height:52px;font-size:26px;border-radius:12px;background:#334155;color:white;border:none;cursor:pointer">-</button><input id="sw-q" type="number" value="1" min="1" style="width:72px;height:52px;font-size:22px;text-align:center;background:#1e293b;color:white;border:2px solid #475569;border-radius:12px;outline:none"><button type="button" onclick="var el=document.getElementById('sw-q');el.value=parseInt(el.value||1)+1" style="width:52px;height:52px;font-size:26px;border-radius:12px;background:#334155;color:white;border:none;cursor:pointer">+</button></div></div>`; const { value } = await Swal.fire({ title: i.name, html, background: '#1e293b', color: 'white', didOpen: () => { document.getElementById('sw-gift-btn').onclick = () => { isGift = true; Swal.clickConfirm(); }; const costBtn = document.getElementById('sw-cost-btn'); if (costBtn) costBtn.onclick = () => { const el = document.getElementById('sw-p'); if (el) { el.value = String(Number(i.cost) || 0); el.focus(); } }; }, preConfirm: () => isGift ? (function(){var _gq=parseInt(String(document.getElementById('sw-q').value||'1'),10); if(isNaN(_gq)||_gq<1)_gq=1; return [0,_gq,true];})() : [document.getElementById('sw-p').value, document.getElementById('sw-q').value, false] }); if(value===undefined) return; if(value[2]) { var _gq3=parseInt(String(value[1]),10); if(isNaN(_gq3)||_gq3<1)_gq3=1; Cart.push({ ...i, name: i.name + ' (贈)', price: 0, quantity: _gq3, itemId: i.id, originalPrice: defPrice||0, isGift: true }); } else { p = parseInt(value[0]); q = parseInt(value[1]); Cart.push({ ...i, price: p, quantity: q, itemId: i.id, originalPrice: p, isGift: false }); } } else { Cart.push({ ...i, price: p, quantity: q, itemId: i.id, originalPrice: p, isGift: false }); } renderCart(); }
         function renderCart() { 
             const c = document.getElementById('cart-items'); 
@@ -4985,8 +5037,8 @@
                     let safePrice = Number(item.price) || 0, safeCost = Number(item.cost) || 0, safeQty = Number(item.quantity) || 1;
                     if(item.type === 'phone') { let i = DB.inv.find(x => x.id === item.itemId); if(i) i.status_label = '已售出'; }
                     return { 
-                        itemName: finalName, 
-                        name: item.name || finalName,  // 直接調貨使用 name
+                        itemName: (item.isPeerStockTransfer && item.inventoryName) ? item.inventoryName : finalName, 
+                        name: item.isPeerStockTransfer ? finalName : (item.name || finalName),
                         type: item.type, 
                         itemId: item.itemId, 
                         salePrice: safePrice * safeQty, 
@@ -4995,10 +5047,13 @@
                         quantity: safeQty, 
                         imei: item.imei||'', 
                         modelName: item.modelName||'', 
-                        reason: item.reason||'',           // 故障原因（更換物品）
-                        description: item.description||'', // 故障描述
+                        reason: item.reason||'',
+                        description: item.description||'',
                         isStockBattery: item.isStockBattery, 
-                        isDirectTransfer: item.isDirectTransfer || false,  // 標記為直接調貨
+                        isDirectTransfer: item.isDirectTransfer || false,
+                        isPeerStockTransfer: !!item.isPeerStockTransfer,
+                        transferKind: item.transferKind || '',
+                        inventoryName: item.inventoryName || '',
                         batteryCat: item.batteryCat||'', 
                         batteryName: item.batteryName||'',
                         category: item.category||'', 
@@ -5191,7 +5246,7 @@
             const addOne = (v) => {
                 const spec = [v[5],v[6],v[7]].filter(Boolean).join(' ');
                 const cust = resolveFormCustomer(v[4]);
-                Cart.push({type:'new_phone',name:'新機 '+v[0]+(spec?' '+spec:''),dealerName:v[0],cost:Number(v[1]),price:Number(v[3]),imei:v[2],customer:cust,quantity:1,itemId:'NP-'+Date.now()+'-'+Math.random().toString(36).slice(2,9)});
+                Cart.push({type:'new_phone',name:'新機'+(spec?' '+spec:''),dealerName:v[0],cost:Number(v[1]),price:Number(v[3]),imei:v[2],customer:cust,quantity:1,itemId:'NP-'+Date.now()+'-'+Math.random().toString(36).slice(2,9)});
                 applyFormCustomerToCheckout(cust);
                 renderCart();
             };
@@ -5525,34 +5580,152 @@
             }
         }
         async function modalShipping(){const {value:v}=await Swal.fire({title:'運費',input:'number',inputPlaceholder:'金額',background:'#1e293b',color:'white'}); if(v!=null&&v!==''){const amt=Number(v)||0; Cart.push({type:'shipping',name:'運費',cost:amt,price:amt,quantity:1,itemId:'SF-'+Date.now(),originalPrice:amt,isGift:false}); renderCart();}}
+        const SERVICE_TRANSFER_BATTERY_CATS = ['已加工成品電池', '成品大容量電池', '原廠拆機電池0循環'];
+        async function modalServiceStockTransfer() {
+            const kindPick = await Swal.fire({
+                title: '庫存調貨',
+                html: '<div class="text-[12px] text-slate-400 text-left mb-2">別人跟你調＝只能選自己庫存。配件 tab 的「調貨」是你跟廠商調（不扣庫）。</div>' +
+                    '<div class="flex flex-col gap-2 text-left text-sm text-slate-200">' +
+                    '<label class="flex items-center gap-2 p-2 rounded-lg border border-slate-600"><input type="radio" name="st-kind" value="acc" class="accent-yellow-500" checked>配件</label>' +
+                    '<label class="flex items-center gap-2 p-2 rounded-lg border border-slate-600"><input type="radio" name="st-kind" value="battery" class="accent-yellow-500">電池</label>' +
+                    '<label class="flex items-center gap-2 p-2 rounded-lg border border-amber-700"><input type="radio" name="st-kind" value="parts" class="accent-yellow-500">維修料件（獨立科目）</label>' +
+                    '</div>',
+                background: '#1e293b',
+                color: 'white',
+                showCancelButton: true,
+                confirmButtonText: '下一步',
+                cancelButtonText: '取消',
+                preConfirm: () => {
+                    const el = document.querySelector('input[name="st-kind"]:checked');
+                    return (el && el.value) || 'acc';
+                }
+            });
+            if (!kindPick.isConfirmed || !kindPick.value) return;
+            const kind = kindPick.value;
+            let pool = (DB.inv || []).filter((i) => i.type === 'accessory' && !i.isHidden && Number(i.stock) > 0);
+            if (kind === 'battery') {
+                pool = pool.filter((i) => SERVICE_TRANSFER_BATTERY_CATS.includes(i.category));
+            } else if (kind === 'acc') {
+                pool = pool.filter((i) => !SERVICE_TRANSFER_BATTERY_CATS.includes(i.category));
+            }
+            if (!pool.length) {
+                Swal.fire({ icon: 'info', title: '沒有可調庫存', text: kind === 'battery' ? '沒有庫存電池' : '沒有庫存品項', background: '#1e293b', color: 'white' });
+                return;
+            }
+            const opts = pool.map((i) => {
+                const label = booksEscape((i.category ? i.category + ' - ' : '') + i.name + '（庫 ' + i.stock + '／本 ' + (Number(i.cost) || 0) + '）');
+                return `<option value="${String(i.id)}">${label}</option>`;
+            }).join('');
+            const kindLabel = kind === 'battery' ? '電池' : (kind === 'parts' ? '維修料件' : '配件');
+            const pick = await Swal.fire({
+                title: '選庫存・' + kindLabel,
+                html: '<select id="st-item" class="swal2-select" style="width:100%"><option value="">選擇品項</option>' + opts + '</select>' +
+                    '<input id="st-peer" class="swal2-input" placeholder="同行名稱（必填）">' +
+                    '<input id="st-p" type="number" class="swal2-input" placeholder="單價">' +
+                    '<div class="flex items-center justify-center gap-2 mt-2">' +
+                    '<button type="button" id="st-gift" class="px-3 py-2 rounded bg-red-900/50 text-red-400 border border-red-700 text-sm">贈</button>' +
+                    '<button type="button" id="st-cost" class="px-3 py-2 rounded bg-emerald-900/50 text-emerald-400 border border-emerald-700 text-sm">本</button>' +
+                    '<div style="display:flex;align-items:center;justify-content:center;gap:12px">' +
+                    '<button type="button" id="st-q-minus" style="width:52px;height:52px;font-size:26px;border-radius:12px;background:#334155;color:white;border:none;cursor:pointer">-</button>' +
+                    '<input id="st-q" type="number" value="1" min="1" style="width:72px;height:52px;font-size:22px;text-align:center;background:#1e293b;color:white;border:2px solid #475569;border-radius:12px;outline:none">' +
+                    '<button type="button" id="st-q-plus" style="width:52px;height:52px;font-size:26px;border-radius:12px;background:#334155;color:white;border:none;cursor:pointer">+</button>' +
+                    '</div></div>',
+                background: '#1e293b',
+                color: 'white',
+                showCancelButton: true,
+                confirmButtonText: 'OK',
+                cancelButtonText: '取消',
+                didOpen: () => {
+                    const itemEl = document.getElementById('st-item');
+                    const priceEl = document.getElementById('st-p');
+                    if (Swal.getPopup()) Swal.getPopup().dataset.stGift = '0';
+                    const giftBtn = document.getElementById('st-gift');
+                    if (giftBtn) giftBtn.onclick = () => {
+                        if (Swal.getPopup()) Swal.getPopup().dataset.stGift = '1';
+                        Swal.clickConfirm();
+                    };
+                    const costBtn = document.getElementById('st-cost');
+                    if (costBtn) costBtn.onclick = () => {
+                        const id = itemEl && itemEl.value;
+                        const it = pool.find((x) => String(x.id) === String(id));
+                        if (priceEl) { priceEl.value = String(Number(it && it.cost) || 0); priceEl.focus(); }
+                    };
+                    const qm = document.getElementById('st-q-minus');
+                    const qp = document.getElementById('st-q-plus');
+                    const qEl = document.getElementById('st-q');
+                    if (qm) qm.onclick = () => { if (qEl) qEl.value = Math.max(1, parseInt(qEl.value || 1, 10) - 1); };
+                    if (qp) qp.onclick = () => { if (qEl) qEl.value = (parseInt(qEl.value || 1, 10) || 1) + 1; };
+                },
+                preConfirm: () => {
+                    const id = (document.getElementById('st-item') && document.getElementById('st-item').value) || '';
+                    const peer = ((document.getElementById('st-peer') && document.getElementById('st-peer').value) || '').trim();
+                    const isGift = (Swal.getPopup() && Swal.getPopup().dataset.stGift === '1');
+                    const price = isGift ? 0 : (parseInt((document.getElementById('st-p') && document.getElementById('st-p').value) || '', 10));
+                    let q = parseInt((document.getElementById('st-q') && document.getElementById('st-q').value) || '1', 10);
+                    if (isNaN(q) || q < 1) q = 1;
+                    if (!id) { Swal.showValidationMessage('請選擇庫存品項'); return false; }
+                    if (!peer) { Swal.showValidationMessage('請填同行名稱'); return false; }
+                    if (!isGift && (isNaN(price) || price < 0)) { Swal.showValidationMessage('請填單價（或按「本」）'); return false; }
+                    const it = pool.find((x) => String(x.id) === String(id));
+                    if (!it) { Swal.showValidationMessage('找不到品項'); return false; }
+                    if (q > Number(it.stock)) { Swal.showValidationMessage('庫存不足（庫 ' + it.stock + '）'); return false; }
+                    return { it, peer, price: isGift ? 0 : price, q, isGift };
+                }
+            });
+            if (!pick.isConfirmed || !pick.value) return;
+            const { it, peer, price, q, isGift } = pick.value;
+            const unitCost = Number(it.cost) || 0;
+            const invName = String(it.name || '');
+            let ledgerName = kind === 'parts' ? ('[維修料件調貨] ' + invName) : ('調貨 ' + invName);
+            if (isGift && !ledgerName.includes('贈')) ledgerName += ' (贈)';
+            Cart.push({
+                ...it,
+                type: 'accessory',
+                name: ledgerName,
+                inventoryName: invName,
+                price: isGift ? 0 : price,
+                cost: unitCost,
+                quantity: q,
+                itemId: it.id,
+                originalPrice: isGift ? unitCost : price,
+                isGift: !!isGift,
+                dealerName: peer,
+                customer: peer,
+                transferKind: kind === 'parts' ? 'parts' : (kind === 'battery' ? 'battery' : 'acc'),
+                isPeerStockTransfer: true,
+                isDirectTransfer: false
+            });
+            applyFormCustomerToCheckout(peer);
+            renderCart();
+        }
         function renderDirectTransferGrid() {
             const grid = document.getElementById('item-grid');
             setItemGridMode('grid');
-            grid.innerHTML = `<div onclick="modalDirectTransfer()" class="glass p-6 rounded-xl border-l-4 border-purple-500 flex flex-col items-center justify-center gap-2 cursor-pointer"><i class="fa-solid fa-truck-fast text-4xl text-purple-500"></i><span class="font-bold text-white">新增調貨</span><span class="text-xs text-slate-400">點擊新增調貨項目</span></div>`;
+            grid.innerHTML = `<div onclick="modalDirectTransfer()" class="glass p-6 rounded-xl border-l-4 border-purple-500 flex flex-col items-center justify-center gap-2 cursor-pointer"><i class="fa-solid fa-truck-fast text-4xl text-purple-500"></i><span class="font-bold text-white">新增調貨</span><span class="text-xs text-slate-400">跟廠商調貨（不扣庫存）</span></div>`;
         }
         async function modalDirectTransfer() {
             const { value: v } = await Swal.fire({
-                title: '調貨',
-                html: '<input id="dt1" class="swal2-input" placeholder="調貨廠商"><input id="dt2" class="swal2-input" placeholder="品項"><input id="dt3" class="swal2-input" type="number" placeholder="成本"><input id="dt4" class="swal2-input" type="number" placeholder="售價">',
+                title: '跟廠商調貨',
+                html: '<div class="text-[12px] text-slate-400 text-left px-2 mb-1">你跟別家調來再賣（不扣自己庫存）。別人跟你調請用「服務→調貨」。</div><input id="dt1" class="swal2-input" placeholder="調貨廠商"><input id="dt2" class="swal2-input" placeholder="品項"><input id="dt3" class="swal2-input" type="number" placeholder="成本"><input id="dt4" class="swal2-input" type="number" placeholder="售價">',
                 background: '#1e293b',
                 color: 'white',
                 preConfirm: () => [
-                    document.getElementById('dt1').value,  // 調貨廠商
-                    document.getElementById('dt2').value,  // 品項
-                    document.getElementById('dt3').value,  // 成本
-                    document.getElementById('dt4').value   // 售價
+                    document.getElementById('dt1').value,
+                    document.getElementById('dt2').value,
+                    document.getElementById('dt3').value,
+                    document.getElementById('dt4').value
                 ]
             });
             if (v && v[0] && v[1] && v[2] && v[3]) {
                 Cart.push({
                     type: 'direct_transfer',
                     name: '調貨: ' + v[1],
-                    dealerName: v[0],  // 調貨廠商
+                    dealerName: v[0],
                     cost: Number(v[2]) || 0,
                     price: Number(v[3]) || 0,
                     quantity: 1,
                     itemId: 'DT-' + Date.now() + '-' + Math.random().toString(36).slice(2, 9),
-                    isDirectTransfer: true  // 標記為直接調貨，不扣庫存
+                    isDirectTransfer: true
                 });
                 renderCart();
             }
