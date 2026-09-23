@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <meta name="theme-color" content="#0f172a">
+    <meta name="theme-color" content="#1a1714">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="mobile-web-app-capable" content="yes">
@@ -13,45 +13,64 @@
     <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
     <title>內部POS系統</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        slate: {
+                            50: '#faf7f4', 100: '#f3ebe3', 200: '#e5d6c8', 300: '#cfb8a6',
+                            400: '#b09886', 500: '#8f7a68', 600: '#6f5c4e', 700: '#54463c',
+                            800: '#3a322c', 900: '#2a2420', 950: '#1a1714'
+                        },
+                        yellow: {
+                            300: '#f5c878', 400: '#f0b35c', 500: '#e8a04a', 600: '#d4893a',
+                            700: '#b8732e', 800: '#946028', 900: '#6b421c'
+                        }
+                    }
+                }
+            }
+        };
+    </script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/js/all.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <style>
-        html { background-color: #0f172a; min-height: 100%; min-height: -webkit-fill-available; }
-        body { background-color: transparent; color: #f1f5f9; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; -webkit-tap-highlight-color: transparent; padding-top: env(safe-area-inset-top); padding-bottom: env(safe-area-inset-bottom); min-height: 100vh; min-height: -webkit-fill-available; }
+        html { background-color: #1a1714; min-height: 100%; min-height: -webkit-fill-available; }
+        body { background-color: transparent; color: #f3ebe3; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; -webkit-tap-highlight-color: transparent; padding-top: env(safe-area-inset-top); padding-bottom: env(safe-area-inset-bottom); min-height: 100vh; min-height: -webkit-fill-available; }
         /* Safari 專用：固定全螢幕背景層，延伸到安全區域，消除頂部/底部白條 */
-        #bg-fill { position: fixed; z-index: -1; background-color: #0f172a; top: calc(-1 * env(safe-area-inset-top, 0px)); left: calc(-1 * env(safe-area-inset-left, 0px)); width: calc(100vw + env(safe-area-inset-left, 0px) + env(safe-area-inset-right, 0px)); height: calc(100vh + env(safe-area-inset-top, 0px) + env(safe-area-inset-bottom, 0px)); height: calc(100dvh + env(safe-area-inset-top, 0px) + env(safe-area-inset-bottom, 0px)); min-height: 100vh; -webkit-min-height: -webkit-fill-available; }
+        #bg-fill { position: fixed; z-index: -1; background-color: #1a1714; top: calc(-1 * env(safe-area-inset-top, 0px)); left: calc(-1 * env(safe-area-inset-left, 0px)); width: calc(100vw + env(safe-area-inset-left, 0px) + env(safe-area-inset-right, 0px)); height: calc(100vh + env(safe-area-inset-top, 0px) + env(safe-area-inset-bottom, 0px)); height: calc(100dvh + env(safe-area-inset-top, 0px) + env(safe-area-inset-bottom, 0px)); min-height: 100vh; -webkit-min-height: -webkit-fill-available; }
         .pt-safe-top { padding-top: env(safe-area-inset-top, 0px); }
-        .glass { background: rgba(30, 41, 59, 0.95); backdrop-filter: blur(12px); border: 1px solid rgba(255,255,255,0.08); }
-        .input-dark { background: #1e293b; border: 1px solid #334155; color: white; outline: none; transition: border-color 0.2s; }
-        .input-dark:focus { border-color: #eab308; }
-        .pill-btn { display: inline-flex; align-items: center; justify-content: center; padding: 6px 14px; margin-right: 6px; border-radius: 9999px; border: 1px solid #475569; color: #cbd5e1; font-size: 13px; font-weight: 600; background: rgba(30, 41, 59, 0.5); cursor: pointer; transition: all 0.2s; white-space: nowrap; }
-        .pill-btn.active { background: #eab308; color: #000; border-color: #eab308; box-shadow: 0 0 10px rgba(234, 179, 8, 0.3); }
-        .main-tab { flex: 1; text-align: center; padding: 10px 0; color: #94a3b8; font-weight: bold; border-bottom: 2px solid transparent; transition: all 0.2s; cursor: pointer; }
-        .main-tab.active { color: #eab308; border-bottom-color: #eab308; }
-        .loader { border: 2px solid #334155; border-top: 2px solid #eab308; border-radius: 50%; width: 16px; height: 16px; animation: spin 0.8s linear infinite; display:inline-block; }
+        .glass { background: rgba(38, 34, 30, 0.96); backdrop-filter: blur(12px); border: 1px solid rgba(255,255,255,0.08); }
+        .input-dark { background: #26221e; border: 1px solid #3d3731; color: white; outline: none; transition: border-color 0.2s; }
+        .input-dark:focus { border-color: #e8a04a; }
+        .pill-btn { display: inline-flex; align-items: center; justify-content: center; padding: 6px 14px; margin-right: 6px; border-radius: 9999px; border: 1px solid #4a433c; color: #e8dfd4; font-size: 13px; font-weight: 600; background: rgba(38, 34, 30, 0.55); cursor: pointer; transition: all 0.2s; white-space: nowrap; }
+        .pill-btn.active { background: #e8a04a; color: #1a1410; border-color: #e8a04a; box-shadow: 0 0 10px rgba(232, 160, 74, 0.28); }
+        .main-tab { flex: 1; text-align: center; padding: 10px 0; color: #a89f94; font-weight: bold; border-bottom: 2px solid transparent; transition: all 0.2s; cursor: pointer; }
+        .main-tab.active { color: #e8a04a; border-bottom-color: #e8a04a; }
+        .loader { border: 2px solid #3d3731; border-top: 2px solid #e8a04a; border-radius: 50%; width: 16px; height: 16px; animation: spin 0.8s linear infinite; display:inline-block; }
         .no-scrollbar::-webkit-scrollbar { display: none; }
         #category-sort-list { -webkit-overflow-scrolling: touch; }
-        .spec-tag { font-size: 0.7rem; padding: 2px 6px; border-radius: 4px; background: #334155; color: #94a3b8; margin-right: 4px; display: inline-flex; items-center: center; }
-        .mobile-nav-item { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 8px 0; color: #64748b; font-size: 10px; transition: color 0.2s; }
+        .spec-tag { font-size: 0.7rem; padding: 2px 6px; border-radius: 4px; background: #3d3731; color: #a89f94; margin-right: 4px; display: inline-flex; items-center: center; }
+        .mobile-nav-item { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 8px 0; color: #7a7168; font-size: 10px; transition: color 0.2s; }
         .mobile-nav-item i { font-size: 20px; margin-bottom: 2px; }
-        .mobile-nav-item.active { color: #eab308; }
+        .mobile-nav-item.active { color: #e8a04a; }
         /* 桌機左欄：文字標籤跟隨按鈕目前文字色 */
         .nav-btn .nav-label { color: inherit; }
-        .books-sheet { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; background: #0b1220; }
-        .books-sheet th, .books-sheet td { border: 1px solid #334155; padding: 7px 10px; font-size: 12px; color: #e2e8f0; }
-        .books-sheet th { background: #0f172a; color: #94a3b8; font-weight: 600; letter-spacing: .04em; }
+        .books-sheet { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; background: #141210; }
+        .books-sheet th, .books-sheet td { border: 1px solid #3d3731; padding: 7px 10px; font-size: 12px; color: #e8dfd4; }
+        .books-sheet th { background: #1a1714; color: #a89f94; font-weight: 600; letter-spacing: .04em; }
         .books-sheet td.num, .books-sheet th.num { text-align: right; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; white-space: nowrap; }
-        .books-sheet .sec td { background: #1e293b; color: #cbd5e1; font-weight: 700; }
-        .books-sheet .tot td { background: #111827; font-weight: 700; }
-        .books-sheet .inc { color: #facc15; }
-        .books-sheet .exp { color: #f87171; }
-        .books-sheet .net { color: #4ade80; }
-        .books-sheet .mute { color: #64748b; }
-        .books-sheet tbody tr:nth-child(even):not(.sec):not(.tot) { background: rgba(15, 23, 42, 0.55); }
-        .books-entry-btn { flex: 1 1 auto; min-width: 7.5rem; padding: 8px 12px; border-radius: 8px; border: 1px solid #475569; background: #1e293b; color: #e2e8f0; font-size: 12px; font-weight: 700; }
-        .books-menu { position: absolute; left: 0; top: calc(100% + 4px); z-index: 40; min-width: 11rem; max-height: min(70vh, 22rem); overflow-y: auto; background: #0f172a; border: 1px solid #475569; border-radius: 8px; box-shadow: 0 12px 24px rgba(0,0,0,.35); }
-        .books-menu button { display: block; width: 100%; text-align: left; padding: 9px 12px; font-size: 13px; color: #e2e8f0; background: transparent; border: 0; }
-        .books-menu button:hover { background: #1e293b; color: #facc15; }
+        .books-sheet .sec td { background: #26221e; color: #e8dfd4; font-weight: 700; }
+        .books-sheet .tot td { background: #1f1b18; font-weight: 700; }
+        .books-sheet .inc { color: #e8a04a; }
+        .books-sheet .exp { color: #e08a7a; }
+        .books-sheet .net { color: #7dba84; }
+        .books-sheet .mute { color: #7a7168; }
+        .books-sheet tbody tr:nth-child(even):not(.sec):not(.tot) { background: rgba(26, 23, 20, 0.55); }
+        .books-entry-btn { flex: 1 1 auto; min-width: 7.5rem; padding: 8px 12px; border-radius: 8px; border: 1px solid #4a433c; background: #26221e; color: #e8dfd4; font-size: 12px; font-weight: 700; }
+        .books-menu { position: absolute; left: 0; top: calc(100% + 4px); z-index: 40; min-width: 11rem; max-height: min(70vh, 22rem); overflow-y: auto; background: #1a1714; border: 1px solid #4a433c; border-radius: 8px; box-shadow: 0 12px 24px rgba(0,0,0,.35); }
+        .books-menu button { display: block; width: 100%; text-align: left; padding: 9px 12px; font-size: 13px; color: #e8dfd4; background: transparent; border: 0; }
+        .books-menu button:hover { background: #26221e; color: #e8a04a; }
         .books-m { display: block; }
         .books-d { display: none; }
         .books-page { padding: 8px 10px 5.5rem; }
@@ -61,27 +80,27 @@
         .books-toolbar-actions, .books-toolbar-period, .books-toolbar-entry { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
         .books-toolbar-actions button, .books-toolbar-period button { min-height: 36px; }
         .books-hero { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 10px; }
-        .books-hero-card { background: #0b1220; border: 1px solid #334155; border-radius: 12px; padding: 10px 12px; }
-        .books-hero-card span { display: block; font-size: 11px; color: #94a3b8; margin-bottom: 4px; }
+        .books-hero-card { background: #141210; border: 1px solid #3d3731; border-radius: 12px; padding: 10px 12px; }
+        .books-hero-card span { display: block; font-size: 11px; color: #a89f94; margin-bottom: 4px; }
         .books-hero-card b { font-size: 1.25rem; font-variant-numeric: tabular-nums; font-weight: 800; letter-spacing: -.02em; }
         .books-hero-card.net { grid-column: 1 / -1; }
-        .books-hero-card.inc b { color: #facc15; }
-        .books-hero-card.exp b { color: #f87171; }
-        .books-hero-card.net b { color: #4ade80; }
-        .books-sec { font-size: 11px; font-weight: 700; letter-spacing: .16em; color: #94a3b8; margin: 12px 0 6px; }
-        .books-kv { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; padding: 11px 4px; border-bottom: 1px solid #1e293b; font-size: 15px; }
-        .books-kv .lab { color: #e2e8f0; }
+        .books-hero-card.inc b { color: #e8a04a; }
+        .books-hero-card.exp b { color: #e08a7a; }
+        .books-hero-card.net b { color: #7dba84; }
+        .books-sec { font-size: 11px; font-weight: 700; letter-spacing: .16em; color: #a89f94; margin: 12px 0 6px; }
+        .books-kv { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; padding: 11px 4px; border-bottom: 1px solid #26221e; font-size: 15px; }
+        .books-kv .lab { color: #e8dfd4; }
         .books-kv .num { font-variant-numeric: tabular-nums; font-weight: 700; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; white-space: nowrap; }
-        .books-kv .num.inc, .books-card-amt.inc { color: #facc15; }
-        .books-kv .num.exp, .books-card-amt.exp { color: #f87171; }
-        .books-kv .num.net, .books-sheet .num.net { color: #4ade80; }
-        .books-kv .num.mute, .books-kv .lab.mute, .books-card-amt.mute { color: #94a3b8; }
-        .books-kv.tot { border-bottom-color: #334155; font-weight: 800; }
-        .books-card { background: #0b1220; border: 1px solid #334155; border-radius: 12px; padding: 12px; margin-bottom: 8px; }
-        .books-card-top { display: flex; justify-content: space-between; gap: 8px; font-size: 12px; color: #94a3b8; margin-bottom: 4px; }
-        .books-card-name { font-size: 15px; font-weight: 700; color: #f1f5f9; line-height: 1.35; margin-bottom: 6px; word-break: break-word; }
+        .books-kv .num.inc, .books-card-amt.inc { color: #e8a04a; }
+        .books-kv .num.exp, .books-card-amt.exp { color: #e08a7a; }
+        .books-kv .num.net, .books-sheet .num.net { color: #7dba84; }
+        .books-kv .num.mute, .books-kv .lab.mute, .books-card-amt.mute { color: #a89f94; }
+        .books-kv.tot { border-bottom-color: #3d3731; font-weight: 800; }
+        .books-card { background: #141210; border: 1px solid #3d3731; border-radius: 12px; padding: 12px; margin-bottom: 8px; }
+        .books-card-top { display: flex; justify-content: space-between; gap: 8px; font-size: 12px; color: #a89f94; margin-bottom: 4px; }
+        .books-card-name { font-size: 15px; font-weight: 700; color: #f3ebe3; line-height: 1.35; margin-bottom: 6px; word-break: break-word; }
         .books-card-amt { font-size: 1.2rem; font-weight: 800; font-variant-numeric: tabular-nums; }
-        .books-card-meta { margin-top: 6px; font-size: 12px; color: #64748b; line-height: 1.4; }
+        .books-card-meta { margin-top: 6px; font-size: 12px; color: #7a7168; line-height: 1.4; }
         #books-tables, #fund-tables { -webkit-overflow-scrolling: touch; }
         @media (min-width: 768px) {
             .books-m { display: none; }
@@ -97,7 +116,7 @@
             .books-sheet th, .books-sheet td { padding: 10px 8px; font-size: 14px; }
             .pill-btn { min-height: 36px; padding: 6px 12px; margin-right: 0; }
             #books-month, #fund-month { min-height: 36px; font-size: 16px; flex: 1 1 9rem; }
-            #books-period-label, #fund-hint { font-size: 12px; line-height: 1.45; color: #94a3b8; }
+            #books-period-label, #fund-hint { font-size: 12px; line-height: 1.45; color: #a89f94; }
             .swal2-popup { width: calc(100vw - 12px) !important; max-width: 28rem; }
             .swal2-title { font-size: 1.15rem !important; }
             .swal2-html-container { font-size: 14px !important; }
@@ -105,29 +124,29 @@
             .swal2-actions { width: 100% !important; }
             .swal2-styled { min-height: 44px; font-size: 16px !important; }
         }
-        .accordion-content { max-height: 0; overflow: hidden; transition: max-height 0.3s ease-out; background: #020617; border-bottom: 1px solid #1e293b; }
+        .accordion-content { max-height: 0; overflow: hidden; transition: max-height 0.3s ease-out; background: #141210; border-bottom: 1px solid #26221e; }
         .accordion-content.open { max-height: 5000px; transition: max-height 0.5s ease-in; }
-        .list-row { border-bottom: 1px solid #334155; padding: 12px 8px; cursor: pointer; transition: background 0.2s; }
-        .list-row:hover { background: #1e293b; }
+        .list-row { border-bottom: 1px solid #3d3731; padding: 12px 8px; cursor: pointer; transition: background 0.2s; }
+        .list-row:hover { background: #26221e; }
         .phone-list { display: flex; flex-direction: column; gap: 0; padding: 0 0 6rem; }
-        .phone-row { display: flex; align-items: flex-start; gap: 10px; padding: 11px 12px; border-bottom: 1px solid #1e293b; border-left: 3px solid #3b82f6; cursor: pointer; background: rgba(15, 23, 42, 0.55); }
-        .phone-row:active { background: #1e293b; }
-        .phone-row.is-selected { background: rgba(234, 179, 8, 0.14); border-left-color: #eab308; }
-        .phone-row-check { display: none; width: 22px; flex-shrink: 0; margin-top: 3px; color: #64748b; font-size: 16px; text-align: center; }
+        .phone-row { display: flex; align-items: flex-start; gap: 10px; padding: 11px 12px; border-bottom: 1px solid #26221e; border-left: 3px solid #6b9bd1; cursor: pointer; background: rgba(26, 23, 20, 0.55); }
+        .phone-row:active { background: #26221e; }
+        .phone-row.is-selected { background: rgba(232, 160, 74, 0.14); border-left-color: #e8a04a; }
+        .phone-row-check { display: none; width: 22px; flex-shrink: 0; margin-top: 3px; color: #7a7168; font-size: 16px; text-align: center; }
         .phone-list.is-multiselect .phone-row-check { display: block; }
-        .phone-row.is-selected .phone-row-check { color: #eab308; }
+        .phone-row.is-selected .phone-row-check { color: #e8a04a; }
         .phone-row-main { flex: 1; min-width: 0; }
         .phone-row-top { display: flex; align-items: baseline; gap: 4px; }
-        .phone-row-name { font-size: 15px; font-weight: 700; color: #f1f5f9; line-height: 1.35; min-width: 0; word-break: break-word; }
-        .phone-row-id { font-size: 11px; color: #94a3b8; font-weight: 600; flex-shrink: 0; }
+        .phone-row-name { font-size: 15px; font-weight: 700; color: #f3ebe3; line-height: 1.35; min-width: 0; word-break: break-word; }
+        .phone-row-id { font-size: 11px; color: #a89f94; font-weight: 600; flex-shrink: 0; }
         .phone-row-spec { margin-top: 5px; display: flex; flex-wrap: wrap; gap: 6px; }
-        .acc-check { display: none; position: absolute; top: 8px; left: 8px; color: #64748b; font-size: 18px; z-index: 2; }
+        .acc-check { display: none; position: absolute; top: 8px; left: 8px; color: #7a7168; font-size: 18px; z-index: 2; }
         #item-grid.is-multiselect .acc-check { display: block; }
-        .acc-card.is-selected { box-shadow: inset 0 0 0 2px #eab308; background: rgba(234, 179, 8, 0.12); }
-        .acc-card.is-selected .acc-check { color: #eab308; }
-        .list-row-exp { border-bottom: 1px solid #334155; padding: 12px 8px; background: rgba(69, 10, 10, 0.2); }
+        .acc-card.is-selected { box-shadow: inset 0 0 0 2px #e8a04a; background: rgba(232, 160, 74, 0.12); }
+        .acc-card.is-selected .acc-check { color: #e8a04a; }
+        .list-row-exp { border-bottom: 1px solid #3d3731; padding: 12px 8px; background: rgba(120, 40, 30, 0.18); }
         .cp-box { display: flex; flex-direction: column; align-items: flex-end; justify-content: center; line-height: 1.2; }
-        .cp-cost { font-size: 10px; color: #64748b; }
+        .cp-cost { font-size: 10px; color: #7a7168; }
         .pb-safe { padding-bottom: max(1rem, env(safe-area-inset-bottom, 1rem)); }
         /* 直屏時結帳區塊：蓋過底導覽、固定高度、清單可捲動、確認結帳固定可見 */
         #cart-panel.mobile-cart-open { height: 100dvh !important; max-height: 100dvh !important; display: flex !important; flex-direction: column !important; overflow: hidden; z-index: 60 !important; }
@@ -188,6 +207,10 @@
             transition: none !important;
         }
         .swal2-popup.swal2-show { transform: none !important; }
+
+        .swal2-popup { background: #26221e !important; color: #f3ebe3 !important; }
+        .swal2-title, .swal2-html-container { color: #f3ebe3 !important; }
+        .swal2-input, .swal2-select, .swal2-textarea { background: #1a1714 !important; color: #f3ebe3 !important; border-color: #3d3731 !important; }
         #mobile-float-bar-pos, #mobile-float-bar-restock, #cart-footer-draggable { transition: none !important; }
     </style>
 </head>
@@ -921,7 +944,7 @@
                 }
             }
         }
-        function showError(msg) { if (typeof Swal !== 'undefined') { Swal.fire({icon:'error', title:msg, background:'#1e293b', color:'white'}); } else { alert(msg); } }
+        function showError(msg) { if (typeof Swal !== 'undefined') { Swal.fire({icon:'error', title:msg, background:'#26221e', color:'white'}); } else { alert(msg); } }
         function loginSuccess(n, a, u) { 
             User = { name: n, isAdmin: a, username: u }; 
             const rem = document.getElementById('remember-me'); 
@@ -967,7 +990,7 @@
                 console.log('收到資料:', d);
                 if (d.status === 'error') { 
                     document.getElementById('sync-status').innerHTML = '<span class="text-red-500">● 同步失敗</span>'; 
-                    if (typeof Swal !== 'undefined') Swal.fire({ icon: 'error', title: '載入失敗', text: d.msg || '請重新整理', background: '#1e293b', color: 'white' }); 
+                    if (typeof Swal !== 'undefined') Swal.fire({ icon: 'error', title: '載入失敗', text: d.msg || '請重新整理', background: '#26221e', color: 'white' }); 
                     return; 
                 }
                 DB.inv = d.inventory || []; 
@@ -995,7 +1018,7 @@
 
         function switchView(v) { 
             if ((v === 'books' || v === 'fund' || v === 'salary') && !(User && User.isAdmin)) {
-                Swal.fire({ icon: 'error', title: '僅管理員可查看', background: '#1e293b', color: 'white' });
+                Swal.fire({ icon: 'error', title: '僅管理員可查看', background: '#26221e', color: 'white' });
                 return;
             }
             const ev = document.getElementById('view-'+v); if (!ev) return;
@@ -1165,7 +1188,7 @@
             if (Array.isArray(UI.categoryOrder) && UI.categoryOrder.length) localCat = UI.categoryOrder;
             if (Array.isArray(UI.favAccessoryIds) && UI.favAccessoryIds.length) localFav = UI.favAccessoryIds;
             if ((!localCat || !localCat.length) && (!localFav || !localFav.length)) {
-                Swal.fire({ icon:'warning', title:'本機沒有可上傳的設定', background:'#1e293b', color:'white' });
+                Swal.fire({ icon:'warning', title:'本機沒有可上傳的設定', background:'#26221e', color:'white' });
                 return;
             }
             try {
@@ -1184,11 +1207,11 @@
                     icon:'success',
                     title:'已上傳到雲端',
                     text:`分類 ${UI.categoryOrder.length}　常用 ${UI.favAccessoryIds.length}`,
-                    background:'#1e293b', color:'white'
+                    background:'#26221e', color:'white'
                 });
             } catch (e) {
                 Swal.close();
-                Swal.fire({ icon:'error', title:'上傳失敗', text: e.message || '', background:'#1e293b', color:'white' });
+                Swal.fire({ icon:'error', title:'上傳失敗', text: e.message || '', background:'#26221e', color:'white' });
             }
         }
         function getOrderedCategories() {
@@ -1306,14 +1329,14 @@
             if (UI.multiSelect && UI.tab === 'phone') { togglePhoneSelect(id); return; }
             if (UI.multiSelect && UI.tab === 'accessory') { toggleAccSelect('a:' + String(id)); return; }
             const i = DB.inv.find(x => String(x.id) === String(id));
-            if(!i) { Swal.fire({icon:'error', title:'找不到商品', text:`ID: ${id}`, background:'#1e293b', color:'white'}); return; }
+            if(!i) { Swal.fire({icon:'error', title:'找不到商品', text:`ID: ${id}`, background:'#26221e', color:'white'}); return; }
             let p = i.price, q = 1;
             let defPrice = i.defaultPrice > 0 ? i.defaultPrice : (i.price > 0 ? i.price : '');
             if (i.type === 'phone') {
                 const { value } = await withPreservedItemGridScroll((swalOpts) => Swal.fire({
                     title: i.name,
                     html: `<input id="sw-p" type="number" class="swal2-input" placeholder="單價" value="${defPrice}">`,
-                    background: '#1e293b', color: 'white',
+                    background: '#26221e', color: 'white',
                     ...swalOpts,
                     preConfirm: () => document.getElementById('sw-p').value
                 }));
@@ -1323,8 +1346,8 @@
             } else if (i.type === 'accessory' || i.price === 0) {
                 const { value } = await withPreservedItemGridScroll((swalOpts) => Swal.fire({
                     title: i.name,
-                    html: `<input id="sw-p" type="number" class="swal2-input" placeholder="單價" value="${defPrice}"><div class="flex items-center justify-center gap-2 mt-2"><button type="button" id="sw-gift-btn" class="px-3 py-2 rounded bg-red-900/50 text-red-400 border border-red-700 text-sm">贈</button><button type="button" id="sw-cost-btn" class="px-3 py-2 rounded bg-emerald-900/50 text-emerald-400 border border-emerald-700 text-sm">本</button><div style="display:flex;align-items:center;justify-content:center;gap:12px"><button type="button" onclick="var el=document.getElementById('sw-q');el.value=Math.max(1,parseInt(el.value||1)-1)" style="width:52px;height:52px;font-size:26px;border-radius:12px;background:#334155;color:white;border:none;cursor:pointer">-</button><input id="sw-q" type="number" value="1" min="1" style="width:72px;height:52px;font-size:22px;text-align:center;background:#1e293b;color:white;border:2px solid #475569;border-radius:12px;outline:none"><button type="button" onclick="var el=document.getElementById('sw-q');el.value=parseInt(el.value||1)+1" style="width:52px;height:52px;font-size:26px;border-radius:12px;background:#334155;color:white;border:none;cursor:pointer">+</button></div>`,
-                    background: '#1e293b', color: 'white',
+                    html: `<input id="sw-p" type="number" class="swal2-input" placeholder="單價" value="${defPrice}"><div class="flex items-center justify-center gap-2 mt-2"><button type="button" id="sw-gift-btn" class="px-3 py-2 rounded bg-red-900/50 text-red-400 border border-red-700 text-sm">贈</button><button type="button" id="sw-cost-btn" class="px-3 py-2 rounded bg-emerald-900/50 text-emerald-400 border border-emerald-700 text-sm">本</button><div style="display:flex;align-items:center;justify-content:center;gap:12px"><button type="button" onclick="var el=document.getElementById('sw-q');el.value=Math.max(1,parseInt(el.value||1)-1)" style="width:52px;height:52px;font-size:26px;border-radius:12px;background:#3d3731;color:white;border:none;cursor:pointer">-</button><input id="sw-q" type="number" value="1" min="1" style="width:72px;height:52px;font-size:22px;text-align:center;background:#26221e;color:white;border:2px solid #4a433c;border-radius:12px;outline:none"><button type="button" onclick="var el=document.getElementById('sw-q');el.value=parseInt(el.value||1)+1" style="width:52px;height:52px;font-size:26px;border-radius:12px;background:#3d3731;color:white;border:none;cursor:pointer">+</button></div>`,
+                    background: '#26221e', color: 'white',
                     ...swalOpts,
                     didOpen: () => {
                         document.getElementById('sw-gift-btn').onclick = () => { window._swGift = true; Swal.clickConfirm(); };
@@ -1654,8 +1677,8 @@
                 const line2 = ids.length ? `#二手機編號${ids.join(',')}` : '#二手機編號';
                 const text = `${customer} $${pure.toLocaleString()}\n${line2}`;
                 const ok = await copyTextToClipboard(text);
-                if (ok) Swal.fire({ icon:'success', title:'已複製二手機內容', toast:true, position:'top', timer:1500, showConfirmButton:false, background:'#1e293b', color:'white' });
-                else Swal.fire({ icon:'error', title:'複製失敗', text:'請手動複製', background:'#1e293b', color:'white' });
+                if (ok) Swal.fire({ icon:'success', title:'已複製二手機內容', toast:true, position:'top', timer:1500, showConfirmButton:false, background:'#26221e', color:'white' });
+                else Swal.fire({ icon:'error', title:'複製失敗', text:'請手動複製', background:'#26221e', color:'white' });
                 return;
             }
             if (kind === 'acc') {
@@ -1665,8 +1688,8 @@
                 const names = nonGiftAcc.map((it, idx) => `${idx + 1}. ${formatAccessoryCopyLabel(it)}`);
                 const text = `${customer} $${pure.toLocaleString()}\n${names.join('\n')}`.trim();
                 const ok = await copyTextToClipboard(text);
-                if (ok) Swal.fire({ icon:'success', title:'已複製配件內容', toast:true, position:'top', timer:1500, showConfirmButton:false, background:'#1e293b', color:'white' });
-                else Swal.fire({ icon:'error', title:'複製失敗', text:'請手動複製', background:'#1e293b', color:'white' });
+                if (ok) Swal.fire({ icon:'success', title:'已複製配件內容', toast:true, position:'top', timer:1500, showConfirmButton:false, background:'#26221e', color:'white' });
+                else Swal.fire({ icon:'error', title:'複製失敗', text:'請手動複製', background:'#26221e', color:'white' });
                 return;
             }
             if (kind === 'soft') {
@@ -1676,8 +1699,8 @@
                 const names = softItems.map((it, idx) => `${idx + 1}. ${stripLedgerName(it.itemName || it.name || '')}`);
                 const text = `${customer} $${pure.toLocaleString()}\n${names.join('\n')}`.trim();
                 const ok = await copyTextToClipboard(text);
-                if (ok) Swal.fire({ icon:'success', title:'\u5df2\u8907\u88fd\u8edf\u9ad4\u5167\u5bb9', toast:true, position:'top', timer:1500, showConfirmButton:false, background:'#1e293b', color:'white' });
-                else Swal.fire({ icon:'error', title:'\u8907\u88fd\u5931\u6557', text:'\u8acb\u624b\u52d5\u8907\u88fd', background:'#1e293b', color:'white' });
+                if (ok) Swal.fire({ icon:'success', title:'\u5df2\u8907\u88fd\u8edf\u9ad4\u5167\u5bb9', toast:true, position:'top', timer:1500, showConfirmButton:false, background:'#26221e', color:'white' });
+                else Swal.fire({ icon:'error', title:'\u8907\u88fd\u5931\u6557', text:'\u8acb\u624b\u52d5\u8907\u88fd', background:'#26221e', color:'white' });
                 return;
             }
             if (kind === 'card') {
@@ -1687,8 +1710,8 @@
                 const names = nonGiftCards.map((it, idx) => `${idx + 1}. ${formatCardCopyLabel(it)}`);
                 const text = `${customer} $${pure.toLocaleString()}\n${names.join('\n')}`.trim();
                 const ok = await copyTextToClipboard(text);
-                if (ok) Swal.fire({ icon:'success', title:'已複製卡片內容', toast:true, position:'top', timer:1500, showConfirmButton:false, background:'#1e293b', color:'white' });
-                else Swal.fire({ icon:'error', title:'複製失敗', text:'請手動複製', background:'#1e293b', color:'white' });
+                if (ok) Swal.fire({ icon:'success', title:'已複製卡片內容', toast:true, position:'top', timer:1500, showConfirmButton:false, background:'#26221e', color:'white' });
+                else Swal.fire({ icon:'error', title:'複製失敗', text:'請手動複製', background:'#26221e', color:'white' });
                 return;
             }
             if (kind === 'repair') {
@@ -1698,8 +1721,8 @@
                 const names = repairItems.map((it, idx) => `${idx + 1}. ${formatRepairCopyLabel(it)}`);
                 const text = `${customer} $${pure.toLocaleString()}\n${names.join('\n')}`.trim();
                 const ok = await copyTextToClipboard(text);
-                if (ok) Swal.fire({ icon:'success', title:'已複製維修內容', toast:true, position:'top', timer:1500, showConfirmButton:false, background:'#1e293b', color:'white' });
-                else Swal.fire({ icon:'error', title:'複製失敗', text:'請手動複製', background:'#1e293b', color:'white' });
+                if (ok) Swal.fire({ icon:'success', title:'已複製維修內容', toast:true, position:'top', timer:1500, showConfirmButton:false, background:'#26221e', color:'white' });
+                else Swal.fire({ icon:'error', title:'複製失敗', text:'請手動複製', background:'#26221e', color:'white' });
                 return;
             }
             if (kind === 'new') {
@@ -1709,19 +1732,19 @@
                 const names = newItems.map((it, idx) => `${idx + 1}. ${stripLedgerName(it.itemName || it.name || '')}`);
                 const text = `${customer} $${pure.toLocaleString()}\n${names.join('\n')}`.trim();
                 const ok = await copyTextToClipboard(text);
-                if (ok) Swal.fire({ icon:'success', title:'已複製新機內容', toast:true, position:'top', timer:1500, showConfirmButton:false, background:'#1e293b', color:'white' });
-                else Swal.fire({ icon:'error', title:'複製失敗', text:'請手動複製', background:'#1e293b', color:'white' });
+                if (ok) Swal.fire({ icon:'success', title:'已複製新機內容', toast:true, position:'top', timer:1500, showConfirmButton:false, background:'#26221e', color:'white' });
+                else Swal.fire({ icon:'error', title:'複製失敗', text:'請手動複製', background:'#26221e', color:'white' });
                 return;
             }
             if (kind === 'settle') {
                 const text = buildSettlementCopyText(normalized);
                 if (!text) {
-                    Swal.fire({ icon:'warning', title:'無可複製明細', text:'沒有非贈品且售價大於 0 的品項', background:'#1e293b', color:'white' });
+                    Swal.fire({ icon:'warning', title:'無可複製明細', text:'沒有非贈品且售價大於 0 的品項', background:'#26221e', color:'white' });
                     return;
                 }
                 const ok = await copyTextToClipboard(text);
-                if (ok) Swal.fire({ icon:'success', title:'已複製結算明細', toast:true, position:'top', timer:1500, showConfirmButton:false, background:'#1e293b', color:'white' });
-                else Swal.fire({ icon:'error', title:'複製失敗', text:'請手動複製', background:'#1e293b', color:'white' });
+                if (ok) Swal.fire({ icon:'success', title:'已複製結算明細', toast:true, position:'top', timer:1500, showConfirmButton:false, background:'#26221e', color:'white' });
+                else Swal.fire({ icon:'error', title:'複製失敗', text:'請手動複製', background:'#26221e', color:'white' });
             }
         }
         function mapLedgerType(type) {
@@ -1924,7 +1947,7 @@
         function openReport() { 
             // 限制 a002 帳號不能使用「今日」功能
             if (User && User.username === 'a002') {
-                Swal.fire({ icon: 'warning', title: '權限不足', text: '此帳號無法使用「今日帳務」功能', background: '#1e293b', color: 'white' });
+                Swal.fire({ icon: 'warning', title: '權限不足', text: '此帳號無法使用「今日帳務」功能', background: '#26221e', color: 'white' });
                 return;
             }
             switchView('report'); 
@@ -2115,7 +2138,7 @@
 
         function openSalary() {
             if (!(User && User.isAdmin)) {
-                Swal.fire({ icon: 'error', title: '僅管理員可查看薪資', background: '#1e293b', color: 'white' });
+                Swal.fire({ icon: 'error', title: '僅管理員可查看薪資', background: '#26221e', color: 'white' });
                 return;
             }
             switchView('salary');
@@ -2241,12 +2264,12 @@
                 formula: meta.name
             }]);
             const ok = await copyTextToClipboard(text);
-            Swal.fire({ icon: ok ? 'success' : 'info', title: ok ? '已複製' : '請手動複製', text: ok ? '' : text, toast: true, position: 'top', timer: 1600, showConfirmButton: false, background: '#1e293b' });
+            Swal.fire({ icon: ok ? 'success' : 'info', title: ok ? '已複製' : '請手動複製', text: ok ? '' : text, toast: true, position: 'top', timer: 1600, showConfirmButton: false, background: '#26221e' });
         }
         async function copySalaryPaidLedger() {
             const paid = UI.salaryPaidRows || [];
             if (!paid.length) {
-                Swal.fire({ icon: 'info', title: '本月無已發流水', background: '#1e293b', color: 'white' });
+                Swal.fire({ icon: 'info', title: '本月無已發流水', background: '#26221e', color: 'white' });
                 return;
             }
             const lines = paid.map((row) => {
@@ -2261,7 +2284,7 @@
             });
             const text = buildSalaryCopyText(lines);
             const ok = await copyTextToClipboard(text);
-            Swal.fire({ icon: ok ? 'success' : 'info', title: ok ? '已複製本月已發' : '請手動複製', text: ok ? '' : text, background: '#1e293b', color: 'white' });
+            Swal.fire({ icon: ok ? 'success' : 'info', title: ok ? '已複製本月已發' : '請手動複製', text: ok ? '' : text, background: '#26221e', color: 'white' });
         }
         const SALARY_QUEUE_KEY = 'pos_salary_queue_v1';
         function loadSalaryQueue() {
@@ -2358,12 +2381,12 @@
                 formula: row.formula
             }]);
             const ok = await copyTextToClipboard(text);
-            Swal.fire({ icon: ok ? 'success' : 'info', title: ok ? '已複製' : '請手動複製', text: ok ? '' : text, toast: true, position: 'top', timer: 1600, showConfirmButton: false, background: '#1e293b' });
+            Swal.fire({ icon: ok ? 'success' : 'info', title: ok ? '已複製' : '請手動複製', text: ok ? '' : text, toast: true, position: 'top', timer: 1600, showConfirmButton: false, background: '#26221e' });
         }
         async function copyAllSalaryQueue() {
             const list = refreshSalaryQueueStatuses(loadSalaryQueue()).filter((r) => !r.paid && (Number(r.amount) || 0) > 0);
             if (!list.length) {
-                Swal.fire({ icon: 'info', title: '沒有可複製項目', background: '#1e293b', color: 'white' });
+                Swal.fire({ icon: 'info', title: '沒有可複製項目', background: '#26221e', color: 'white' });
                 return;
             }
             const text = buildSalaryCopyText(list.map((r) => ({
@@ -2374,14 +2397,14 @@
                 formula: r.formula
             })));
             const ok = await copyTextToClipboard(text);
-            Swal.fire({ icon: ok ? 'success' : 'info', title: ok ? '已複製全部' : '請手動複製', text: ok ? '' : text, background: '#1e293b', color: 'white' });
+            Swal.fire({ icon: ok ? 'success' : 'info', title: ok ? '已複製全部' : '請手動複製', text: ok ? '' : text, background: '#26221e', color: 'white' });
         }
         async function payReadySalaryQueue() {
             if (!(User && User.isAdmin)) return;
             const list = refreshSalaryQueueStatuses(loadSalaryQueue());
             const picks = list.filter((r) => !r.paid && String(r.status) === 'Completed' && (Number(r.amount) || 0) > 0);
             if (!picks.length) {
-                Swal.fire({ icon: 'info', title: '沒有可發放的要結項目', text: '未結需先入帳才會變成要結', background: '#1e293b', color: 'white' });
+                Swal.fire({ icon: 'info', title: '沒有可發放的要結項目', text: '未結需先入帳才會變成要結', background: '#26221e', color: 'white' });
                 return;
             }
             const confirm = await Swal.fire({
@@ -2389,7 +2412,7 @@
                 text: `合計 $${picks.reduce((s, r) => s + (Number(r.amount) || 0), 0).toLocaleString()}`,
                 showCancelButton: true,
                 confirmButtonText: '確認發放',
-                background: '#1e293b',
+                background: '#26221e',
                 color: 'white'
             });
             if (!confirm.isConfirmed) return;
@@ -2420,19 +2443,19 @@
         async function openOrderSalaryPay(orderId) {
             try {
                 if (!(User && User.isAdmin)) {
-                    Swal.fire({ icon: 'error', title: '僅管理員可發薪資', background: '#1e293b', color: 'white' });
+                    Swal.fire({ icon: 'error', title: '僅管理員可發薪資', background: '#26221e', color: 'white' });
                     return;
                 }
                 const g = getOrderGroupForSalary(orderId);
                 if (!g) {
-                    Swal.fire({ icon: 'warning', title: '找不到該單', background: '#1e293b', color: 'white' });
+                    Swal.fire({ icon: 'warning', title: '找不到該單', background: '#26221e', color: 'white' });
                     return;
                 }
                 const allRows = calcOrderSalaryBreakdown(g);
                 const rows = allRows.filter((r) => !r.paid);
                 if (!rows.length) {
                     const msg = allRows.length ? '此單相關分類已發過' : '此單沒有可發薪資的品項分類';
-                    Swal.fire({ icon: 'info', title: '無法加入薪資清單', text: msg, background: '#1e293b', color: 'white' });
+                    Swal.fire({ icon: 'info', title: '無法加入薪資清單', text: msg, background: '#26221e', color: 'white' });
                     return;
                 }
                 const htmlRows = rows.map((r) => {
@@ -2450,7 +2473,7 @@
                 const result = await Swal.fire({
                     title: '指定分類＋手填金額',
                     html: `<div class="text-[11px] text-slate-400 text-left mb-2">${salaryEsc(g.orderId)}　${salaryEsc(g.customer || '')}<br>勾選本單要發的分類（不限三類）</div>${htmlRows}`,
-                    background: '#1e293b',
+                    background: '#26221e',
                     color: 'white',
                     showCancelButton: true,
                     confirmButtonText: '加入清單',
@@ -2504,11 +2527,11 @@
                     position: 'top',
                     timer: 1600,
                     showConfirmButton: false,
-                    background: '#1e293b'
+                    background: '#26221e'
                 });
             } catch (e) {
                 console.error('openOrderSalaryPay', e);
-                Swal.fire({ icon: 'error', title: '薪資開啟失敗', text: (e && e.message) ? e.message : String(e), background: '#1e293b', color: 'white' });
+                Swal.fire({ icon: 'error', title: '薪資開啟失敗', text: (e && e.message) ? e.message : String(e), background: '#26221e', color: 'white' });
             }
         }
         window.openOrderSalaryPay = openOrderSalaryPay;
@@ -2516,7 +2539,7 @@
         window.calcOrderSalaryBreakdown = calcOrderSalaryBreakdown;
         async function payOrderSalaryPicks(picks) {
             if (!picks || !picks.length) return;
-            Swal.fire({ title: '發放中...', background: '#1e293b', color: 'white', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
+            Swal.fire({ title: '發放中...', background: '#26221e', color: 'white', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
             const paidLines = [];
             for (const pick of picks) {
                 if (isSalaryAlreadyPaid(pick.orderId, pick.kind)) continue;
@@ -2538,12 +2561,12 @@
                         entryDate
                     });
                     if (r.status === 'error') {
-                        Swal.fire({ icon: 'error', title: '發放失敗', text: r.msg || pick.label, background: '#1e293b', color: 'white' });
+                        Swal.fire({ icon: 'error', title: '發放失敗', text: r.msg || pick.label, background: '#26221e', color: 'white' });
                         return;
                     }
                     paidLines.push(pick);
                 } catch (e) {
-                    Swal.fire({ icon: 'error', title: '發放失敗', text: (e && e.message) || '', background: '#1e293b', color: 'white' });
+                    Swal.fire({ icon: 'error', title: '發放失敗', text: (e && e.message) || '', background: '#26221e', color: 'white' });
                     return;
                 }
             }
@@ -2561,7 +2584,7 @@
                 icon: 'success',
                 title: '已寫入薪支',
                 text: copied ? '明細已複製，可直接貼給員工' : text,
-                background: '#1e293b',
+                background: '#26221e',
                 color: 'white'
             });
         }
@@ -2854,7 +2877,7 @@
         }
         function openBooks() {
             if (!(User && User.isAdmin)) {
-                Swal.fire({ icon: 'error', title: '僅管理員可查看記帳', background: '#1e293b', color: 'white' });
+                Swal.fire({ icon: 'error', title: '僅管理員可查看記帳', background: '#26221e', color: 'white' });
                 return;
             }
             switchView('books');
@@ -2871,7 +2894,7 @@
             const silent = !!(opts && opts.silent);
             const period = booksPeriodRange();
             if (!period) {
-                if (!silent) Swal.fire({ icon: 'warning', title: '請選擇月份', background: '#1e293b', color: 'white' });
+                if (!silent) Swal.fire({ icon: 'warning', title: '請選擇月份', background: '#26221e', color: 'white' });
                 return;
             }
             if (!silent) Swal.showLoading();
@@ -2883,7 +2906,7 @@
                 renderBooksReport(report);
             } catch (err) {
                 if (!silent) Swal.close();
-                Swal.fire({ icon: 'error', title: '載入失敗', text: err.message || '請重試', background: '#1e293b' });
+                Swal.fire({ icon: 'error', title: '載入失敗', text: err.message || '請重試', background: '#26221e' });
             }
         }
         function renderBooksReport(report) {
@@ -3015,7 +3038,7 @@
                         <div class="flex items-center justify-between mb-2">
                             <div class="text-xs font-bold tracking-[0.2em] text-slate-400">明細帳</div>
                             <div class="flex items-center gap-2">
-                                <select id="books-det-filter" onchange="filterBooksDetail()" style="background:#1e293b;color:#cbd5e1;border:1px solid #334155;border-radius:6px;padding:3px 8px;font-size:11px;">
+                                <select id="books-det-filter" onchange="filterBooksDetail()" style="background:#26221e;color:#e8dfd4;border:1px solid #3d3731;border-radius:6px;padding:3px 8px;font-size:11px;">
                                     <option value="">全部科目</option>
                                     <option value="二手機純毛利">二手機</option>
                                     <option value="新機純毛利">新機</option>
@@ -3073,16 +3096,16 @@
         }
         async function submitBooksLedger(items, vendorName, entryDate, opts) {
             if (!(User && User.isAdmin)) {
-                Swal.fire({ icon: 'error', title: '僅管理員可入帳', background: '#1e293b', color: 'white' });
+                Swal.fire({ icon: 'error', title: '僅管理員可入帳', background: '#26221e', color: 'white' });
                 return false;
             }
             const quiet = !!(opts && opts.quiet);
             const oid = 'EXP' + Date.now().toString().slice(-6);
-            if (!quiet) Swal.fire({ title: '入帳中...', background: '#1e293b', color: 'white', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
+            if (!quiet) Swal.fire({ title: '入帳中...', background: '#26221e', color: 'white', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
             try {
                 const r = await API.handleRestock({ items, person: User.name, orderId: oid, vendorName: vendorName || undefined, entryDate: entryDate || undefined });
                 if (r.status === 'error') {
-                    Swal.fire({ icon: 'error', title: '入帳失敗', text: r.msg || '請重試', background: '#1e293b', color: 'white' });
+                    Swal.fire({ icon: 'error', title: '入帳失敗', text: r.msg || '請重試', background: '#26221e', color: 'white' });
                     return false;
                 }
                 if (entryDate && /^\d{4}-\d{2}-\d{2}$/.test(entryDate)) {
@@ -3097,11 +3120,11 @@
                     if (document.getElementById('view-books') && !document.getElementById('view-books').classList.contains('hidden')) {
                         await loadBooksReport();
                     }
-                    Swal.fire({ icon: 'success', title: '已入帳', toast: true, position: 'top', timer: 1400, showConfirmButton: false, background: '#1e293b' });
+                    Swal.fire({ icon: 'success', title: '已入帳', toast: true, position: 'top', timer: 1400, showConfirmButton: false, background: '#26221e' });
                 }
                 return true;
             } catch (err) {
-                Swal.fire({ icon: 'error', title: '入帳失敗', text: (err && err.message) || '請重試', background: '#1e293b', color: 'white' });
+                Swal.fire({ icon: 'error', title: '入帳失敗', text: (err && err.message) || '請重試', background: '#26221e', color: 'white' });
                 return false;
             }
         }
@@ -3176,12 +3199,12 @@
                 position: 'top',
                 timer: 1800,
                 showConfirmButton: false,
-                background: '#1e293b'
+                background: '#26221e'
             });
         }
         function booksRequireAdmin() {
             if (User && User.isAdmin) return true;
-            Swal.fire({ icon: 'error', title: '僅管理員可入帳', background: '#1e293b', color: 'white' });
+            Swal.fire({ icon: 'error', title: '僅管理員可入帳', background: '#26221e', color: 'white' });
             return false;
         }
         async function promptBooksEntry(kind) {
@@ -3192,20 +3215,20 @@
             const amountKinds = ['food', 'sim', 'extra_repair', 'company_misc', 'ship', 'salary', 'profit_share', 'loss', 'buy_used', 'buy_new'];
             let html = booksDateFieldHtml();
             if (kind === 'food') html += '<input id="bk-n" class="swal2-input" placeholder="摘要（如：便當）"><input id="bk-a" type="number" class="swal2-input" placeholder="金額">';
-            else if (kind === 'sim') html += '<div style="font-size:12px;color:#94a3b8;text-align:left;padding:4px 8px 0">只記進卡付了多少（備查），不扣本期淨利。賣出 eSIM／網卡的毛利另計「網卡純毛利」。</div><input id="bk-n" class="swal2-input" placeholder="摘要（如：DTAC／eSIM）"><input id="bk-a" type="number" class="swal2-input" placeholder="金額">';
-            else if (kind === 'extra_repair') html += '<div style="font-size:12px;color:#94a3b8;text-align:left;padding:4px 8px 0">只記花了多少料錢／外修，方便對帳，不扣本期淨利。二手機請把這筆加進庫存成本，賣掉才算毛利。</div><input id="bk-n" class="swal2-input" placeholder="摘要（如：料錢、外修、廖）"><input id="bk-a" type="number" class="swal2-input" placeholder="金額">';
+            else if (kind === 'sim') html += '<div style="font-size:12px;color:#a89f94;text-align:left;padding:4px 8px 0">只記進卡付了多少（備查），不扣本期淨利。賣出 eSIM／網卡的毛利另計「網卡純毛利」。</div><input id="bk-n" class="swal2-input" placeholder="摘要（如：DTAC／eSIM）"><input id="bk-a" type="number" class="swal2-input" placeholder="金額">';
+            else if (kind === 'extra_repair') html += '<div style="font-size:12px;color:#a89f94;text-align:left;padding:4px 8px 0">只記花了多少料錢／外修，方便對帳，不扣本期淨利。二手機請把這筆加進庫存成本，賣掉才算毛利。</div><input id="bk-n" class="swal2-input" placeholder="摘要（如：料錢、外修、廖）"><input id="bk-a" type="number" class="swal2-input" placeholder="金額">';
             else if (kind === 'company_misc') html += '<input id="bk-n" class="swal2-input" placeholder="摘要（如：文具、清潔）"><input id="bk-a" type="number" class="swal2-input" placeholder="金額">';
             else if (kind === 'ship') html += '<input id="bk-n" class="swal2-input" placeholder="摘要（如：黑貓／順豐／郵寄）"><input id="bk-a" type="number" class="swal2-input" placeholder="金額">';
             else if (kind === 'salary') html += '<input id="bk-n" class="swal2-input" placeholder="摘要（如：抽成／薪水）"><input id="bk-a" type="number" class="swal2-input" placeholder="金額">';
             else if (kind === 'profit_share') html += '<input id="bk-n" class="swal2-input" placeholder="摘要（如：股東分潤／季度分紅）"><input id="bk-a" type="number" class="swal2-input" placeholder="金額">';
             else if (kind === 'loss') html += '<input id="bk-n" class="swal2-input" placeholder="摘要（如：拆壞螢幕）"><input id="bk-a" type="number" class="swal2-input" placeholder="損失金額">';
-            else if (kind === 'buy_used' || kind === 'buy_new') html += '<div style="font-size:12px;color:#94a3b8;text-align:left;padding:4px 8px 0">只記付了多少，不扣本期淨利。自己庫存賣掉會用庫存成本算毛利。</div><input id="bk-v" class="swal2-input" placeholder="來源／同行"><input id="bk-n" class="swal2-input" placeholder="型號／摘要"><input id="bk-a" type="number" class="swal2-input" placeholder="金額">';
-            else if (kind === 'repair') html += '<div style="font-size:12px;color:#94a3b8;text-align:left;padding:4px 8px 0">只記付給料商多少，不扣本期淨利。維修單照常填成本。</div><input id="bk-v" class="swal2-input" placeholder="料商（選填）"><input id="bk-n" class="swal2-input" placeholder="品名"><input id="bk-c" type="number" class="swal2-input" placeholder="成本"><input id="bk-q" type="number" class="swal2-input" placeholder="數量" value="1">';
+            else if (kind === 'buy_used' || kind === 'buy_new') html += '<div style="font-size:12px;color:#a89f94;text-align:left;padding:4px 8px 0">只記付了多少，不扣本期淨利。自己庫存賣掉會用庫存成本算毛利。</div><input id="bk-v" class="swal2-input" placeholder="來源／同行"><input id="bk-n" class="swal2-input" placeholder="型號／摘要"><input id="bk-a" type="number" class="swal2-input" placeholder="金額">';
+            else if (kind === 'repair') html += '<div style="font-size:12px;color:#a89f94;text-align:left;padding:4px 8px 0">只記付給料商多少，不扣本期淨利。維修單照常填成本。</div><input id="bk-v" class="swal2-input" placeholder="料商（選填）"><input id="bk-n" class="swal2-input" placeholder="品名"><input id="bk-c" type="number" class="swal2-input" placeholder="成本"><input id="bk-q" type="number" class="swal2-input" placeholder="數量" value="1">';
             else html += `<input id="bk-v" class="swal2-input" placeholder="廠商" value="${booksEscape(UI.lastBooksVendor || '')}"><input id="bk-n" class="swal2-input" placeholder="品名"><input id="bk-c" type="number" class="swal2-input" placeholder="成本"><input id="bk-q" type="number" class="swal2-input" placeholder="數量" value="1">`;
             const result = await Swal.fire({
                 title,
                 html,
-                background: '#1e293b',
+                background: '#26221e',
                 color: 'white',
                 showCancelButton: !looping,
                 cancelButtonText: '取消',
@@ -3316,7 +3339,7 @@
         const FUND_CATEGORIES = ['營業營收匯入', '進貨採購支出', '營業費用', '營運雜支', '員工薪資', '店租', '業主固定提領', '業主季度分紅', '稅金', '借貸週轉'];
         function openFundFlow() {
             if (!(User && User.isAdmin)) {
-                Swal.fire({ icon: 'error', title: '僅管理員可查看資金流水', background: '#1e293b', color: 'white' });
+                Swal.fire({ icon: 'error', title: '僅管理員可查看資金流水', background: '#26221e', color: 'white' });
                 return;
             }
             switchView('fund');
@@ -3332,14 +3355,14 @@
                 const res = await API.getCompanyFund(month);
                 Swal.close();
                 if (res.status === 'error') {
-                    Swal.fire({ icon: 'error', title: '載入失敗', text: res.msg || '', background: '#1e293b', color: 'white' });
+                    Swal.fire({ icon: 'error', title: '載入失敗', text: res.msg || '', background: '#26221e', color: 'white' });
                     return;
                 }
                 UI.lastFundData = res;
                 renderFundFlow(res, month);
             } catch (err) {
                 Swal.close();
-                Swal.fire({ icon: 'error', title: '載入失敗', text: err.message || '請重試', background: '#1e293b', color: 'white' });
+                Swal.fire({ icon: 'error', title: '載入失敗', text: err.message || '請重試', background: '#26221e', color: 'white' });
             }
         }
         function renderFundFlow(data, month) {
@@ -3428,7 +3451,7 @@
                     <input id="fd-a" type="number" class="swal2-input" placeholder="金額">
                     <input id="fd-rel" class="swal2-input" placeholder="關聯單號／銀行序號（選填）">
                     <input id="fd-n" class="swal2-input" placeholder="備註（如：8月份老闆固定薪資）">`,
-                background: '#1e293b', color: 'white', showCancelButton: true, confirmButtonText: '入帳',
+                background: '#26221e', color: 'white', showCancelButton: true, confirmButtonText: '入帳',
                 didOpen: () => {
                     const flowEl = document.getElementById('fd-flow');
                     const toEl = document.getElementById('fd-to');
@@ -3463,26 +3486,26 @@
                 }
             });
             if (!value) return;
-            Swal.fire({ title: '入帳中...', background: '#1e293b', color: 'white', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
+            Swal.fire({ title: '入帳中...', background: '#26221e', color: 'white', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
             try {
                 const r = await API.addCompanyFund({ ...value, person: User.name });
                 if (r.status === 'error') {
-                    Swal.fire({ icon: 'error', title: '入帳失敗', text: r.msg || '', background: '#1e293b', color: 'white' });
+                    Swal.fire({ icon: 'error', title: '入帳失敗', text: r.msg || '', background: '#26221e', color: 'white' });
                     return;
                 }
                 UI.lastFundData = r;
                 const monthEl = document.getElementById('fund-month');
                 if (monthEl && value.date) monthEl.value = value.date.slice(0, 7);
                 renderFundFlow(r, (monthEl && monthEl.value) || value.date.slice(0, 7));
-                Swal.fire({ icon: 'success', title: '已入帳', toast: true, position: 'top', timer: 1400, showConfirmButton: false, background: '#1e293b' });
+                Swal.fire({ icon: 'success', title: '已入帳', toast: true, position: 'top', timer: 1400, showConfirmButton: false, background: '#26221e' });
             } catch (err) {
-                Swal.fire({ icon: 'error', title: '入帳失敗', text: err.message || '', background: '#1e293b', color: 'white' });
+                Swal.fire({ icon: 'error', title: '入帳失敗', text: err.message || '', background: '#26221e', color: 'white' });
             }
         }
         function exportFundCsv() {
             const data = UI.lastFundData;
             if (!data) {
-                Swal.fire({ icon: 'warning', title: '請先載入期間', background: '#1e293b', color: 'white' });
+                Swal.fire({ icon: 'warning', title: '請先載入期間', background: '#26221e', color: 'white' });
                 return;
             }
             const month = (document.getElementById('fund-month')?.value || '').trim();
@@ -3508,7 +3531,7 @@
         function exportBooksCsv() {
             const report = UI.lastBooksReport;
             if (!report) {
-                Swal.fire({ icon: 'warning', title: '請先載入期間', background: '#1e293b', color: 'white' });
+                Swal.fire({ icon: 'warning', title: '請先載入期間', background: '#26221e', color: 'white' });
                 return;
             }
             const lines = [];
@@ -3655,7 +3678,7 @@
             const countEl = document.getElementById('r-photo-count');
             if (countEl) countEl.textContent = repairPhotoQueue.length + ' / ' + REPAIR_PHOTO_MAX;
             if (!preview) return;
-            preview.innerHTML = repairPhotoQueue.map((p, i) => '<span class="inline-block mr-2 mb-1 text-center"><img src="data:' + p.mimeType + ';base64,' + p.data + '" style="height:56px;width:56px;object-fit:cover;border-radius:6px;border:1px solid #475569"><button type="button" class="block w-full text-red-400 text-[10px] r-photo-rm" data-i="' + i + '">移除</button></span>').join('');
+            preview.innerHTML = repairPhotoQueue.map((p, i) => '<span class="inline-block mr-2 mb-1 text-center"><img src="data:' + p.mimeType + ';base64,' + p.data + '" style="height:56px;width:56px;object-fit:cover;border-radius:6px;border:1px solid #4a433c"><button type="button" class="block w-full text-red-400 text-[10px] r-photo-rm" data-i="' + i + '">移除</button></span>').join('');
             preview.querySelectorAll('.r-photo-rm').forEach((btn) => {
                 btn.onclick = (e) => { e.preventDefault(); repairPhotoQueue.splice(Number(btn.dataset.i), 1); renderRepairPhotoPreview(); };
             });
@@ -3839,7 +3862,7 @@
                 showCancelButton: true,
                 confirmButtonText: '確認收款',
                 cancelButtonText: '取消',
-                background: '#1e293b',
+                background: '#26221e',
                 color: 'white'
             });
             if (!pay) return;
@@ -3858,16 +3881,16 @@
                     const fd = await API.getTodaySalesOnly();
                     if (fd.todaySales) { DB.sales = fd.todaySales; renderReport(); }
                 } catch (e) { /* ignore */ }
-                Swal.fire({ icon: 'success', title: '取件完成', timer: 1200, background: '#1e293b' });
+                Swal.fire({ icon: 'success', title: '取件完成', timer: 1200, background: '#26221e' });
             } catch (e) {
-                Swal.fire({ icon: 'error', title: '取件失敗', text: e.message || '', background: '#1e293b' });
+                Swal.fire({ icon: 'error', title: '取件失敗', text: e.message || '', background: '#26221e' });
             }
         }
 
         function openPending() {
             // 限制 a002 帳號不能使用「未結」功能
             if (User && User.username === 'a002') {
-                Swal.fire({ icon: 'warning', title: '權限不足', text: '此帳號無法使用「未結帳款」功能', background: '#1e293b', color: 'white' });
+                Swal.fire({ icon: 'warning', title: '權限不足', text: '此帳號無法使用「未結帳款」功能', background: '#26221e', color: 'white' });
                 return;
             }
             switchView('pending'); 
@@ -4002,7 +4025,7 @@
             } catch(err) {
                 Swal.close();
                 console.error('載入歷史記錄失敗:', err);
-                Swal.fire({icon:'error', title:'載入失敗', text: err.message || '請重試', background:'#1e293b'});
+                Swal.fire({icon:'error', title:'載入失敗', text: err.message || '請重試', background:'#26221e'});
             }
         }
         function renderHistoryList() {
@@ -4076,7 +4099,7 @@
             if (!item) { Swal.fire({icon:'error', title:'資料錯誤', text:'找不到商品資料'}); return; }
             const { orderId, itemId, type, itemName, quantity, cost, salePrice, customer } = item;
             const r = await Swal.fire({
-                title: '確認退貨？', text: `${itemName} 將回補庫存`, icon: 'warning', showCancelButton: true, background: '#1e293b', color: 'white'
+                title: '確認退貨？', text: `${itemName} 將回補庫存`, icon: 'warning', showCancelButton: true, background: '#26221e', color: 'white'
             });
             if (r.isConfirmed) {
                 BlackList.items.push(orderId + '_' + itemId);
@@ -4104,18 +4127,18 @@
                     if(!document.getElementById('view-report').classList.contains('hidden')) renderReport();
                     if(!document.getElementById('view-pending').classList.contains('hidden')) renderPendingList();
                     if(!document.getElementById('view-history').classList.contains('hidden')) renderHistoryList();
-                    Swal.fire({icon:'success', title:'退貨完成', timer:1000, background:'#1e293b'});
+                    Swal.fire({icon:'success', title:'退貨完成', timer:1000, background:'#26221e'});
                     fetchData();
                 } catch(e) {
                     console.error('退貨失敗:', e);
-                    Swal.fire({icon:'error', title:'退貨失敗', text: e.message || '請重試', background:'#1e293b'});
+                    Swal.fire({icon:'error', title:'退貨失敗', text: e.message || '請重試', background:'#26221e'});
                 }
             }
         }
         
         async function confirmDeleteOrder(oid) {
             const { value: password } = await Swal.fire({
-                title: '刪除整筆訂單', text: '請輸入管理員密碼', input: 'password', showCancelButton: true, background: '#1e293b', color: 'white'
+                title: '刪除整筆訂單', text: '請輸入管理員密碼', input: 'password', showCancelButton: true, background: '#26221e', color: 'white'
             });
             if (password === 'Apple168168') {
                 BlackList.orders.push(oid);
@@ -4125,17 +4148,17 @@
                 if(!document.getElementById('view-history').classList.contains('hidden')) renderHistoryList();
                 try {
                     await API.handleTransaction({action: 'delete', orderId: oid, person: User.name});
-                    Swal.fire({icon:'success', title:'訂單已刪除', timer:1000, background:'#1e293b'});
+                    Swal.fire({icon:'success', title:'訂單已刪除', timer:1000, background:'#26221e'});
                 } catch(e) {
-                    Swal.fire({icon:'error', title:'刪除失敗', text: e.message || '請重試', background:'#1e293b'});
+                    Swal.fire({icon:'error', title:'刪除失敗', text: e.message || '請重試', background:'#26221e'});
                 }
             } else if (password) {
-                Swal.fire({icon:'error', title:'密碼錯誤', background:'#1e293b'});
+                Swal.fire({icon:'error', title:'密碼錯誤', background:'#26221e'});
             }
         }
         async function confirmDeleteOrderItem(orderId, itemId) {
             const { value: password } = await Swal.fire({
-                title: '刪除此項目', text: '請輸入管理員密碼', input: 'password', showCancelButton: true, background: '#1e293b', color: 'white'
+                title: '刪除此項目', text: '請輸入管理員密碼', input: 'password', showCancelButton: true, background: '#26221e', color: 'white'
             });
             if (password === 'Apple168168') {
                 BlackList.items.push(orderId + '_' + itemId);
@@ -4162,13 +4185,13 @@
                     if(!document.getElementById('view-report').classList.contains('hidden')) renderReport();
                     if(!document.getElementById('view-pending').classList.contains('hidden')) renderPendingList();
                     if(!document.getElementById('view-history').classList.contains('hidden')) renderHistoryList();
-                    Swal.fire({icon:'success', title:'項目已刪除', timer:1000, background:'#1e293b'});
+                    Swal.fire({icon:'success', title:'項目已刪除', timer:1000, background:'#26221e'});
                 } catch(e) {
                     console.error('刪除項目失敗:', e);
-                    Swal.fire({icon:'error', title:'刪除失敗', text: e.message || '請重試', background:'#1e293b'});
+                    Swal.fire({icon:'error', title:'刪除失敗', text: e.message || '請重試', background:'#26221e'});
                 }
             } else if (password) {
-                Swal.fire({icon:'error', title:'密碼錯誤', background:'#1e293b'});
+                Swal.fire({icon:'error', title:'密碼錯誤', background:'#26221e'});
             }
         }
 
@@ -4238,7 +4261,7 @@
                 showCancelButton: true,
                 confirmButtonText: '確認入帳',
                 cancelButtonText: '取消',
-                background: '#1e293b',
+                background: '#26221e',
                 color: 'white'
             });
             if (!r.isConfirmed) return;
@@ -4258,9 +4281,9 @@
             fetchData();
             if (fail.length) {
                 const failLines = fail.map(f => `${f.oid}: ${f.msg}`).join('\n');
-                Swal.fire({ icon: 'warning', title: `完成 ${ok.length} 筆，失敗 ${fail.length} 筆`, text: failLines, background: '#1e293b', color: 'white' });
+                Swal.fire({ icon: 'warning', title: `完成 ${ok.length} 筆，失敗 ${fail.length} 筆`, text: failLines, background: '#26221e', color: 'white' });
             } else {
-                Swal.fire({ icon: 'success', title: `已入帳 ${ok.length} 筆`, timer: 1500, background: '#1e293b' });
+                Swal.fire({ icon: 'success', title: `已入帳 ${ok.length} 筆`, timer: 1500, background: '#26221e' });
             }
         }
 
@@ -4272,23 +4295,23 @@
                 showCancelButton: true,
                 confirmButtonText: '確認改回未結',
                 cancelButtonText: '取消',
-                background: '#1e293b',
+                background: '#26221e',
                 color: 'white'
             });
             if (!r.isConfirmed) return;
             try {
                 const res = await API.handleTransaction({ action: 'unsettle', orderId: oid });
                 if (res && res.status === 'error') {
-                    Swal.fire({ icon: 'error', title: '操作失敗', text: res.msg || '請重試', background: '#1e293b', color: 'white' });
+                    Swal.fire({ icon: 'error', title: '操作失敗', text: res.msg || '請重試', background: '#26221e', color: 'white' });
                     return;
                 }
                 if (!document.getElementById('view-report').classList.contains('hidden')) renderReport();
                 if (!document.getElementById('view-history').classList.contains('hidden')) renderHistoryList();
                 fetchData();
-                Swal.fire({ icon: 'success', title: '已改回未結', timer: 1000, background: '#1e293b' });
+                Swal.fire({ icon: 'success', title: '已改回未結', timer: 1000, background: '#26221e' });
             } catch (e) {
                 console.error('改回未結失敗:', e);
-                Swal.fire({ icon: 'error', title: '操作失敗', text: e.message || '請重試', background: '#1e293b', color: 'white' });
+                Swal.fire({ icon: 'error', title: '操作失敗', text: e.message || '請重試', background: '#26221e', color: 'white' });
             }
         }
 
@@ -4304,12 +4327,12 @@
             });
             Swal.close();
             if (res && res.status === 'error') {
-                Swal.fire({ icon: 'error', title: '更新失敗', text: res.msg || '請重試', background: '#1e293b', color: 'white' });
+                Swal.fire({ icon: 'error', title: '更新失敗', text: res.msg || '請重試', background: '#26221e', color: 'white' });
                 return false;
             }
             await loadPending();
             fetchData();
-            Swal.fire({ icon: 'success', title: newSale === 0 ? '已改為贈品' : '金額已更新', toast: true, position: 'top', timer: 1500, showConfirmButton: false, background: '#1e293b', color: 'white' });
+            Swal.fire({ icon: 'success', title: newSale === 0 ? '已改為贈品' : '金額已更新', toast: true, position: 'top', timer: 1500, showConfirmButton: false, background: '#26221e', color: 'white' });
             return true;
         }
 
@@ -4326,7 +4349,7 @@
                 showCancelButton: true,
                 confirmButtonText: '確認贈',
                 cancelButtonText: '取消',
-                background: '#1e293b',
+                background: '#26221e',
                 color: 'white'
             });
             if (!r.isConfirmed) return;
@@ -4334,7 +4357,7 @@
                 await applyPendingItemSale(orderId, itemId, 0, currentSale);
             } catch (e) {
                 console.error('改為贈品失敗:', e);
-                Swal.fire({ icon: 'error', title: '更新失敗', text: e.message || '請重試', background: '#1e293b', color: 'white' });
+                Swal.fire({ icon: 'error', title: '更新失敗', text: e.message || '請重試', background: '#26221e', color: 'white' });
             }
         }
 
@@ -4367,7 +4390,7 @@
                 showCancelButton: true,
                 confirmButtonText: '儲存',
                 cancelButtonText: '取消',
-                background: '#1e293b',
+                background: '#26221e',
                 color: 'white',
                 preConfirm: () => {
                     const v = document.getElementById('sw-pending-sale')?.value;
@@ -4383,7 +4406,7 @@
                 await applyPendingItemSale(orderId, itemId, newSale, currentSale);
             } catch (e) {
                 console.error('修改金額失敗:', e);
-                Swal.fire({ icon: 'error', title: '更新失敗', text: e.message || '請重試', background: '#1e293b', color: 'white' });
+                Swal.fire({ icon: 'error', title: '更新失敗', text: e.message || '請重試', background: '#26221e', color: 'white' });
             }
         }
 
@@ -4395,7 +4418,7 @@
                 showCancelButton:true,
                 confirmButtonText:'確認入帳',
                 cancelButtonText:'取消',
-                background:'#1e293b',
+                background:'#26221e',
                 color:'white'
             });
             if(!r.isConfirmed) return;
@@ -4403,10 +4426,10 @@
                 await API.handleTransaction({action:'settle', orderId:oid});
                 loadPending(); 
                 fetchData(); 
-                Swal.fire({icon:'success', title:'已入帳', timer:1000, background:'#1e293b'});
+                Swal.fire({icon:'success', title:'已入帳', timer:1000, background:'#26221e'});
             } catch(e) {
                 console.error('入帳失敗:', e);
-                Swal.fire({icon:'error', title:'入帳失敗', text: e.message || '請重試', background:'#1e293b'});
+                Swal.fire({icon:'error', title:'入帳失敗', text: e.message || '請重試', background:'#26221e'});
             }
         }
         
@@ -4464,10 +4487,10 @@
                 const res = await API.savePosPrefs({ favAccessoryIds: fav });
                 if (res && res.status === 'error') throw new Error(res.msg || '同步失敗');
                 if (Array.isArray(res.favAccessoryIds)) setFavAccessories(res.favAccessoryIds);
-                Swal.fire({ icon:'success', title:'常用已同步', toast:true, position:'top', timer:1000, showConfirmButton:false, background:'#1e293b', color:'white' });
+                Swal.fire({ icon:'success', title:'常用已同步', toast:true, position:'top', timer:1000, showConfirmButton:false, background:'#26221e', color:'white' });
             } catch (e) {
                 console.error('toggleFavAccessory sync fail:', e);
-                Swal.fire({ icon:'warning', title:'常用已暫存在本機', text: e.message || '雲端同步失敗，稍後再試', toast:true, position:'top', timer:2000, showConfirmButton:false, background:'#1e293b', color:'white' });
+                Swal.fire({ icon:'warning', title:'常用已暫存在本機', text: e.message || '雲端同步失敗，稍後再試', toast:true, position:'top', timer:2000, showConfirmButton:false, background:'#26221e', color:'white' });
             }
         }
         function hideFavSubNav() {
@@ -4715,10 +4738,10 @@
                     UI.categoryOrder = res.categoryOrder.map(String);
                     saveCategoryOrderToStorage(UI.categoryOrder);
                 }
-                Swal.fire({icon:'success', title:'已同步', text:'分類順序已更新到雲端', timer:1500, background:'#1e293b'});
+                Swal.fire({icon:'success', title:'已同步', text:'分類順序已更新到雲端', timer:1500, background:'#26221e'});
             } catch (e) {
                 console.error('saveCategoryOrder sync fail:', e);
-                Swal.fire({icon:'warning', title:'已暫存在本機', text: e.message || '雲端同步失敗，稍後再試', background:'#1e293b'});
+                Swal.fire({icon:'warning', title:'已暫存在本機', text: e.message || '雲端同步失敗，稍後再試', background:'#26221e'});
             }
             if (UI.tab === 'accessory') {
                 switchMainTab('accessory');
@@ -4729,8 +4752,8 @@
             const defPrice = Number(price) || 0;
             const { value } = await Swal.fire({
                 title: name,
-                html: `<input id="p" type="number" class="swal2-input" value="${defPrice}" placeholder="售價"><div class="flex items-center justify-center gap-2 mt-2"><button type="button" id="sw-gift-btn" class="px-3 py-2 rounded bg-red-900/50 text-red-400 border border-red-700 text-sm">贈</button><div style="display:flex;align-items:center;justify-content:center;gap:12px"><button type="button" onclick="var el=document.getElementById('q');if(el)el.value=Math.max(1,parseInt(el.value||1)-1)" style="width:52px;height:52px;font-size:26px;border-radius:12px;background:#334155;color:white;border:none;cursor:pointer">-</button><input id="q" type="number" value="1" min="1" style="width:72px;height:52px;font-size:22px;text-align:center;background:#1e293b;color:white;border:2px solid #475569;border-radius:12px;outline:none"><button type="button" onclick="var el=document.getElementById('q');if(el)el.value=parseInt(el.value||1)+1" style="width:52px;height:52px;font-size:26px;border-radius:12px;background:#334155;color:white;border:none;cursor:pointer">+</button></div></div>`,
-                background: '#1e293b',
+                html: `<input id="p" type="number" class="swal2-input" value="${defPrice}" placeholder="售價"><div class="flex items-center justify-center gap-2 mt-2"><button type="button" id="sw-gift-btn" class="px-3 py-2 rounded bg-red-900/50 text-red-400 border border-red-700 text-sm">贈</button><div style="display:flex;align-items:center;justify-content:center;gap:12px"><button type="button" onclick="var el=document.getElementById('q');if(el)el.value=Math.max(1,parseInt(el.value||1)-1)" style="width:52px;height:52px;font-size:26px;border-radius:12px;background:#3d3731;color:white;border:none;cursor:pointer">-</button><input id="q" type="number" value="1" min="1" style="width:72px;height:52px;font-size:22px;text-align:center;background:#26221e;color:white;border:2px solid #4a433c;border-radius:12px;outline:none"><button type="button" onclick="var el=document.getElementById('q');if(el)el.value=parseInt(el.value||1)+1" style="width:52px;height:52px;font-size:26px;border-radius:12px;background:#3d3731;color:white;border:none;cursor:pointer">+</button></div></div>`,
+                background: '#26221e',
                 color: 'white',
                 showCancelButton: true,
                 confirmButtonText: '加入',
@@ -4768,24 +4791,24 @@
             });
             renderCart();
         }
-        async function addNewCompanyTemplate() { const n = document.getElementById('new-cp-name').value.trim(); const c = document.getElementById('new-cp-cost').value; const p = document.getElementById('new-cp-price').value; if(!n || !c || !p) { Swal.fire({icon:'warning', title:'請填寫完整', toast:true, position:'top', background:'#1e293b'}); return; } try { const res = await API.addCompanyTemplate(n, c, p); if(res.status === 'success') { Swal.fire({icon:'success', title:'已新增', toast:true, position:'top', background:'#1e293b'}); document.getElementById('new-cp-name').value=''; document.getElementById('new-cp-cost').value=''; document.getElementById('new-cp-price').value=''; fetchData(); renderCompanyTemplateList(); } else { Swal.fire({icon:'error', title:'新增失敗', text: res.msg || '', background:'#1e293b'}); } } catch(e) { Swal.fire({icon:'error', title:'新增失敗', text: e.message || '請重試', background:'#1e293b'}); } }
-        async function addNewAccessory(){const cat=document.getElementById('new-acc-category').value.trim();const nm=document.getElementById('new-acc-name').value.trim();if(!cat||!nm){Swal.fire({icon:'warning',title:'請填寫分類與品項名稱',toast:true,position:'top',background:'#1e293b'});return;}try{const res=await API.addAccessory(cat,nm);if(res.status==='success'){Swal.fire({icon:'success',title:'已新增 '+res.id,toast:true,background:'#1e293b'});document.getElementById('new-acc-category').value='';document.getElementById('new-acc-name').value='';fetchData();}else{Swal.fire({icon:'error',title:'新增失敗',text:res.msg||'',background:'#1e293b'});}}catch(e){Swal.fire({icon:'error',title:'新增失敗',text:e.message||'',background:'#1e293b'});}}
+        async function addNewCompanyTemplate() { const n = document.getElementById('new-cp-name').value.trim(); const c = document.getElementById('new-cp-cost').value; const p = document.getElementById('new-cp-price').value; if(!n || !c || !p) { Swal.fire({icon:'warning', title:'請填寫完整', toast:true, position:'top', background:'#26221e'}); return; } try { const res = await API.addCompanyTemplate(n, c, p); if(res.status === 'success') { Swal.fire({icon:'success', title:'已新增', toast:true, position:'top', background:'#26221e'}); document.getElementById('new-cp-name').value=''; document.getElementById('new-cp-cost').value=''; document.getElementById('new-cp-price').value=''; fetchData(); renderCompanyTemplateList(); } else { Swal.fire({icon:'error', title:'新增失敗', text: res.msg || '', background:'#26221e'}); } } catch(e) { Swal.fire({icon:'error', title:'新增失敗', text: e.message || '請重試', background:'#26221e'}); } }
+        async function addNewAccessory(){const cat=document.getElementById('new-acc-category').value.trim();const nm=document.getElementById('new-acc-name').value.trim();if(!cat||!nm){Swal.fire({icon:'warning',title:'請填寫分類與品項名稱',toast:true,position:'top',background:'#26221e'});return;}try{const res=await API.addAccessory(cat,nm);if(res.status==='success'){Swal.fire({icon:'success',title:'已新增 '+res.id,toast:true,background:'#26221e'});document.getElementById('new-acc-category').value='';document.getElementById('new-acc-name').value='';fetchData();}else{Swal.fire({icon:'error',title:'新增失敗',text:res.msg||'',background:'#26221e'});}}catch(e){Swal.fire({icon:'error',title:'新增失敗',text:e.message||'',background:'#26221e'});}}
         function renderCompanyTemplateList(){const el=document.getElementById('company-template-list');if(!el)return;el.innerHTML='';(DB.companyTemplates||[]).forEach(t=>{el.innerHTML+='<div class="flex justify-between p-2 bg-slate-800 rounded"><span>'+t.name+'</span><button onclick="deleteCompanyTemplate(&quot;'+t.name.replace(/"/g,'&quot;')+'&quot;)" class="text-red-400"><i class="fa-solid fa-trash"></i></button></div>';});}
-        async function deleteCompanyTemplate(name){const r=await Swal.fire({title:'確定刪除？',text:name,showCancelButton:true,background:'#1e293b',color:'white'});if(!r.isConfirmed)return;try{const res=await API.deleteCompanyTemplate(name);if(res.status==='success'){Swal.fire({icon:'success',title:'已刪除',toast:true,background:'#1e293b'});fetchData();renderCompanyTemplateList();}else{Swal.fire({icon:'error',title:'刪除失敗',text:res.msg||'',background:'#1e293b'});}}catch(e){Swal.fire({icon:'error',title:'刪除失敗',text:e.message||'',background:'#1e293b'});}}
+        async function deleteCompanyTemplate(name){const r=await Swal.fire({title:'確定刪除？',text:name,showCancelButton:true,background:'#26221e',color:'white'});if(!r.isConfirmed)return;try{const res=await API.deleteCompanyTemplate(name);if(res.status==='success'){Swal.fire({icon:'success',title:'已刪除',toast:true,background:'#26221e'});fetchData();renderCompanyTemplateList();}else{Swal.fire({icon:'error',title:'刪除失敗',text:res.msg||'',background:'#26221e'});}}catch(e){Swal.fire({icon:'error',title:'刪除失敗',text:e.message||'',background:'#26221e'});}}
         async function changeStatus(id, s) { 
             let ns = s === '庫存中' ? '客訂中' : '庫存中'; 
-            const r = await Swal.fire({ title: '切換狀態', text: `改為「${ns}」？`, icon: 'question', showCancelButton: true, background: '#1e293b', color: 'white' });
+            const r = await Swal.fire({ title: '切換狀態', text: `改為「${ns}」？`, icon: 'question', showCancelButton: true, background: '#26221e', color: 'white' });
             if(r.isConfirmed) { 
                 try {
                     const res = await API.changePhoneStatus(id, s);
                     if(res.status === 'success'){ 
-                        Swal.fire({title:'已更新', icon:'success', timer:800, background:'#1e293b'}); 
+                        Swal.fire({title:'已更新', icon:'success', timer:800, background:'#26221e'}); 
                         let item = DB.inv.find(x => x.id == id); 
                         if(item) { item.status_label = ns; filterItems(null, document.querySelector('.pill-btn.active').innerText); } 
                     }
                 } catch(e) {
                     console.error('更改狀態失敗:', e);
-                    Swal.fire({icon:'error', title:'更新失敗', text: e.message || '請重試', background:'#1e293b'});
+                    Swal.fire({icon:'error', title:'更新失敗', text: e.message || '請重試', background:'#26221e'});
                 }
             }
         }
@@ -4801,7 +4824,7 @@
                 <div onclick="modalShipping()" class="glass p-6 rounded-xl border-l-4 border-slate-400 flex flex-col items-center justify-center gap-2"><i class="fa-solid fa-truck text-4xl text-slate-400"></i><span class="font-bold">運費</span></div>
                 <div onclick="modalSoftware()" class="glass p-6 rounded-xl border-l-4 border-indigo-500 flex flex-col items-center justify-center gap-2"><i class="fa-solid fa-mobile-screen-button text-4xl text-indigo-400"></i><span class="font-bold">軟體</span></div>`;
         }
-        async function addToCart(id) { const i = DB.inv.find(x => x.id == id); if(!i) return; let p = i.price, q = 1; let defPrice = i.defaultPrice > 0 ? i.defaultPrice : (i.price > 0 ? i.price : ''); if (i.type === 'accessory' || i.price === 0) { let isGift = false; const html = `<input id="sw-p" type="number" class="swal2-input" placeholder="單價" value="${defPrice}"><div class="flex items-center justify-center gap-2 mt-2"><button type="button" id="sw-gift-btn" class="px-3 py-2 rounded bg-red-900/50 text-red-400 border border-red-700 text-sm">贈</button><button type="button" id="sw-cost-btn" class="px-3 py-2 rounded bg-emerald-900/50 text-emerald-400 border border-emerald-700 text-sm">本</button><div style="display:flex;align-items:center;justify-content:center;gap:12px"><button type="button" onclick="var el=document.getElementById('sw-q');el.value=Math.max(1,parseInt(el.value||1)-1)" style="width:52px;height:52px;font-size:26px;border-radius:12px;background:#334155;color:white;border:none;cursor:pointer">-</button><input id="sw-q" type="number" value="1" min="1" style="width:72px;height:52px;font-size:22px;text-align:center;background:#1e293b;color:white;border:2px solid #475569;border-radius:12px;outline:none"><button type="button" onclick="var el=document.getElementById('sw-q');el.value=parseInt(el.value||1)+1" style="width:52px;height:52px;font-size:26px;border-radius:12px;background:#334155;color:white;border:none;cursor:pointer">+</button></div></div>`; const { value } = await Swal.fire({ title: i.name, html, background: '#1e293b', color: 'white', didOpen: () => { document.getElementById('sw-gift-btn').onclick = () => { isGift = true; Swal.clickConfirm(); }; const costBtn = document.getElementById('sw-cost-btn'); if (costBtn) costBtn.onclick = () => { const el = document.getElementById('sw-p'); if (el) { el.value = String(Number(i.cost) || 0); el.focus(); } }; }, preConfirm: () => isGift ? (function(){var _gq=parseInt(String(document.getElementById('sw-q').value||'1'),10); if(isNaN(_gq)||_gq<1)_gq=1; return [0,_gq,true];})() : [document.getElementById('sw-p').value, document.getElementById('sw-q').value, false] }); if(value===undefined) return; if(value[2]) { var _gq3=parseInt(String(value[1]),10); if(isNaN(_gq3)||_gq3<1)_gq3=1; Cart.push({ ...i, name: i.name + ' (贈)', price: 0, quantity: _gq3, itemId: i.id, originalPrice: defPrice||0, isGift: true }); } else { p = parseInt(value[0]); q = parseInt(value[1]); Cart.push({ ...i, price: p, quantity: q, itemId: i.id, originalPrice: p, isGift: false }); } } else { Cart.push({ ...i, price: p, quantity: q, itemId: i.id, originalPrice: p, isGift: false }); } renderCart(); }
+        async function addToCart(id) { const i = DB.inv.find(x => x.id == id); if(!i) return; let p = i.price, q = 1; let defPrice = i.defaultPrice > 0 ? i.defaultPrice : (i.price > 0 ? i.price : ''); if (i.type === 'accessory' || i.price === 0) { let isGift = false; const html = `<input id="sw-p" type="number" class="swal2-input" placeholder="單價" value="${defPrice}"><div class="flex items-center justify-center gap-2 mt-2"><button type="button" id="sw-gift-btn" class="px-3 py-2 rounded bg-red-900/50 text-red-400 border border-red-700 text-sm">贈</button><button type="button" id="sw-cost-btn" class="px-3 py-2 rounded bg-emerald-900/50 text-emerald-400 border border-emerald-700 text-sm">本</button><div style="display:flex;align-items:center;justify-content:center;gap:12px"><button type="button" onclick="var el=document.getElementById('sw-q');el.value=Math.max(1,parseInt(el.value||1)-1)" style="width:52px;height:52px;font-size:26px;border-radius:12px;background:#3d3731;color:white;border:none;cursor:pointer">-</button><input id="sw-q" type="number" value="1" min="1" style="width:72px;height:52px;font-size:22px;text-align:center;background:#26221e;color:white;border:2px solid #4a433c;border-radius:12px;outline:none"><button type="button" onclick="var el=document.getElementById('sw-q');el.value=parseInt(el.value||1)+1" style="width:52px;height:52px;font-size:26px;border-radius:12px;background:#3d3731;color:white;border:none;cursor:pointer">+</button></div></div>`; const { value } = await Swal.fire({ title: i.name, html, background: '#26221e', color: 'white', didOpen: () => { document.getElementById('sw-gift-btn').onclick = () => { isGift = true; Swal.clickConfirm(); }; const costBtn = document.getElementById('sw-cost-btn'); if (costBtn) costBtn.onclick = () => { const el = document.getElementById('sw-p'); if (el) { el.value = String(Number(i.cost) || 0); el.focus(); } }; }, preConfirm: () => isGift ? (function(){var _gq=parseInt(String(document.getElementById('sw-q').value||'1'),10); if(isNaN(_gq)||_gq<1)_gq=1; return [0,_gq,true];})() : [document.getElementById('sw-p').value, document.getElementById('sw-q').value, false] }); if(value===undefined) return; if(value[2]) { var _gq3=parseInt(String(value[1]),10); if(isNaN(_gq3)||_gq3<1)_gq3=1; Cart.push({ ...i, name: i.name + ' (贈)', price: 0, quantity: _gq3, itemId: i.id, originalPrice: defPrice||0, isGift: true }); } else { p = parseInt(value[0]); q = parseInt(value[1]); Cart.push({ ...i, price: p, quantity: q, itemId: i.id, originalPrice: p, isGift: false }); } } else { Cart.push({ ...i, price: p, quantity: q, itemId: i.id, originalPrice: p, isGift: false }); } renderCart(); }
         function renderCart() { 
             const c = document.getElementById('cart-items'); 
             c.innerHTML = ''; 
@@ -4983,7 +5006,7 @@
             const g = OrderRegistry[orderId];
             const salesItems = getOrderItemsForAmend(orderId);
             if (!salesItems.length && !(g && g.items && g.items.length)) {
-                Swal.fire({ icon: 'warning', title: '找不到該單', background: '#1e293b', color: 'white' });
+                Swal.fire({ icon: 'warning', title: '找不到該單', background: '#26221e', color: 'white' });
                 return;
             }
             const sample = salesItems[0] || (g.items && g.items[0]) || {};
@@ -4992,7 +5015,7 @@
             const todayYmd = ymdTaipei(new Date());
             const orderDay = ymdTaipei(parseLedgerDate(sample.time || (g && g.time)));
             if (orderDay && orderDay !== todayYmd) {
-                Swal.fire({ icon: 'warning', title: '只能補當日單', text: '此單不是今天的帳', background: '#1e293b', color: 'white' });
+                Swal.fire({ icon: 'warning', title: '只能補當日單', text: '此單不是今天的帳', background: '#26221e', color: 'white' });
                 return;
             }
             UI.amendTarget = { orderId: String(orderId), customer, payMethod };
@@ -5002,7 +5025,7 @@
             updateAmendBanner();
             switchView('pos');
             toggleMobileCart('pos', true);
-            Swal.fire({ icon: 'info', title: '補 key 模式', text: `客人／付款已鎖定，結帳會併入 ${orderId}`, toast: true, position: 'top', timer: 1800, showConfirmButton: false, background: '#1e293b' });
+            Swal.fire({ icon: 'info', title: '補 key 模式', text: `客人／付款已鎖定，結帳會併入 ${orderId}`, toast: true, position: 'top', timer: 1800, showConfirmButton: false, background: '#26221e' });
         }
         
         async function confirmCheckout() { 
@@ -5026,7 +5049,7 @@
                     showCancelButton: true,
                     confirmButtonText: amend ? '確定併入' : '確定結帳',
                     cancelButtonText: '取消',
-                    background: '#1e293b',
+                    background: '#26221e',
                     color: 'white'
                 });
                 if (!confirm.isConfirmed) return;
@@ -5087,7 +5110,7 @@
                 try {
                     const result = await API.checkoutOrder({ orderId: oid, customer: cust, payMethod: pay, person: User.name, items: items, isAmend: !!amend });
                     if (result.status === 'error') { 
-                        Swal.fire({icon:'error', title:'結帳失敗', text: result.msg || '請截圖通知管理員', background: '#1e293b'}); 
+                        Swal.fire({icon:'error', title:'結帳失敗', text: result.msg || '請截圖通知管理員', background: '#26221e'}); 
                         return; 
                     }
                     Cart = [];
@@ -5118,28 +5141,28 @@
                                     ? `${mergedOrderId} 已更新，請展開該單確認`
                                     : (reactivated ? '已恢復被退貨的品項，請按同步後再看' : '若今日／歷史未看到新品項，請按同步或稍後再試'),
                                 timer: ok ? 2200 : 3500,
-                                background: '#1e293b'
+                                background: '#26221e'
                             });
                         } else {
                             await refreshLedgerAfterCheckout();
                             if (UI.tab === 'phone') switchMainTab('phone');
                             document.getElementById('sync-status').innerHTML = '<span class="text-green-500">● 已同步</span>';
                             await fetchData();
-                            Swal.fire({ icon: 'success', title: '結帳完成', timer: 1500, background: '#1e293b' });
+                            Swal.fire({ icon: 'success', title: '結帳完成', timer: 1500, background: '#26221e' });
                         }
                     } catch(e) { 
                         console.error('載入帳務失敗:', e);
                         await fetchData();
                         if (amend) openReport();
-                        Swal.fire({icon:'success', title: amend ? '已併入原單' : '結帳完成', text: '若帳務未更新請按「同步」', timer: 2500, background: '#1e293b'});
+                        Swal.fire({icon:'success', title: amend ? '已併入原單' : '結帳完成', text: '若帳務未更新請按「同步」', timer: 2500, background: '#26221e'});
                     }
                 } catch(e) {
                     console.error('結帳失敗:', e);
-                    Swal.fire({icon:'error', title:'結帳失敗', text: '請截圖通知管理員: ' + (e && e.message ? e.message : String(e)), background:'#1e293b'});
+                    Swal.fire({icon:'error', title:'結帳失敗', text: '請截圖通知管理員: ' + (e && e.message ? e.message : String(e)), background:'#26221e'});
                 }
             } catch(e) {
                 console.error(e);
-                Swal.fire({icon:'error', title:'結帳失敗', text: '請截圖通知管理員: ' + e.message, background:'#1e293b'});
+                Swal.fire({icon:'error', title:'結帳失敗', text: '請截圖通知管理員: ' + e.message, background:'#26221e'});
             }
         }
 
@@ -5169,17 +5192,17 @@
         }
         function createRsPill(t, v) { const d = document.createElement('div'); d.className = 'pill-btn rs-pill'; d.innerText = t; if(UI.rsCat === v) d.classList.add('active'); d.onclick = () => { UI.rsCat = v; document.querySelectorAll('.rs-pill').forEach(b=>b.classList.remove('active')); d.classList.add('active'); renderRestockGrid(); }; return d; }
         function renderRestockGrid() { if(UI.rsMode === 'expense') return; const term = document.getElementById('rs-search').value.toLowerCase(); const grid = document.getElementById('rs-grid'); grid.innerHTML = ''; let list = DB.inv.filter(i => { if (i.type !== 'accessory') return false; if (term) return i.name.toLowerCase().includes(term); if (UI.rsCat === 'hidden_parts') return i.isHidden; if (UI.rsCat === 'all') return !i.isHidden; return i.category === UI.rsCat; }); if(list.length === 0) { grid.innerHTML = '<div class="col-span-full text-center text-slate-500 mt-4">無符合商品</div>'; return; } list.forEach(i => { let border = i.isHidden ? 'border-pink-500' : 'border-blue-500'; grid.innerHTML += `<div class="glass p-3 rounded-xl border-l-4 ${border} relative group active:scale-95 transition"><button onclick="event.stopPropagation(); editAccessory('${i.id}', '${i.name}', ${i.cost}, ${i.defaultPrice})" class="absolute top-2 right-2 text-slate-500 hover:text-white p-1"><i class="fa-solid fa-pen-to-square"></i></button><div onclick="addRsItem('${i.id}')" class="cursor-pointer"><div class="flex justify-between text-xs text-slate-500"><span>${i.category}</span><span>庫: ${i.stock}</span></div><div class="font-bold text-sm text-slate-200 line-clamp-2 my-1">${i.name}</div><div class="text-right text-xs text-slate-400">成本 $${i.cost}</div></div></div>`; }); }
-        async function editAccessory(id, n, c, p) { const { value: v } = await Swal.fire({ title: '編輯商品', html: `<div class="text-xs text-slate-400 mb-2">${n}</div><label class="text-xs text-slate-500 block text-left">成本</label><input id="sw-edit-c" class="swal2-input" type="number" value="${c}"><label class="text-xs text-slate-500 block text-left mt-2">建議售價</label><input id="sw-edit-p" class="swal2-input" type="number" value="${p}">`, background: '#1e293b', color: 'white', showCancelButton: true, preConfirm: () => [document.getElementById('sw-edit-c').value, document.getElementById('sw-edit-p').value] }); if (v) { let item = DB.inv.find(x => x.id == id); if(item) { item.cost = parseInt(v[0]); item.defaultPrice = parseInt(v[1]); } renderRestockGrid(); Swal.fire({title:'已更新（本機）', text:'重新整理後會恢復，完整儲存功能開發中', toast:true, position:'top', timer:2000, background:'#1e293b'}); } }
+        async function editAccessory(id, n, c, p) { const { value: v } = await Swal.fire({ title: '編輯商品', html: `<div class="text-xs text-slate-400 mb-2">${n}</div><label class="text-xs text-slate-500 block text-left">成本</label><input id="sw-edit-c" class="swal2-input" type="number" value="${c}"><label class="text-xs text-slate-500 block text-left mt-2">建議售價</label><input id="sw-edit-p" class="swal2-input" type="number" value="${p}">`, background: '#26221e', color: 'white', showCancelButton: true, preConfirm: () => [document.getElementById('sw-edit-c').value, document.getElementById('sw-edit-p').value] }); if (v) { let item = DB.inv.find(x => x.id == id); if(item) { item.cost = parseInt(v[0]); item.defaultPrice = parseInt(v[1]); } renderRestockGrid(); Swal.fire({title:'已更新（本機）', text:'重新整理後會恢復，完整儲存功能開發中', toast:true, position:'top', timer:2000, background:'#26221e'}); } }
         async function addRsItem(id) {
             const i = DB.inv.find(x => x.id == id);
             if (!i) {
-                Swal.fire({ icon: 'error', title: '找不到商品', background: '#1e293b', color: 'white' });
+                Swal.fire({ icon: 'error', title: '找不到商品', background: '#26221e', color: 'white' });
                 return;
             }
             const result = await Swal.fire({
                 title: i.name,
-                html: `<div style="display:flex;align-items:center;justify-content:center;gap:12px;margin-top:8px"><button type="button" onclick="var el=document.getElementById('sw-q');if(el)el.value=Math.max(1,parseInt(el.value||1)-1)" style="width:52px;height:52px;font-size:26px;border-radius:12px;background:#334155;color:white;border:none;cursor:pointer">-</button><input id="sw-q" type="number" value="1" min="1" style="width:72px;height:52px;font-size:22px;text-align:center;background:#1e293b;color:white;border:2px solid #475569;border-radius:12px;outline:none"><button type="button" onclick="var el=document.getElementById('sw-q');if(el)el.value=parseInt(el.value||1)+1" style="width:52px;height:52px;font-size:26px;border-radius:12px;background:#334155;color:white;border:none;cursor:pointer">+</button></div>`,
-                background: '#1e293b',
+                html: `<div style="display:flex;align-items:center;justify-content:center;gap:12px;margin-top:8px"><button type="button" onclick="var el=document.getElementById('sw-q');if(el)el.value=Math.max(1,parseInt(el.value||1)-1)" style="width:52px;height:52px;font-size:26px;border-radius:12px;background:#3d3731;color:white;border:none;cursor:pointer">-</button><input id="sw-q" type="number" value="1" min="1" style="width:72px;height:52px;font-size:22px;text-align:center;background:#26221e;color:white;border:2px solid #4a433c;border-radius:12px;outline:none"><button type="button" onclick="var el=document.getElementById('sw-q');if(el)el.value=parseInt(el.value||1)+1" style="width:52px;height:52px;font-size:26px;border-radius:12px;background:#3d3731;color:white;border:none;cursor:pointer">+</button></div>`,
+                background: '#26221e',
                 color: 'white',
                 showCancelButton: true,
                 confirmButtonText: '加入',
@@ -5193,7 +5216,7 @@
             RestockCart.push({ type: 'restock', name: i.name, category: i.category, cost: Number(i.cost) || 0, quantity: q });
             renderRestockCartList();
         }
-        async function addExpItem(type) { const { value } = await Swal.fire({ title: type, html: `<input id="ex-n" class="swal2-input" placeholder="備註 (如: 便當/抽成)"><input id="ex-a" type="number" class="swal2-input" placeholder="金額">`, background:'#1e293b', color:'white', preConfirm:()=>[document.getElementById('ex-n').value, document.getElementById('ex-a').value] }); if(value && value[1]) { RestockCart.push({type: type==='薪資/抽成'?'salary':'expense', name:`[${type}] ${value[0]}`, cost:parseInt(value[1]), quantity:1}); renderRestockCartList(); } }
+        async function addExpItem(type) { const { value } = await Swal.fire({ title: type, html: `<input id="ex-n" class="swal2-input" placeholder="備註 (如: 便當/抽成)"><input id="ex-a" type="number" class="swal2-input" placeholder="金額">`, background:'#26221e', color:'white', preConfirm:()=>[document.getElementById('ex-n').value, document.getElementById('ex-a').value] }); if(value && value[1]) { RestockCart.push({type: type==='薪資/抽成'?'salary':'expense', name:`[${type}] ${value[0]}`, cost:parseInt(value[1]), quantity:1}); renderRestockCartList(); } }
         function renderRestockCartList() {
             const d = document.getElementById('rs-cart-items');
             if (!d) return;
@@ -5218,7 +5241,7 @@
 
         async function submitRestock() { 
             if(RestockCart.length===0) return; 
-            const confirm = await Swal.fire({ title: '確定要送出進貨清單？', text: '送出後無法撤回。會入庫，並記「配件進貨」備查（不扣淨利，賣出才算成本）。', showCancelButton: true, confirmButtonText: '確定送出', cancelButtonText: '取消', background: '#1e293b', color: 'white' });
+            const confirm = await Swal.fire({ title: '確定要送出進貨清單？', text: '送出後無法撤回。會入庫，並記「配件進貨」備查（不扣淨利，賣出才算成本）。', showCancelButton: true, confirmButtonText: '確定送出', cancelButtonText: '取消', background: '#26221e', color: 'white' });
             if (!confirm.isConfirmed) return;
             const btn = document.getElementById('btn-submit-restock');
             if(btn){ btn.disabled=true; btn.textContent='送出中...'; }
@@ -5227,16 +5250,16 @@
             try {
                 const r = await API.handleRestock({items:RestockCart, person:User.name, orderId:oid, vendorName: vendorName || undefined});
                 if(r.status==='error'){ 
-                    Swal.fire({icon:'error', title:'進貨失敗', text: r.msg||'請重試', background:'#1e293b'}); 
+                    Swal.fire({icon:'error', title:'進貨失敗', text: r.msg||'請重試', background:'#26221e'}); 
                     return; 
                 }
                 RestockCart=[]; 
                 renderRestockCartList(); 
                 toggleMobileCart('restock', false); 
                 fetchData(); 
-                Swal.fire({icon:'success', title:'已送出', background:'#1e293b'});
+                Swal.fire({icon:'success', title:'已送出', background:'#26221e'});
             } catch(err) {
-                Swal.fire({icon:'error', title:'進貨失敗', text: (err&&err.message)||'請重試', background:'#1e293b'});
+                Swal.fire({icon:'error', title:'進貨失敗', text: (err&&err.message)||'請重試', background:'#26221e'});
             } finally {
                 if(btn){ btn.disabled=false; btn.textContent='確認送出'; }
             }
@@ -5273,7 +5296,7 @@
             const { value: v } = await Swal.fire({
                 title: '新機',
                 html,
-                background: '#1e293b',
+                background: '#26221e',
                 color: 'white',
                 showCancelButton: true,
                 confirmButtonText: 'OK',
@@ -5391,7 +5414,7 @@
             const { value: packed } = await Swal.fire({
                 title: '二手機',
                 html,
-                background: '#1e293b',
+                background: '#26221e',
                 color: 'white',
                 showCancelButton: true,
                 confirmButtonText: 'OK',
@@ -5432,22 +5455,22 @@
             if (packed && packed.vals && canAddPeer(packed.vals)) addOne(packed.vals, packed.repair);
         }
         async function modalRepair() {
-            const { value: t } = await Swal.fire({ input: 'select', inputOptions: { 'gen': '一般', 'stock': '庫存電池' }, background: '#1e293b', color: 'white' });
+            const { value: t } = await Swal.fire({ input: 'select', inputOptions: { 'gen': '一般', 'stock': '庫存電池' }, background: '#26221e', color: 'white' });
             if (!t) return;
             if (t === 'stock') {
                 // 電池維修：選擇庫存電池，然後顯示維修登記表單
                 const BATTERY_CATS = ['已加工成品電池', '成品大容量電池', '原廠拆機電池0循環'];
                 const batteries = DB.inv.filter(i => i.type === 'accessory' && i.category && BATTERY_CATS.includes(i.category) && Number(i.stock) > 0);
-                if (batteries.length === 0) { Swal.fire({ icon: 'warning', title: '無庫存電池', text: '請先至進貨補貨（已加工成品電池、成品大容量電池、原廠拆機電池0循環）', background: '#1e293b', color: 'white' }); return; }
+                if (batteries.length === 0) { Swal.fire({ icon: 'warning', title: '無庫存電池', text: '請先至進貨補貨（已加工成品電池、成品大容量電池、原廠拆機電池0循環）', background: '#26221e', color: 'white' }); return; }
                 const options = {}; batteries.forEach(b => { options['b' + b.id] = (b.category || '電池') + ' - ' + b.name + ' (庫存 ' + b.stock + ')'; });
-                const { value: bid } = await Swal.fire({ title: '選擇庫存電池', input: 'select', inputOptions: options, background: '#1e293b', color: 'white' });
+                const { value: bid } = await Swal.fire({ title: '選擇庫存電池', input: 'select', inputOptions: options, background: '#26221e', color: 'white' });
                 if (!bid) return;
                 const item = batteries.find(b => 'b' + b.id === bid);
                 // 庫存電池維修：顯示維修登記表單（型號、序號、更換物品、客戶、價格），然後寫入維修紀錄
                 const { value: v } = await Swal.fire({ 
                     title: '維修登記 - 庫存電池',
                     html: '<input id="r1" class="swal2-input" placeholder="型號"><input id="r2" class="swal2-input" placeholder="序號"><input id="r3" class="swal2-input" placeholder="故障原因／更換物品"><input id="r4" class="swal2-input" placeholder="客戶"><input id="r5" class="swal2-input" placeholder="電話" type="tel" inputmode="tel"><input id="r6" class="swal2-input" type="number" placeholder="維修報價（成本已帶入庫存）">' + REPAIR_EXTRA_HTML, 
-                    background: '#1e293b', 
+                    background: '#26221e', 
                     color: 'white',
                     didOpen: () => { initRepairPhotoPaste(); },
                     showLoaderOnConfirm: true,
@@ -5500,7 +5523,7 @@
                 // 一般維修：輸入型號、序號（IMEI）、更換物品、客戶、成本、價格
                 const { value: v } = await Swal.fire({ 
                     html: '<input id="r1" class="swal2-input" placeholder="型號"><input id="r2" class="swal2-input" placeholder="序號"><input id="r3" class="swal2-input" placeholder="故障原因／更換物品"><input id="r4" class="swal2-input" placeholder="客戶"><input id="r5" class="swal2-input" placeholder="電話" type="tel" inputmode="tel"><input id="r6" class="swal2-input" type="number" placeholder="維修成本"><input id="r7" class="swal2-input" type="number" placeholder="維修報價">' + REPAIR_EXTRA_HTML, 
-                    background: '#1e293b', 
+                    background: '#26221e', 
                     color: 'white',
                     didOpen: () => { initRepairPhotoPaste(); },
                     showLoaderOnConfirm: true,
@@ -5551,15 +5574,15 @@
             }
         }
 
-        async function modalWrap(){const {value:v}=await Swal.fire({html:'<input id="w1" class="swal2-input" placeholder="項目"><input id="w2" class="swal2-input" placeholder="售價">',background:'#1e293b',preConfirm:()=>[document.getElementById('w1').value,document.getElementById('w2').value]}); if(v){Cart.push({type:'wrap',name:'包膜:'+v[0],cost:0,price:Number(v[1])||0,quantity:1,itemId:'W-'+Date.now()});renderCart();}}
-        async function modalESIM(){const {value:v}=await Swal.fire({title:'eSIM',html:'<input id="es1" class="swal2-input" type="number" placeholder="成本"><input id="es2" class="swal2-input" type="number" placeholder="結帳金額">',background:'#1e293b',color:'white',preConfirm:()=>[document.getElementById('es1').value,document.getElementById('es2').value]}); if(v&&v[1]){Cart.push({type:'esim',name:'eSIM',cost:Number(v[0])||0,price:Number(v[1])||0,quantity:1,itemId:'ESIM-'+Date.now()});renderCart();}}
+        async function modalWrap(){const {value:v}=await Swal.fire({html:'<input id="w1" class="swal2-input" placeholder="項目"><input id="w2" class="swal2-input" placeholder="售價">',background:'#26221e',preConfirm:()=>[document.getElementById('w1').value,document.getElementById('w2').value]}); if(v){Cart.push({type:'wrap',name:'包膜:'+v[0],cost:0,price:Number(v[1])||0,quantity:1,itemId:'W-'+Date.now()});renderCart();}}
+        async function modalESIM(){const {value:v}=await Swal.fire({title:'eSIM',html:'<input id="es1" class="swal2-input" type="number" placeholder="成本"><input id="es2" class="swal2-input" type="number" placeholder="結帳金額">',background:'#26221e',color:'white',preConfirm:()=>[document.getElementById('es1').value,document.getElementById('es2').value]}); if(v&&v[1]){Cart.push({type:'esim',name:'eSIM',cost:Number(v[0])||0,price:Number(v[1])||0,quantity:1,itemId:'ESIM-'+Date.now()});renderCart();}}
         async function modalSoftware(){
             const { value: mode } = await Swal.fire({
                 title:'\u8edf\u9ad4',
                 input:'select',
                 inputOptions:{ soft:'\u55ae\u8edf\u9ad4', soft_phone:'\u6709\u4e8c\u624b\u6a5f' },
                 inputPlaceholder:'\u8acb\u9078\u64c7\u6a21\u5f0f',
-                background:'#1e293b',
+                background:'#26221e',
                 color:'white',
                 showCancelButton:true,
                 confirmButtonText:'\u4e0b\u4e00\u6b65',
@@ -5567,7 +5590,7 @@
             });
             if(!mode) return;
             if(mode === 'soft_phone') { await modalSoftwareWithPhone(); return; }
-            const {value:v}=await Swal.fire({title:'\u8edf\u9ad4',html:'<input id="sf1" class="swal2-input" type="number" placeholder="\u6210\u672c"><input id="sf2" class="swal2-input" type="number" placeholder="\u552e\u50f9">',background:'#1e293b',color:'white',showCancelButton:true,preConfirm:()=>[document.getElementById('sf1').value,document.getElementById('sf2').value]});
+            const {value:v}=await Swal.fire({title:'\u8edf\u9ad4',html:'<input id="sf1" class="swal2-input" type="number" placeholder="\u6210\u672c"><input id="sf2" class="swal2-input" type="number" placeholder="\u552e\u50f9">',background:'#26221e',color:'white',showCancelButton:true,preConfirm:()=>[document.getElementById('sf1').value,document.getElementById('sf2').value]});
             if(v&&v[1]){Cart.push({type:'software',name:'\u8edf\u9ad4',cost:Number(v[0])||0,price:Number(v[1])||0,quantity:1,itemId:'SW-'+Date.now(),originalPrice:Number(v[1])||0,isGift:false});renderCart();}
         }
         async function modalSoftwareWithPhone() {
@@ -5576,7 +5599,7 @@
             const { value: v } = await Swal.fire({
                 title: '\u8edf\u9ad4\uff08\u6709\u4e8c\u624b\u6a5f\uff09',
                 html,
-                background:'#1e293b',
+                background:'#26221e',
                 color:'white',
                 showCancelButton:true,
                 preConfirm: () => [gp('sp1'),gp('sp2'),gp('sp3'),gp('sp4'),gp('sp5'),gp('sp6'),gp('sp7'),gp('sp8')].map(el=>el?el.value:'').map(x=>typeof x==='string'?x.trim():x)
@@ -5597,7 +5620,7 @@
                 renderCart();
             }
         }
-        async function modalShipping(){const {value:v}=await Swal.fire({title:'運費',input:'number',inputPlaceholder:'金額',background:'#1e293b',color:'white'}); if(v!=null&&v!==''){const amt=Number(v)||0; Cart.push({type:'shipping',name:'運費',cost:amt,price:amt,quantity:1,itemId:'SF-'+Date.now(),originalPrice:amt,isGift:false}); renderCart();}}
+        async function modalShipping(){const {value:v}=await Swal.fire({title:'運費',input:'number',inputPlaceholder:'金額',background:'#26221e',color:'white'}); if(v!=null&&v!==''){const amt=Number(v)||0; Cart.push({type:'shipping',name:'運費',cost:amt,price:amt,quantity:1,itemId:'SF-'+Date.now(),originalPrice:amt,isGift:false}); renderCart();}}
         async function modalServiceStockTransfer() {
             const kindPick = await Swal.fire({
                 title: '庫存調貨',
@@ -5607,7 +5630,7 @@
                     '<label class="flex items-center gap-2 p-2 rounded-lg border border-slate-600"><input type="radio" name="st-kind" value="battery" class="accent-yellow-500">電池</label>' +
                     '<label class="flex items-center gap-2 p-2 rounded-lg border border-amber-700"><input type="radio" name="st-kind" value="parts" class="accent-yellow-500">維修料件（手機維修料件）</label>' +
                     '</div>',
-                background: '#1e293b',
+                background: '#26221e',
                 color: 'white',
                 showCancelButton: true,
                 confirmButtonText: '下一步',
@@ -5621,24 +5644,31 @@
             const kind = kindPick.value;
             // Battery/parts are flagged isHidden by API keyword rules; still allow them here.
             let pool = (DB.inv || []).filter((i) => i.type === 'accessory' && Number(i.stock) > 0);
-            const catOf = (i) => String(i.category || '').trim();
             if (kind === 'battery') {
-                pool = pool.filter((i) => SERVICE_TRANSFER_BATTERY_CATS.includes(catOf(i)));
+                pool = pool.filter((i) => isServiceTransferBatteryItem(i));
             } else if (kind === 'parts') {
-                pool = pool.filter((i) => SERVICE_TRANSFER_PARTS_CATS.includes(catOf(i)));
+                pool = pool.filter((i) => isServiceTransferPartsItem(i));
             } else {
                 pool = pool.filter((i) => {
-                    const cat = catOf(i);
-                    if (SERVICE_TRANSFER_BATTERY_CATS.includes(cat) || SERVICE_TRANSFER_PARTS_CATS.includes(cat)) return false;
+                    if (isServiceTransferBatteryItem(i) || isServiceTransferPartsItem(i)) return false;
                     if (i.isHidden) return false;
                     return true;
                 });
             }
             if (!pool.length) {
-                const emptyMsg = kind === 'battery'
-                    ? '沒有庫存電池（成品大容量／原廠拆機0循環／已加工成品）'
-                    : (kind === 'parts' ? '沒有庫存「手機維修料件」' : '沒有可調配件庫存');
-                Swal.fire({ icon: 'info', title: '沒有可調庫存', text: emptyMsg, background: '#1e293b', color: 'white' });
+                let emptyMsg = '沒有可調配件庫存';
+                if (kind === 'battery') {
+                    const n = (DB.inv || []).filter((i) => i.type === 'accessory' && isServiceTransferBatteryItem(i)).length;
+                    emptyMsg = n
+                        ? ('有 ' + n + ' 筆電池分類，但庫存皆為 0')
+                        : '沒有庫存電池（成品大容量／原廠拆機0循環／已加工成品）';
+                } else if (kind === 'parts') {
+                    const n = (DB.inv || []).filter((i) => i.type === 'accessory' && isServiceTransferPartsItem(i)).length;
+                    emptyMsg = n
+                        ? ('有 ' + n + ' 筆維修料件，但庫存皆為 0（請到進貨→隱藏料件核對）')
+                        : '找不到維修料件（分類「手機維修料件」或進貨隱藏料件）';
+                }
+                Swal.fire({ icon: 'info', title: '沒有可調庫存', text: emptyMsg, background: '#26221e', color: 'white' });
                 return;
             }
             const opts = pool.map((i) => {
@@ -5655,11 +5685,11 @@
                     '<button type="button" id="st-gift" class="px-3 py-2 rounded bg-red-900/50 text-red-400 border border-red-700 text-sm">贈</button>' +
                     '<button type="button" id="st-cost" class="px-3 py-2 rounded bg-emerald-900/50 text-emerald-400 border border-emerald-700 text-sm">本</button>' +
                     '<div style="display:flex;align-items:center;justify-content:center;gap:12px">' +
-                    '<button type="button" id="st-q-minus" style="width:52px;height:52px;font-size:26px;border-radius:12px;background:#334155;color:white;border:none;cursor:pointer">-</button>' +
-                    '<input id="st-q" type="number" value="1" min="1" style="width:72px;height:52px;font-size:22px;text-align:center;background:#1e293b;color:white;border:2px solid #475569;border-radius:12px;outline:none">' +
-                    '<button type="button" id="st-q-plus" style="width:52px;height:52px;font-size:26px;border-radius:12px;background:#334155;color:white;border:none;cursor:pointer">+</button>' +
+                    '<button type="button" id="st-q-minus" style="width:52px;height:52px;font-size:26px;border-radius:12px;background:#3d3731;color:white;border:none;cursor:pointer">-</button>' +
+                    '<input id="st-q" type="number" value="1" min="1" style="width:72px;height:52px;font-size:22px;text-align:center;background:#26221e;color:white;border:2px solid #4a433c;border-radius:12px;outline:none">' +
+                    '<button type="button" id="st-q-plus" style="width:52px;height:52px;font-size:26px;border-radius:12px;background:#3d3731;color:white;border:none;cursor:pointer">+</button>' +
                     '</div></div>',
-                background: '#1e293b',
+                background: '#26221e',
                 color: 'white',
                 showCancelButton: true,
                 confirmButtonText: 'OK',
@@ -5736,7 +5766,7 @@
             const { value: v } = await Swal.fire({
                 title: '跟廠商調貨',
                 html: '<div class="text-[12px] text-slate-400 text-left px-2 mb-1">你跟別家調來再賣（不扣自己庫存）。別人跟你調請用「服務→調貨」。</div><input id="dt1" class="swal2-input" placeholder="調貨廠商"><input id="dt2" class="swal2-input" placeholder="品項"><input id="dt3" class="swal2-input" type="number" placeholder="成本"><input id="dt4" class="swal2-input" type="number" placeholder="售價">',
-                background: '#1e293b',
+                background: '#26221e',
                 color: 'white',
                 preConfirm: () => [
                     document.getElementById('dt1').value,
@@ -5872,7 +5902,7 @@
                         <input id="multi-acc-same" type="number" class="swal2-input !my-0 flex-1 !text-sm" placeholder="同一售價">
                         <button type="button" id="multi-acc-fill" class="text-xs px-2 py-2 rounded bg-slate-600 text-white shrink-0">套用</button>
                     </div>`,
-                background: '#1e293b', color: 'white',
+                background: '#26221e', color: 'white',
                 showCancelButton: true, confirmButtonText: '加入購物車', cancelButtonText: '取消',
                 didOpen: () => {
                     const allGift = document.getElementById('multi-acc-all-gift');
@@ -5960,7 +5990,7 @@
             const baseStatus = String(phones[0].status_label || '');
             const mixedStatus = phones.some(p => String(p.status_label || '') !== baseStatus);
             if (mixedStatus) {
-                Swal.fire({ icon:'warning', title:'只能同狀態批次變更', text:'請先只選同一種原始狀態的手機', background:'#1e293b', color:'white' });
+                Swal.fire({ icon:'warning', title:'只能同狀態批次變更', text:'請先只選同一種原始狀態的手機', background:'#26221e', color:'white' });
                 return;
             }
             const nextStatus = baseStatus === '庫存中' ? '客訂中' : '庫存中';
@@ -5971,7 +6001,7 @@
                 showCancelButton: true,
                 confirmButtonText: '確認',
                 cancelButtonText: '取消',
-                background: '#1e293b',
+                background: '#26221e',
                 color: 'white'
             });
             if (!ok.isConfirmed) return;
@@ -5981,12 +6011,12 @@
                     if (!res || res.status !== 'success') throw new Error(res?.msg || '更新失敗');
                     p.status_label = nextStatus;
                 }
-                Swal.fire({ icon:'success', title:'批次更新完成', toast:true, position:'top', timer:1200, showConfirmButton:false, background:'#1e293b', color:'white' });
+                Swal.fire({ icon:'success', title:'批次更新完成', toast:true, position:'top', timer:1200, showConfirmButton:false, background:'#26221e', color:'white' });
                 const active = document.querySelector('.pill-btn.active');
                 filterItems(null, active ? active.innerText : '庫存中');
                 cancelMultiSelect();
             } catch (e) {
-                Swal.fire({ icon:'error', title:'批次更新失敗', text: e.message || '請稍後重試', background:'#1e293b', color:'white' });
+                Swal.fire({ icon:'error', title:'批次更新失敗', text: e.message || '請稍後重試', background:'#26221e', color:'white' });
             }
         }
 
@@ -6009,7 +6039,7 @@
                         <input id="multi-total-fill" type="number" class="swal2-input !my-0 flex-1 !text-sm" placeholder="總價（選填）">
                         <button type="button" id="multi-split-btn" class="text-xs px-2 py-2 rounded bg-slate-600 text-white shrink-0">平均分配</button>
                     </div>`,
-                background: '#1e293b', color: 'white',
+                background: '#26221e', color: 'white',
                 showCancelButton: true, confirmButtonText: '加入購物車', cancelButtonText: '取消',
                 didOpen: () => {
                     const btn = document.getElementById('multi-split-btn');
@@ -6058,8 +6088,8 @@
                 confirmButtonText: '確定登出',
                 cancelButtonText: '取消',
                 confirmButtonColor: '#ef4444',
-                cancelButtonColor: '#64748b',
-                background: '#1e293b',
+                cancelButtonColor: '#7a7168',
+                background: '#26221e',
                 color: 'white'
             });
             if (result.isConfirmed) {
