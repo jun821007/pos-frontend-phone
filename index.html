@@ -788,7 +788,7 @@
         let ItemRegistry = {};
         let OrderRegistry = {};
         let User = { name: '', isAdmin: false };
-        let UI = { tab: 'phone', sub: '', rsMode: 'inventory', rsCat: 'all', multiSelect: false, selectedPhones: new Set(), selectedAcc: new Set(), selectedPendingOrders: new Set(), pendingOrderMeta: {}, pendingOrdersByCustomer: {}, allPendingOrderIds: [], pendingTab: 'unpaid', statsCollapsed: { report: true, history: true }, categoryOrder: null, favAccessoryIds: null, favSubCat: '', posPrefsLoaded: false, booksMode: 'month', lastBooksReport: null, lastFundData: null, booksContinuous: false, booksLooping: false, lastBooksEntryYmd: null, lastBooksVendor: '', booksSessionCount: 0, amendTarget: null, salaryTab: 'unpaid', salaryPaidRows: [] };
+        let UI = { tab: 'phone', sub: '', rsMode: 'inventory', rsCat: 'all', multiSelect: false, selectedPhones: new Set(), selectedAcc: new Set(), selectedPendingOrders: new Set(), pendingOrderMeta: {}, pendingOrdersByCustomer: {}, allPendingOrderIds: [], pendingTab: 'unpaid', statsCollapsed: { report: true, history: true }, categoryOrder: null, favAccessoryIds: null, favSubCat: '', posPrefsLoaded: false, booksMode: 'month', lastBooksReport: null, lastFundData: null, booksContinuous: false, booksLooping: false, lastBooksEntryYmd: null, lastBooksVendor: '', lastBooksFoodNote: '飲料', booksSessionCount: 0, amendTarget: null, salaryTab: 'unpaid', salaryPaidRows: [] };
         let cartFooterTranslateY = 0;
         const CART_FOOTER_DRAG_MAX_UP = 360;
         const CART_FOOTER_DRAG_MAX_DOWN = 0;
@@ -3214,7 +3214,19 @@
             const title = (titles[kind] || '新增支出') + (looping ? `　·　連續 ${n} 筆` : '');
             const amountKinds = ['food', 'sim', 'extra_repair', 'company_misc', 'ship', 'salary', 'profit_share', 'loss', 'buy_used', 'buy_new'];
             let html = booksDateFieldHtml();
-            if (kind === 'food') html += '<input id="bk-n" class="swal2-input" placeholder="摘要（如：便當）"><input id="bk-a" type="number" class="swal2-input" placeholder="金額">';
+            if (kind === 'food') {
+                const lastFood = (UI.lastBooksFoodNote === '晚餐') ? '晚餐' : '飲料';
+                html += `<div style="text-align:left;padding:4px 8px 8px;font-size:12px;color:#a89f94">摘要（點選）</div>
+                    <div style="display:flex;gap:8px;justify-content:center;padding:0 8px 8px">
+                        <label style="flex:1;display:flex;align-items:center;justify-content:center;gap:6px;padding:12px 8px;border:1px solid #4a433c;border-radius:10px;background:#1a1714;cursor:pointer">
+                            <input type="radio" name="bk-food-note" value="飲料" class="accent-yellow-500" ${lastFood === '飲料' ? 'checked' : ''}>飲料
+                        </label>
+                        <label style="flex:1;display:flex;align-items:center;justify-content:center;gap:6px;padding:12px 8px;border:1px solid #4a433c;border-radius:10px;background:#1a1714;cursor:pointer">
+                            <input type="radio" name="bk-food-note" value="晚餐" class="accent-yellow-500" ${lastFood === '晚餐' ? 'checked' : ''}>晚餐
+                        </label>
+                    </div>
+                    <input id="bk-a" type="number" class="swal2-input" placeholder="金額" inputmode="numeric">`;
+            }
             else if (kind === 'sim') html += '<div style="font-size:12px;color:#a89f94;text-align:left;padding:4px 8px 0">只記進卡付了多少（備查），不扣本期淨利。賣出 eSIM／網卡的毛利另計「網卡純毛利」。</div><input id="bk-n" class="swal2-input" placeholder="摘要（如：DTAC／eSIM）"><input id="bk-a" type="number" class="swal2-input" placeholder="金額">';
             else if (kind === 'extra_repair') html += '<div style="font-size:12px;color:#a89f94;text-align:left;padding:4px 8px 0">只記花了多少料錢／外修，方便對帳，不扣本期淨利。二手機請把這筆加進庫存成本，賣掉才算毛利。</div><input id="bk-n" class="swal2-input" placeholder="摘要（如：料錢、外修、廖）"><input id="bk-a" type="number" class="swal2-input" placeholder="金額">';
             else if (kind === 'company_misc') html += '<input id="bk-n" class="swal2-input" placeholder="摘要（如：文具、清潔）"><input id="bk-a" type="number" class="swal2-input" placeholder="金額">';
@@ -3238,18 +3250,25 @@
                 allowOutsideClick: !looping,
                 allowEscapeKey: true,
                 didOpen: () => {
-                    const f = document.getElementById('bk-n');
-                    if (f) f.focus();
+                    const focusEl = document.getElementById(kind === 'food' ? 'bk-a' : 'bk-n');
+                    if (focusEl) focusEl.focus();
                 },
                 preConfirm: () => {
                     const d = booksReadEntryDate();
                     if (!d) return false;
                     if (amountKinds.includes(kind)) {
-                        const name = (document.getElementById('bk-n').value || '').trim();
+                        let name = '';
+                        if (kind === 'food') {
+                            const picked = document.querySelector('input[name="bk-food-note"]:checked');
+                            name = (picked && picked.value) ? String(picked.value).trim() : '';
+                        } else {
+                            name = (document.getElementById('bk-n').value || '').trim();
+                        }
                         const a = parseInt(document.getElementById('bk-a').value, 10);
-                        if (!name) { Swal.showValidationMessage('請填摘要'); return false; }
+                        if (!name) { Swal.showValidationMessage(kind === 'food' ? '請選擇飲料或晚餐' : '請填摘要'); return false; }
                         if (!a || a <= 0) { Swal.showValidationMessage('請填金額'); return false; }
                         const vendor = document.getElementById('bk-v') ? (document.getElementById('bk-v').value || '').trim() : '';
+                        if (kind === 'food') UI.lastBooksFoodNote = name;
                         return { d, name, a, vendor };
                     }
                     const name = (document.getElementById('bk-n').value || '').trim();
