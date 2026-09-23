@@ -1547,11 +1547,25 @@
         }
         const SERVICE_TRANSFER_BATTERY_CATS = ['成品大容量電池', '原廠拆機電池0循環', '已加工成品電池'];
         const SERVICE_TRANSFER_PARTS_CATS = ['手機維修料件'];
+        function serviceTransferCat(i) {
+            return String((i && i.category) || '').trim();
+        }
+        function isServiceTransferBatteryItem(i) {
+            return SERVICE_TRANSFER_BATTERY_CATS.includes(serviceTransferCat(i));
+        }
+        function isServiceTransferPartsItem(i) {
+            const cat = serviceTransferCat(i);
+            if (SERVICE_TRANSFER_PARTS_CATS.includes(cat)) return true;
+            if (cat.includes('維修料件')) return true;
+            // 與進貨頁「隱藏料件」一致：被關鍵字藏起、且不是電池分類
+            if (i && i.isHidden && !isServiceTransferBatteryItem(i)) return true;
+            return false;
+        }
         function isPartsTransferItem(it) {
             if (it && (it.transferKind === 'parts' || it.isPartsTransfer)) return true;
             const n = String(it.itemName || it.name || '');
             if (/\[維修料件調貨\]/.test(n)) return true;
-            if (it && it.isPeerStockTransfer && SERVICE_TRANSFER_PARTS_CATS.includes(it.category)) return true;
+            if (it && it.isPeerStockTransfer && isServiceTransferPartsItem(it)) return true;
             return false;
         }
         function calcGiftAllocation(normalized) {
