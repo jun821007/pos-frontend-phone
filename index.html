@@ -5605,13 +5605,20 @@
             });
             if (!kindPick.isConfirmed || !kindPick.value) return;
             const kind = kindPick.value;
-            let pool = (DB.inv || []).filter((i) => i.type === 'accessory' && !i.isHidden && Number(i.stock) > 0);
+            // Battery/parts are flagged isHidden by API keyword rules; still allow them here.
+            let pool = (DB.inv || []).filter((i) => i.type === 'accessory' && Number(i.stock) > 0);
+            const catOf = (i) => String(i.category || '').trim();
             if (kind === 'battery') {
-                pool = pool.filter((i) => SERVICE_TRANSFER_BATTERY_CATS.includes(i.category));
+                pool = pool.filter((i) => SERVICE_TRANSFER_BATTERY_CATS.includes(catOf(i)));
             } else if (kind === 'parts') {
-                pool = pool.filter((i) => SERVICE_TRANSFER_PARTS_CATS.includes(i.category));
+                pool = pool.filter((i) => SERVICE_TRANSFER_PARTS_CATS.includes(catOf(i)));
             } else {
-                pool = pool.filter((i) => !SERVICE_TRANSFER_BATTERY_CATS.includes(i.category) && !SERVICE_TRANSFER_PARTS_CATS.includes(i.category));
+                pool = pool.filter((i) => {
+                    const cat = catOf(i);
+                    if (SERVICE_TRANSFER_BATTERY_CATS.includes(cat) || SERVICE_TRANSFER_PARTS_CATS.includes(cat)) return false;
+                    if (i.isHidden) return false;
+                    return true;
+                });
             }
             if (!pool.length) {
                 const emptyMsg = kind === 'battery'
