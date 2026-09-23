@@ -1545,10 +1545,14 @@
             const n = (it.itemName || it.name || '').toLowerCase();
             return n.includes('泰國註冊卡') || n.includes('網卡') || n.includes('esim');
         }
+        const SERVICE_TRANSFER_BATTERY_CATS = ['成品大容量電池', '原廠拆機電池0循環', '已加工成品電池'];
+        const SERVICE_TRANSFER_PARTS_CATS = ['手機維修料件'];
         function isPartsTransferItem(it) {
             if (it && (it.transferKind === 'parts' || it.isPartsTransfer)) return true;
             const n = String(it.itemName || it.name || '');
-            return /\[維修料件調貨\]/.test(n);
+            if (/\[維修料件調貨\]/.test(n)) return true;
+            if (it && it.isPeerStockTransfer && SERVICE_TRANSFER_PARTS_CATS.includes(it.category)) return true;
+            return false;
         }
         function calcGiftAllocation(normalized) {
             const G = normalized.reduce((s, it) => isGiftDeduction(it) ? s + (Number(it.cost) || 0) : s, 0);
@@ -5580,7 +5584,6 @@
             }
         }
         async function modalShipping(){const {value:v}=await Swal.fire({title:'運費',input:'number',inputPlaceholder:'金額',background:'#1e293b',color:'white'}); if(v!=null&&v!==''){const amt=Number(v)||0; Cart.push({type:'shipping',name:'運費',cost:amt,price:amt,quantity:1,itemId:'SF-'+Date.now(),originalPrice:amt,isGift:false}); renderCart();}}
-        const SERVICE_TRANSFER_BATTERY_CATS = ['已加工成品電池', '成品大容量電池', '原廠拆機電池0循環'];
         async function modalServiceStockTransfer() {
             const kindPick = await Swal.fire({
                 title: '庫存調貨',
@@ -5588,7 +5591,7 @@
                     '<div class="flex flex-col gap-2 text-left text-sm text-slate-200">' +
                     '<label class="flex items-center gap-2 p-2 rounded-lg border border-slate-600"><input type="radio" name="st-kind" value="acc" class="accent-yellow-500" checked>配件</label>' +
                     '<label class="flex items-center gap-2 p-2 rounded-lg border border-slate-600"><input type="radio" name="st-kind" value="battery" class="accent-yellow-500">電池</label>' +
-                    '<label class="flex items-center gap-2 p-2 rounded-lg border border-amber-700"><input type="radio" name="st-kind" value="parts" class="accent-yellow-500">維修料件（獨立科目）</label>' +
+                    '<label class="flex items-center gap-2 p-2 rounded-lg border border-amber-700"><input type="radio" name="st-kind" value="parts" class="accent-yellow-500">維修料件（手機維修料件）</label>' +
                     '</div>',
                 background: '#1e293b',
                 color: 'white',
@@ -5605,11 +5608,16 @@
             let pool = (DB.inv || []).filter((i) => i.type === 'accessory' && !i.isHidden && Number(i.stock) > 0);
             if (kind === 'battery') {
                 pool = pool.filter((i) => SERVICE_TRANSFER_BATTERY_CATS.includes(i.category));
-            } else if (kind === 'acc') {
-                pool = pool.filter((i) => !SERVICE_TRANSFER_BATTERY_CATS.includes(i.category));
+            } else if (kind === 'parts') {
+                pool = pool.filter((i) => SERVICE_TRANSFER_PARTS_CATS.includes(i.category));
+            } else {
+                pool = pool.filter((i) => !SERVICE_TRANSFER_BATTERY_CATS.includes(i.category) && !SERVICE_TRANSFER_PARTS_CATS.includes(i.category));
             }
             if (!pool.length) {
-                Swal.fire({ icon: 'info', title: '沒有可調庫存', text: kind === 'battery' ? '沒有庫存電池' : '沒有庫存品項', background: '#1e293b', color: 'white' });
+                const emptyMsg = kind === 'battery'
+                    ? '沒有庫存電池（成品大容量／原廠拆機0循環／已加工成品）'
+                    : (kind === 'parts' ? '沒有庫存「手機維修料件」' : '沒有可調配件庫存');
+                Swal.fire({ icon: 'info', title: '沒有可調庫存', text: emptyMsg, background: '#1e293b', color: 'white' });
                 return;
             }
             const opts = pool.map((i) => {
