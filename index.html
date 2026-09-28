@@ -264,6 +264,7 @@
                     <div class="relative"><i class="fa-solid fa-search absolute left-3 top-3 text-slate-500"></i><input type="text" id="search-input" onkeyup="filterItems()" placeholder="搜尋名稱 / 編號..." class="w-full pl-10 pr-4 py-2.5 rounded-xl input-dark text-sm"></div>
                     <div class="flex border-b border-slate-800">
                         <div onclick="switchMainTab('phone')" id="tab-phone" class="main-tab active">📱 二手機</div>
+                        <div onclick="switchMainTab('new')" id="tab-new" class="main-tab">🆕 新機</div>
                         <div onclick="switchMainTab('accessory')" id="tab-accessory" class="main-tab">🔌 配件</div>
                         <div onclick="switchMainTab('service')" id="tab-service" class="main-tab">🛠️ 服務</div>
                     </div>
@@ -454,6 +455,7 @@
                 <div class="books-toolbar-top">
                     <h2>薪資</h2>
                     <div class="books-toolbar-actions flex flex-wrap gap-2" id="salary-actions-unpaid">
+                        <button type="button" onclick="addManualSalary()" class="px-3 py-2 rounded-lg bg-amber-900 border border-amber-700 text-amber-100 text-sm font-bold">＋手動新增</button>
                         <button type="button" onclick="copyAllSalaryQueue()" class="px-3 py-2 rounded-lg bg-slate-800 border border-slate-600 text-slate-100 text-sm font-bold">複製全部</button>
                         <button type="button" onclick="payReadySalaryQueue()" class="px-3 py-2 rounded-lg bg-yellow-600 text-black text-sm font-bold">發放要結</button>
                         <button type="button" onclick="clearSalaryQueue()" class="px-3 py-2 rounded-lg bg-slate-800 border border-red-900 text-red-300 text-sm">清空</button>
@@ -462,6 +464,7 @@
                         <input type="month" id="salary-paid-month" onchange="loadSalaryPaidLedger()" class="input-dark p-2 rounded text-sm">
                         <button type="button" onclick="loadSalaryPaidLedger()" class="px-3 py-2 rounded-lg bg-yellow-600 text-black text-sm font-bold">載入</button>
                         <button type="button" onclick="copySalaryPaidLedger()" class="px-3 py-2 rounded-lg bg-slate-800 border border-slate-600 text-slate-100 text-sm font-bold">複製本月</button>
+                        <button type="button" onclick="addManualSalary()" class="px-3 py-2 rounded-lg bg-amber-900 border border-amber-700 text-amber-100 text-sm font-bold">＋手動新增</button>
                     </div>
                 </div>
                 <div class="flex gap-2 mt-2">
@@ -1003,6 +1006,7 @@
                 console.log('配件資料:', DB.inv.filter(i => i.type === 'accessory').length);
                 document.getElementById('sync-status').innerHTML = '<span class="text-green-500">● 已同步</span>'; 
                 if(UI.tab === 'phone') switchMainTab('phone'); 
+                else if(UI.tab === 'new') { const a = document.querySelector('#sub-cat-scroll .pill-btn.active'); filterItems('stocktype', a ? a.innerText : '自有'); }
                 else if(UI.tab === 'accessory') { const a = document.querySelector('#sub-cat-scroll .pill-btn.active'); if(a) { const t = a.innerText; if(t.includes('常用')) { renderFavSubNav(); renderFavAccessoryGrid(); } else if(t === '公司貨') renderCompanyAccessoryGrid(); else if(t === '調貨') renderDirectTransferGrid(); else filterItems(null, t); } }
                 renderReport(); 
             } catch(e) { 
@@ -1228,7 +1232,7 @@
         function switchMainTab(t) {
             if (UI.tab !== t) cancelMultiSelect();
             UI.tab = t; document.querySelectorAll('.main-tab').forEach(e => e.classList.remove('active')); document.getElementById('tab-'+t).classList.add('active'); const sub = document.getElementById('sub-cat-scroll'); sub.innerHTML = '';
-            if (t === 'phone') { ['庫存中','客訂中','寄賣中'].forEach(s => sub.appendChild(createPill(s, () => filterItems('status', s)))); if(sub.firstChild) sub.firstChild.click(); renderMultiSelectBar(); } else if (t === 'accessory') { hideFavSubNav(); const favBtn = document.createElement('div'); favBtn.className = 'pill-btn border-amber-500 text-amber-400 shrink-0'; favBtn.innerHTML = '⭐ 常用'; favBtn.setAttribute('title','常用品'); favBtn.onclick = () => openFavAccessoryView(); sub.appendChild(favBtn); const btn = document.createElement('div'); btn.className = 'pill-btn border-blue-500 text-blue-400'; btn.innerHTML = '🏢 公司貨'; btn.onclick = () => { hideFavSubNav(); document.querySelectorAll('#sub-cat-scroll .pill-btn').forEach(b=>b.classList.remove('active')); btn.classList.add('active'); renderCompanyAccessoryGrid(); }; sub.appendChild(btn); const transferBtn = document.createElement('div'); transferBtn.className = 'pill-btn border-purple-500 text-purple-400'; transferBtn.innerHTML = '🚚 調貨'; transferBtn.onclick = () => { hideFavSubNav(); document.querySelectorAll('#sub-cat-scroll .pill-btn').forEach(b=>b.classList.remove('active')); transferBtn.classList.add('active'); renderDirectTransferGrid(); }; sub.appendChild(transferBtn); const cats = getOrderedCategories(); cats.forEach(c => sub.appendChild(createPill(c, () => filterItems('cat', c)))); if(sub.firstChild) sub.firstChild.click(); renderMultiSelectBar(); } else { hideFavSubNav(); renderServiceGrid(); renderMultiSelectBar(); }
+            if (t === 'phone') { ['庫存中','客訂中','寄賣中'].forEach(s => sub.appendChild(createPill(s, () => filterItems('status', s)))); if(sub.firstChild) sub.firstChild.click(); renderMultiSelectBar(); } else if (t === 'new') { hideFavSubNav(); ['自有','寄賣'].forEach(s => sub.appendChild(createPill(s, () => filterItems('stocktype', s)))); if(sub.firstChild) sub.firstChild.click(); renderMultiSelectBar(); } else if (t === 'accessory') { hideFavSubNav(); const favBtn = document.createElement('div'); favBtn.className = 'pill-btn border-amber-500 text-amber-400 shrink-0'; favBtn.innerHTML = '⭐ 常用'; favBtn.setAttribute('title','常用品'); favBtn.onclick = () => openFavAccessoryView(); sub.appendChild(favBtn); const btn = document.createElement('div'); btn.className = 'pill-btn border-blue-500 text-blue-400'; btn.innerHTML = '🏢 公司貨'; btn.onclick = () => { hideFavSubNav(); document.querySelectorAll('#sub-cat-scroll .pill-btn').forEach(b=>b.classList.remove('active')); btn.classList.add('active'); renderCompanyAccessoryGrid(); }; sub.appendChild(btn); const transferBtn = document.createElement('div'); transferBtn.className = 'pill-btn border-purple-500 text-purple-400'; transferBtn.innerHTML = '🚚 調貨'; transferBtn.onclick = () => { hideFavSubNav(); document.querySelectorAll('#sub-cat-scroll .pill-btn').forEach(b=>b.classList.remove('active')); transferBtn.classList.add('active'); renderDirectTransferGrid(); }; sub.appendChild(transferBtn); const cats = getOrderedCategories(); cats.forEach(c => sub.appendChild(createPill(c, () => filterItems('cat', c)))); if(sub.firstChild) sub.firstChild.click(); renderMultiSelectBar(); } else { hideFavSubNav(); renderServiceGrid(); renderMultiSelectBar(); }
         }
         function createPill(t, f) { const d = document.createElement('div'); d.className = 'pill-btn'; d.innerText = t; d.onclick = () => { document.querySelectorAll('#sub-cat-scroll .pill-btn').forEach(b=>b.classList.remove('active')); d.classList.add('active'); f(); }; return d; }
         
@@ -1247,11 +1251,13 @@
             const term = document.getElementById('search-input').value.toLowerCase();
             const grid = document.getElementById('item-grid');
             grid.innerHTML = '';
-            setItemGridMode(UI.tab === 'phone' ? 'phone' : 'grid');
+            setItemGridMode(UI.tab === 'phone' || UI.tab === 'new' ? 'phone' : 'grid');
+            const tabType = UI.tab === 'new' ? 'new_stock' : UI.tab;
             let list = DB.inv.filter(i => {
                 if (i.isHidden && !i.category.includes("加工好電池")) return false;
-                if (term) return (i.name.toLowerCase().includes(term) || String(i.stock_id).includes(term)) && i.type === UI.tab;
+                if (term) return (i.name.toLowerCase().includes(term) || String(i.stock_id).includes(term) || (UI.tab === 'new' && String(i.imei || '').toLowerCase().includes(term))) && i.type === tabType;
                 if (UI.tab === 'phone') return i.type === 'phone' && i.status_label === val;
+                if (UI.tab === 'new') return i.type === 'new_stock' && i.stockType === val;
                 if (UI.tab === 'accessory') return i.type === 'accessory' && i.category === val;
                 return false;
             });
@@ -1260,6 +1266,24 @@
                 return;
             }
             const fav = UI.tab === 'accessory' ? getFavAccessories() : [];
+            if (UI.tab === 'new') {
+                list.forEach(i => {
+                    const sid = String(i.id);
+                    const inCart = Cart.some(c => String(c.itemId) === sid);
+                    let specs = '';
+                    if (i.imei) specs += `<span class="spec-tag">序 ${salaryEsc(i.imei)}</span>`;
+                    specs += `<span class="spec-tag">成本 $${(Number(i.cost) || 0).toLocaleString()}</span>`;
+                    if (i.stockType === '寄賣' && i.owner) specs += `<span class="spec-tag">件主 ${salaryEsc(i.owner)}</span>`;
+                    grid.innerHTML += `<div onclick="triggerAddToCart('${salaryEsc(sid)}')" class="phone-row${inCart ? ' is-selected' : ''}" id="card-${salaryEsc(sid)}" data-id="${salaryEsc(sid)}">
+                        <div class="phone-row-check"><i class="fa-solid fa-circle-check"></i></div>
+                        <div class="phone-row-main">
+                            <div class="phone-row-top"><span class="phone-row-id">#${salaryEsc(i.stock_id)}</span><div class="phone-row-name">${salaryEsc(i.name)}</div></div>
+                            <div class="phone-row-spec">${specs}</div>
+                        </div>
+                    </div>`;
+                });
+                return;
+            }
             if (UI.tab === 'phone') {
                 list.forEach(i => {
                     const sid = String(i.id);
@@ -1325,6 +1349,94 @@
                 restoreItemGridScroll(scrollTop);
             }
         }
+        // 寄賣標記寫在品名：[寄賣:件主 底23000] 記利潤；[寄賣不記:件主 底23000] 不入帳
+        function parseConsignTag(it) {
+            const m = String((it && (it.itemName || it.name)) || '').match(/\[寄賣(不記)?:(.*?) 底(\d+(?:\.\d+)?)\]/);
+            if (!m) return null;
+            return { noCount: !!m[1], owner: m[2].trim(), base: Number(m[3]) || 0 };
+        }
+        function isConsignNoCountItem(it) {
+            const tag = it && it.type === 'new_phone' ? parseConsignTag(it) : null;
+            return !!(tag && tag.noCount);
+        }
+        function consignFormulaLines(tag, sale, myCost) {
+            const owner = tag.owner || '件主';
+            if (tag.noCount) {
+                return [`${owner}：${sale}-${tag.base}=${sale - tag.base}　該給 ${sale}（不入帳）`];
+            }
+            return [
+                `我的：${sale}-${myCost}=${sale - myCost}`,
+                `${owner}：${myCost}-${tag.base}=${myCost - tag.base}　該給 ${myCost}`
+            ];
+        }
+        async function addNewStockToCart(i) {
+            const sid = String(i.id);
+            if (Cart.some(c => String(c.itemId) === sid)) {
+                Swal.fire({ icon: 'info', title: '這台已在購物車', toast: true, position: 'top', timer: 1500, showConfirmButton: false, background: '#26221e', color: 'white' });
+                return;
+            }
+            const base = Number(i.cost) || 0;
+            const isConsign = i.stockType === '寄賣';
+            const owner = String(i.owner || '').trim() || '件主';
+            const consignHtml = isConsign ? `
+                <div class="text-left text-sm text-slate-300 px-2">件主：<b>${salaryEsc(owner)}</b>　件主成本：<b class="text-yellow-400">$${base.toLocaleString()}</b></div>
+                <div class="flex justify-center gap-4 mt-2 text-sm">
+                    <label><input type="radio" name="ns-mode" value="count" checked> 記利潤</label>
+                    <label><input type="radio" name="ns-mode" value="nocount"> 不記（備查）</label>
+                </div>
+                <input id="ns-cost" type="number" class="swal2-input" placeholder="我的成本" value="${base}">` : `
+                <div class="text-left text-sm text-slate-300 px-2">成本：<b class="text-yellow-400">$${base.toLocaleString()}</b></div>`;
+            const { value } = await withPreservedItemGridScroll((swalOpts) => Swal.fire({
+                title: i.name,
+                html: `${consignHtml}<input id="ns-price" type="number" class="swal2-input" placeholder="售價"><div id="ns-preview" class="text-left text-xs text-slate-400 px-2 mt-2 whitespace-pre-line"></div>`,
+                background: '#26221e', color: 'white',
+                showCancelButton: true, confirmButtonText: '加入', cancelButtonText: '取消',
+                ...swalOpts,
+                didOpen: () => {
+                    const costEl = document.getElementById('ns-cost');
+                    const priceEl = document.getElementById('ns-price');
+                    const preview = document.getElementById('ns-preview');
+                    const update = () => {
+                        const sale = Number(priceEl.value) || 0;
+                        const noCount = isConsign && (document.querySelector('input[name="ns-mode"]:checked') || {}).value === 'nocount';
+                        if (costEl) costEl.style.display = noCount ? 'none' : '';
+                        if (!sale) { preview.textContent = ''; return; }
+                        if (!isConsign) { preview.textContent = `毛利：${sale}-${base}=${sale - base}`; return; }
+                        const myCost = Number(costEl.value) || base;
+                        preview.textContent = consignFormulaLines({ noCount, owner, base }, sale, myCost).join('\n');
+                    };
+                    priceEl.addEventListener('input', update);
+                    if (costEl) costEl.addEventListener('input', update);
+                    document.querySelectorAll('input[name="ns-mode"]').forEach(el => el.addEventListener('change', update));
+                    priceEl.focus();
+                },
+                preConfirm: () => {
+                    const sale = Number(document.getElementById('ns-price').value) || 0;
+                    if (sale <= 0) { Swal.showValidationMessage('請填售價'); return false; }
+                    const noCount = isConsign && (document.querySelector('input[name="ns-mode"]:checked') || {}).value === 'nocount';
+                    const costEl = document.getElementById('ns-cost');
+                    const myCost = isConsign && !noCount ? (Number(costEl && costEl.value) || 0) : base;
+                    if (isConsign && !noCount && myCost < base) { Swal.showValidationMessage('我的成本不能低於件主成本'); return false; }
+                    return { sale, noCount, myCost };
+                }
+            }));
+            if (!value) return;
+            let name = '新機 ' + i.name;
+            let cost = base;
+            const extra = {};
+            if (isConsign) {
+                name += value.noCount ? ` [寄賣不記:${owner} 底${base}]` : ` [寄賣:${owner} 底${base}]`;
+                if (value.noCount) { cost = value.sale; extra.profit = 0; }
+                else cost = value.myCost;
+            }
+            Cart.push({
+                type: 'new_phone', name, dealerName: isConsign ? owner : (i.sourceChannel || '自有'),
+                cost, price: value.sale, imei: i.imei || '', quantity: 1,
+                itemId: sid, originalPrice: value.sale, isGift: false, ...extra
+            });
+            renderCart();
+            filterItems('stocktype', i.stockType);
+        }
         async function triggerAddToCart(id) {
             if (UI.multiSelect && UI.tab === 'phone') { togglePhoneSelect(id); return; }
             if (UI.multiSelect && UI.tab === 'accessory') { toggleAccSelect('a:' + String(id)); return; }
@@ -1332,6 +1444,7 @@
             if(!i) { Swal.fire({icon:'error', title:'找不到商品', text:`ID: ${id}`, background:'#26221e', color:'white'}); return; }
             let p = i.price, q = 1;
             let defPrice = i.defaultPrice > 0 ? i.defaultPrice : (i.price > 0 ? i.price : '');
+            if (i.type === 'new_stock') { await addNewStockToCart(i); return; }
             if (i.type === 'phone') {
                 const { value } = await withPreservedItemGridScroll((swalOpts) => Swal.fire({
                     title: i.name,
@@ -1444,6 +1557,7 @@
         function stripLedgerName(name) {
             return String(name || '')
                 .replace(/^\((二|新|配|維|包|軟|調|運)\)\s*/g, '')
+                .replace(/\s*\[寄賣(?:不記)?:[^\]]*\]/g, '')
                 .replace(/\s*\(贈\)\s*/g, ' ')
                 .replace(/\s*x\d+$/i, '')
                 .trim();
@@ -1725,6 +1839,18 @@
                 else Swal.fire({ icon:'error', title:'複製失敗', text:'請手動複製', background:'#26221e', color:'white' });
                 return;
             }
+            if (kind === 'consign') {
+                const blocks = normalized.filter(it => it.type === 'new_phone' && parseConsignTag(it)).map(it => {
+                    const tag = parseConsignTag(it);
+                    const lines = consignFormulaLines(tag, Number(it.salePrice) || 0, Number(it.cost) || 0);
+                    return [`${customer}　${stripLedgerName(it.itemName || it.name || '')}`].concat(lines).join('\n');
+                });
+                if (!blocks.length) return;
+                const ok = await copyTextToClipboard(blocks.join('\n\n'));
+                if (ok) Swal.fire({ icon:'success', title:'已複製寄賣算式', toast:true, position:'top', timer:1500, showConfirmButton:false, background:'#26221e', color:'white' });
+                else Swal.fire({ icon:'error', title:'複製失敗', text:'請手動複製', background:'#26221e', color:'white' });
+                return;
+            }
             if (kind === 'new') {
                 const newItems = normalized.filter(it => it.type === 'new_phone');
                 const newProfit = newItems.reduce((s, it) => s + calcCopyProfit(it), 0);
@@ -1891,6 +2017,7 @@
             const ledgerFormula = buildLedgerFormulaHtml(g.items || []);
             const hasUsedItems = (g.items || []).some(it => it.type === 'phone' || it.type === 'peer_phone');
             const hasNewItems = (g.items || []).some(it => it.type === 'new_phone');
+            const hasConsignItems = (g.items || []).some(it => it.type === 'new_phone' && parseConsignTag(it));
             const hasAccItems = (g.items || []).some(it => it.type === 'accessory' || it.type === 'direct_transfer');
             const hasRepairItems = (g.items || []).some(it => it.type === 'repair');
             const hasSoftItems = (g.items || []).some(it => it.type === 'software' || it.type === 'software_phone');
@@ -1926,7 +2053,7 @@
                         <button onclick="event.stopPropagation(); confirmDeleteOrder('${g.orderId}')" class="text-[10px] bg-red-900 text-red-200 px-1.5 rounded border border-red-700 hover:bg-red-800">刪單</button>
                     </div>
                 </div>
-                <div class="order-accordion-content accordion-content shadow-inner">${details}<div class="border-t border-slate-800 bg-slate-950/30"><div class="px-3 pt-2 flex flex-wrap gap-2">${hasSettleItems ? `<button onclick="event.stopPropagation(); copyOrderSummary('settle', '${oidEsc}')" class="text-[11px] bg-yellow-900/50 text-yellow-200 px-2 py-1 rounded border border-yellow-700 hover:bg-yellow-800/50" title="給客人的明細">複製結算</button>` : ''}${hasUsedItems ? `<button onclick="event.stopPropagation(); copyOrderSummary('used', '${oidEsc}')" class="text-[11px] bg-indigo-900/50 text-indigo-200 px-2 py-1 rounded border border-indigo-700 hover:bg-indigo-800/50">複製二手機</button>` : ''}${hasNewItems ? `<button onclick="event.stopPropagation(); copyOrderSummary('new', '${oidEsc}')" class="text-[11px] bg-amber-900/50 text-amber-200 px-2 py-1 rounded border border-amber-700 hover:bg-amber-800/50">複製新機</button>` : ''}${hasAccItems ? `<button onclick="event.stopPropagation(); copyOrderSummary('acc', '${oidEsc}')" class="text-[11px] bg-emerald-900/50 text-emerald-200 px-2 py-1 rounded border border-emerald-700 hover:bg-emerald-800/50">複製配件</button>` : ''}${hasRepairItems ? `<button onclick="event.stopPropagation(); copyOrderSummary('repair', '${oidEsc}')" class="text-[11px] bg-purple-900/50 text-purple-200 px-2 py-1 rounded border border-purple-700 hover:bg-purple-800/50">複製維修</button>` : ''}${hasSoftItems ? `<button onclick="event.stopPropagation(); copyOrderSummary('soft', '${oidEsc}')" class="text-[11px] bg-violet-900/50 text-violet-200 px-2 py-1 rounded border border-violet-700 hover:bg-violet-800/50">\u8907\u88fd\u8edf\u9ad4</button>` : ''}${hasCardItems ? `<button onclick="event.stopPropagation(); copyOrderSummary('card', '${oidEsc}')" class="text-[11px] bg-sky-900/50 text-sky-200 px-2 py-1 rounded border border-sky-700 hover:bg-sky-800/50">\u8907\u88fd\u5361\u7247</button>` : ''}</div><button onclick="event.stopPropagation(); this.nextElementSibling.classList.toggle('hidden')" class="w-full text-left px-3 py-2 text-[11px] text-slate-400 hover:text-slate-200">記帳算式 ▾</button><div class="hidden px-3 pb-3 space-y-1">${ledgerFormula}</div></div></div>
+                <div class="order-accordion-content accordion-content shadow-inner">${details}<div class="border-t border-slate-800 bg-slate-950/30"><div class="px-3 pt-2 flex flex-wrap gap-2">${hasSettleItems ? `<button onclick="event.stopPropagation(); copyOrderSummary('settle', '${oidEsc}')" class="text-[11px] bg-yellow-900/50 text-yellow-200 px-2 py-1 rounded border border-yellow-700 hover:bg-yellow-800/50" title="給客人的明細">複製結算</button>` : ''}${hasUsedItems ? `<button onclick="event.stopPropagation(); copyOrderSummary('used', '${oidEsc}')" class="text-[11px] bg-indigo-900/50 text-indigo-200 px-2 py-1 rounded border border-indigo-700 hover:bg-indigo-800/50">複製二手機</button>` : ''}${hasNewItems ? `<button onclick="event.stopPropagation(); copyOrderSummary('new', '${oidEsc}')" class="text-[11px] bg-amber-900/50 text-amber-200 px-2 py-1 rounded border border-amber-700 hover:bg-amber-800/50">複製新機</button>` : ''}${hasConsignItems ? `<button onclick="event.stopPropagation(); copyOrderSummary('consign', '${oidEsc}')" class="text-[11px] bg-orange-900/50 text-orange-200 px-2 py-1 rounded border border-orange-700 hover:bg-orange-800/50">複製寄賣</button>` : ''}${hasAccItems ? `<button onclick="event.stopPropagation(); copyOrderSummary('acc', '${oidEsc}')" class="text-[11px] bg-emerald-900/50 text-emerald-200 px-2 py-1 rounded border border-emerald-700 hover:bg-emerald-800/50">複製配件</button>` : ''}${hasRepairItems ? `<button onclick="event.stopPropagation(); copyOrderSummary('repair', '${oidEsc}')" class="text-[11px] bg-purple-900/50 text-purple-200 px-2 py-1 rounded border border-purple-700 hover:bg-purple-800/50">複製維修</button>` : ''}${hasSoftItems ? `<button onclick="event.stopPropagation(); copyOrderSummary('soft', '${oidEsc}')" class="text-[11px] bg-violet-900/50 text-violet-200 px-2 py-1 rounded border border-violet-700 hover:bg-violet-800/50">\u8907\u88fd\u8edf\u9ad4</button>` : ''}${hasCardItems ? `<button onclick="event.stopPropagation(); copyOrderSummary('card', '${oidEsc}')" class="text-[11px] bg-sky-900/50 text-sky-200 px-2 py-1 rounded border border-sky-700 hover:bg-sky-800/50">\u8907\u88fd\u5361\u7247</button>` : ''}</div><button onclick="event.stopPropagation(); this.nextElementSibling.classList.toggle('hidden')" class="w-full text-left px-3 py-2 text-[11px] text-slate-400 hover:text-slate-200">記帳算式 ▾</button><div class="hidden px-3 pb-3 space-y-1">${ledgerFormula}</div></div></div>
             </div>`;
         }
 
@@ -2181,12 +2308,62 @@
             let orderId = '';
             const mOrd = name.match(/ORD\d+/);
             if (mOrd) orderId = mOrd[0];
+            else if (String(row.orderId || '').startsWith('SAL-MAN-')) orderId = '手動';
             else if (String(row.orderId || '').startsWith('SAL-')) {
                 const parts = String(row.orderId).split('-');
                 if (parts.length >= 2) orderId = parts[1];
             } else if (row.orderId) orderId = String(row.orderId);
             const customer = String(row.customer || '').replace(/^薪資$/, '').trim();
             return { kindLabel, orderId, customer, name };
+        }
+        async function addManualSalary() {
+            if (!(User && User.isAdmin)) return;
+            const opts = SALARY_KIND_META.map(m => `<option value="${salaryEsc(m.label)}">${salaryEsc(m.label)}</option>`).join('') + '<option value="__other">其他（自填）</option>';
+            const { value } = await Swal.fire({
+                title: '手動新增薪資',
+                html: `<select id="ms-kind" class="swal2-select" style="width:80%">${opts}</select>
+                    <input id="ms-kind-other" class="swal2-input" placeholder="類別名稱" style="display:none">
+                    <input id="ms-amt" type="number" class="swal2-input" placeholder="金額">
+                    <input id="ms-note" class="swal2-input" placeholder="備註（選填）">`,
+                background: '#26221e', color: 'white',
+                showCancelButton: true, confirmButtonText: '發放', cancelButtonText: '取消',
+                didOpen: () => {
+                    const sel = document.getElementById('ms-kind');
+                    const other = document.getElementById('ms-kind-other');
+                    sel.onchange = () => { other.style.display = sel.value === '__other' ? '' : 'none'; };
+                },
+                preConfirm: () => {
+                    const sel = document.getElementById('ms-kind').value;
+                    const kind = sel === '__other' ? document.getElementById('ms-kind-other').value.trim() : sel;
+                    const amount = Number(document.getElementById('ms-amt').value) || 0;
+                    const note = document.getElementById('ms-note').value.trim();
+                    if (!kind) { Swal.showValidationMessage('請填類別'); return false; }
+                    if (amount <= 0) { Swal.showValidationMessage('請填金額'); return false; }
+                    return { kind: kind.replace(/[\[\]]/g, ''), amount, note };
+                }
+            });
+            if (!value) return;
+            Swal.fire({ title: '發放中...', background: '#26221e', color: 'white', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
+            try {
+                const r = await API.handleRestock({
+                    items: [{ type: 'salary', name: `[薪資][${value.kind}] 手動${value.note ? ' ' + value.note : ''}`, cost: value.amount, quantity: 1 }],
+                    person: User.name,
+                    orderId: 'SAL-MAN-' + Date.now(),
+                    vendorName: '薪資',
+                    entryDate: ymdTaipei(new Date())
+                });
+                if (r && r.status === 'error') {
+                    Swal.fire({ icon: 'error', title: '發放失敗', text: r.msg || '', background: '#26221e', color: 'white' });
+                    return;
+                }
+            } catch (e) {
+                Swal.fire({ icon: 'error', title: '發放失敗', text: (e && e.message) || '', background: '#26221e', color: 'white' });
+                return;
+            }
+            await fetchData();
+            if (UI.salaryTab === 'paid') loadSalaryPaidLedger();
+            else renderSalaryQueue();
+            Swal.fire({ icon: 'success', title: `已發放 ${value.kind} $${value.amount.toLocaleString()}`, toast: true, position: 'top', timer: 1800, showConfirmButton: false, background: '#26221e', color: 'white' });
         }
         async function loadSalaryPaidLedger() {
             const box = document.getElementById('salary-paid-list');
@@ -2631,6 +2808,7 @@
         function booksCategoryOf(it) {
             const t = it.type;
             if (t === 'shipping') return null; // 運費不計毛利
+            if (isConsignNoCountItem(it)) return null;
             if (t === 'phone' || t === 'peer_phone') return 'used';
             if (t === 'new_phone') return 'new';
             if (t === 'repair') return 'repair';
@@ -2791,6 +2969,26 @@
                 const catCost = emptyBooksProfit();
                 const newItemsForName = [];
                 normalized.forEach(it => {
+                    if (isConsignNoCountItem(it)) {
+                        const when = booksCountedWhen(it) || parseLedgerDate(g.time);
+                        const tag = parseConsignTag(it);
+                        const sale = Number(it.salePrice) || 0;
+                        expenseDetails.push({
+                            date: formatBooksYmd(when),
+                            ts: (when || new Date(0)).getTime(),
+                            orderId: g.orderId,
+                            kind: '備查',
+                            subject: '寄賣代售',
+                            name: `${g.customer || '過路客'}　${stripLedgerName(it.itemName || it.name || '')}（${tag.owner} ${sale}-${tag.base}=${sale - tag.base}）`,
+                            sale,
+                            cost: tag.base,
+                            amount: sale,
+                            memo: true,
+                            customer: g.customer || '',
+                            person: g.person || ''
+                        });
+                        return;
+                    }
                     const cat = booksCategoryOf(it);
                     if (!cat) return;
                     const sale = Number(it.salePrice) || 0;
@@ -3060,6 +3258,7 @@
                                     <option value="虧損">虧損</option>
                                     <option value="收購二手機">收購二手機（備查）</option>
                                     <option value="收購新機">收購新機（備查）</option>
+                                    <option value="寄賣代售">寄賣代售（備查）</option>
                                     <option value="額外維修成本">額外維修成本（備查）</option>
                                     <option value="維修料件">維修料件（備查）</option>
                                     <option value="配件進貨">配件進貨（備查）</option>
@@ -5185,6 +5384,7 @@
                     }
                     let safePrice = Number(item.price) || 0, safeCost = Number(item.cost) || 0, safeQty = Number(item.quantity) || 1;
                     if(item.type === 'phone') { let i = DB.inv.find(x => x.id === item.itemId); if(i) i.status_label = '已售出'; }
+                    if(item.type === 'new_phone' && String(item.itemId || '').startsWith('NS:')) DB.inv = DB.inv.filter(x => String(x.id) !== String(item.itemId));
                     return { 
                         itemName: (item.isPeerStockTransfer && item.inventoryName) ? item.inventoryName : finalName, 
                         name: item.isPeerStockTransfer ? finalName : (item.name || finalName),
