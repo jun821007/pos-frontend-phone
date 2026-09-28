@@ -5499,29 +5499,58 @@
             renderRestockGrid();
         }
         function createRsPill(t, v) { const d = document.createElement('div'); d.className = 'pill-btn rs-pill'; d.innerText = t; if(UI.rsCat === v) d.classList.add('active'); d.onclick = () => { UI.rsCat = v; document.querySelectorAll('.rs-pill').forEach(b=>b.classList.remove('active')); d.classList.add('active'); renderRestockGrid(); }; return d; }
-        function renderRestockGrid() { if(UI.rsMode === 'expense') return; const term = document.getElementById('rs-search').value.toLowerCase(); const grid = document.getElementById('rs-grid'); grid.innerHTML = ''; let list = DB.inv.filter(i => { if (i.type !== 'accessory') return false; if (term) return i.name.toLowerCase().includes(term); if (UI.rsCat === 'hidden_parts') return i.isHidden; if (UI.rsCat === 'all') return !i.isHidden; return i.category === UI.rsCat; }); if(list.length === 0) { grid.innerHTML = '<div class="col-span-full text-center text-slate-500 mt-4">無符合商品</div>'; return; } list.forEach(i => { let border = i.isHidden ? 'border-pink-500' : 'border-blue-500'; grid.innerHTML += `<div class="glass p-3 rounded-xl border-l-4 ${border} relative group active:scale-95 transition"><button onclick="event.stopPropagation(); editAccessory('${i.id}', '${i.name}', ${i.cost}, ${i.defaultPrice})" class="absolute top-2 right-2 text-slate-500 hover:text-white p-1"><i class="fa-solid fa-pen-to-square"></i></button><div onclick="addRsItem('${i.id}')" class="cursor-pointer"><div class="flex justify-between text-xs text-slate-500"><span>${i.category}</span><span>庫: ${i.stock}</span></div><div class="font-bold text-sm text-slate-200 line-clamp-2 my-1">${i.name}</div><div class="text-right text-xs text-slate-400">成本 $${i.cost}</div></div></div>`; }); }
+        function renderRestockGrid() { if(UI.rsMode === 'expense') return; const term = document.getElementById('rs-search').value.toLowerCase(); const grid = document.getElementById('rs-grid'); grid.innerHTML = ''; let list = DB.inv.filter(i => { if (i.type !== 'accessory') return false; if (term) return i.name.toLowerCase().includes(term); if (UI.rsCat === 'hidden_parts') return i.isHidden; if (UI.rsCat === 'all') return !i.isHidden; return i.category === UI.rsCat; }); if(list.length === 0) { grid.innerHTML = '<div class="col-span-full text-center text-slate-500 mt-4">無符合商品</div>'; return; } list.forEach(i => { let border = i.isHidden ? 'border-pink-500' : 'border-blue-500'; grid.innerHTML += `<div class="glass p-3 rounded-xl border-l-4 ${border} relative group active:scale-95 transition"><button onclick="event.stopPropagation(); editAccessory('${i.id}', '${i.name}', ${i.cost}, ${i.defaultPrice})" class="absolute top-2 right-2 text-slate-500 hover:text-white p-1"><i class="fa-solid fa-pen-to-square"></i></button><div onclick="addRsItem('${i.id}')" class="cursor-pointer"><div class="flex justify-between text-xs text-slate-500"><span>${i.category}</span><span>庫: ${i.stock}</span></div><div class="font-bold text-sm text-slate-200 line-clamp-2 my-1">${i.name}</div><div class="text-right text-xs text-slate-400">成本 $${i.cost}${i.pendingCost ? `<span class="text-amber-300">（${accPendingLabel(i)}）</span>` : ''}</div></div></div>`; }); }
         async function editAccessory(id, n, c, p) { const { value: v } = await Swal.fire({ title: '編輯商品', html: `<div class="text-xs text-slate-400 mb-2">${n}</div><label class="text-xs text-slate-500 block text-left">成本</label><input id="sw-edit-c" class="swal2-input" type="number" value="${c}"><label class="text-xs text-slate-500 block text-left mt-2">建議售價</label><input id="sw-edit-p" class="swal2-input" type="number" value="${p}">`, background: '#26221e', color: 'white', showCancelButton: true, preConfirm: () => [document.getElementById('sw-edit-c').value, document.getElementById('sw-edit-p').value] }); if (v) { let item = DB.inv.find(x => x.id == id); if(item) { item.cost = parseInt(v[0]); item.defaultPrice = parseInt(v[1]); } renderRestockGrid(); Swal.fire({title:'已更新（本機）', text:'重新整理後會恢復，完整儲存功能開發中', toast:true, position:'top', timer:2000, background:'#26221e'}); } }
+        function accPendingLabel(i) {
+            if (!i || !i.pendingCost) return '';
+            const left = Math.max(0, (Number(i.stock) || 0) - (Number(i.pendingThreshold) || 0));
+            return `再 ${left} 個換 $${i.pendingCost}`;
+        }
         async function addRsItem(id) {
             const i = DB.inv.find(x => x.id == id);
             if (!i) {
                 Swal.fire({ icon: 'error', title: '找不到商品', background: '#26221e', color: 'white' });
                 return;
             }
+            const oldCost = Number(i.cost) || 0;
+            const oldStock = Math.max(0, Number(i.stock) || 0);
+            const pendingNote = i.pendingCost ? `<div class="text-xs text-amber-300 mt-1">已排定：${accPendingLabel(i)}</div>` : '';
             const result = await Swal.fire({
                 title: i.name,
-                html: `<div style="display:flex;align-items:center;justify-content:center;gap:12px;margin-top:8px"><button type="button" onclick="var el=document.getElementById('sw-q');if(el)el.value=Math.max(1,parseInt(el.value||1)-1)" style="width:52px;height:52px;font-size:26px;border-radius:12px;background:#3d3731;color:white;border:none;cursor:pointer">-</button><input id="sw-q" type="number" value="1" min="1" style="width:72px;height:52px;font-size:22px;text-align:center;background:#26221e;color:white;border:2px solid #4a433c;border-radius:12px;outline:none"><button type="button" onclick="var el=document.getElementById('sw-q');if(el)el.value=parseInt(el.value||1)+1" style="width:52px;height:52px;font-size:26px;border-radius:12px;background:#3d3731;color:white;border:none;cursor:pointer">+</button></div>`,
+                html: `<div class="text-xs text-slate-400">目前成本 $${oldCost}　庫存 ${oldStock}</div>${pendingNote}<div style="display:flex;align-items:center;justify-content:center;gap:12px;margin-top:8px"><button type="button" onclick="var el=document.getElementById('sw-q');if(el)el.value=Math.max(1,parseInt(el.value||1)-1)" style="width:52px;height:52px;font-size:26px;border-radius:12px;background:#3d3731;color:white;border:none;cursor:pointer">-</button><input id="sw-q" type="number" value="1" min="1" style="width:72px;height:52px;font-size:22px;text-align:center;background:#26221e;color:white;border:2px solid #4a433c;border-radius:12px;outline:none"><button type="button" onclick="var el=document.getElementById('sw-q');if(el)el.value=parseInt(el.value||1)+1" style="width:52px;height:52px;font-size:26px;border-radius:12px;background:#3d3731;color:white;border:none;cursor:pointer">+</button></div>
+                    <label class="text-xs text-slate-500 block text-left mt-3 px-2">這次進價（單價）</label><input id="sw-rc" type="number" class="swal2-input" style="margin-top:4px" value="${oldCost}">
+                    <div id="sw-rc-mode" class="text-left text-sm px-2 mt-2" style="display:none"></div>`,
                 background: '#26221e',
                 color: 'white',
                 showCancelButton: true,
                 confirmButtonText: '加入',
+                didOpen: () => {
+                    const costEl = document.getElementById('sw-rc');
+                    const box = document.getElementById('sw-rc-mode');
+                    const update = () => {
+                        const nc = Number(costEl.value) || 0;
+                        if (!nc || nc === oldCost) { box.style.display = 'none'; box.innerHTML = ''; return; }
+                        box.style.display = '';
+                        const opts = oldStock > 0
+                            ? `<label class="block"><input type="radio" name="rc-mode" value="fifo" checked> 舊貨賣完再換（還剩 ${oldStock} 個用 $${oldCost}）</label>
+                               <label class="block"><input type="radio" name="rc-mode" value="now"> 現在就換成 $${nc}</label>`
+                            : `<label class="block"><input type="radio" name="rc-mode" value="now" checked> 成本換成 $${nc}（舊貨已賣完）</label>`;
+                        box.innerHTML = `<div class="text-xs text-slate-400 mb-1">成本 $${oldCost} → $${nc}</div>${opts}<label class="block"><input type="radio" name="rc-mode" value="keep"> 不換，維持 $${oldCost}</label>`;
+                    };
+                    costEl.addEventListener('input', update);
+                },
                 preConfirm: () => {
                     const el = document.getElementById('sw-q');
-                    return Math.max(1, parseInt(el && el.value, 10) || 1);
+                    const q = Math.max(1, parseInt(el && el.value, 10) || 1);
+                    const nc = Number(document.getElementById('sw-rc').value) || 0;
+                    if (nc <= 0) { Swal.showValidationMessage('請填進價'); return false; }
+                    const picked = document.querySelector('input[name="rc-mode"]:checked');
+                    return { q, cost: nc, mode: nc === oldCost ? '' : (picked ? picked.value : 'keep') };
                 }
             });
-            if (!result.isConfirmed) return;
-            const q = Math.max(1, parseInt(result.value, 10) || 1);
-            RestockCart.push({ type: 'restock', name: i.name, category: i.category, cost: Number(i.cost) || 0, quantity: q });
+            if (!result.isConfirmed || !result.value) return;
+            const { q, cost, mode } = result.value;
+            RestockCart.push({ type: 'restock', name: i.name, category: i.category, cost, quantity: q, costMode: mode || undefined, oldCost });
             renderRestockCartList();
         }
         async function addExpItem(type) { const { value } = await Swal.fire({ title: type, html: `<input id="ex-n" class="swal2-input" placeholder="備註 (如: 便當/抽成)"><input id="ex-a" type="number" class="swal2-input" placeholder="金額">`, background:'#26221e', color:'white', preConfirm:()=>[document.getElementById('ex-n').value, document.getElementById('ex-a').value] }); if(value && value[1]) { RestockCart.push({type: type==='薪資/抽成'?'salary':'expense', name:`[${type}] ${value[0]}`, cost:parseInt(value[1]), quantity:1}); renderRestockCartList(); } }
@@ -5533,7 +5562,8 @@
             RestockCart.forEach((i, idx) => {
                 t += (Number(i.cost) || 0) * (Number(i.quantity) || 0);
                 c += 1;
-                d.innerHTML += `<div class="flex justify-between text-sm bg-slate-900 p-2 rounded mb-1"><span>${i.name} <span class="text-yellow-500">x${i.quantity}</span></span><div class="flex gap-2 items-center"><span class="text-red-400">$${i.cost*i.quantity}</span><i onclick="RestockCart.splice(${idx},1);renderRestockCartList()" class="fa-solid fa-trash text-slate-500 cursor-pointer"></i></div></div>`;
+                const modeTxt = i.costMode === 'fifo' ? `舊貨賣完換 $${i.cost}` : i.costMode === 'now' ? `成本換 $${i.cost}` : i.costMode === 'keep' ? `不換成本（進價 $${i.cost}）` : '';
+                d.innerHTML += `<div class="flex justify-between text-sm bg-slate-900 p-2 rounded mb-1"><span>${i.name} <span class="text-yellow-500">x${i.quantity}</span>${modeTxt ? `<div class="text-[11px] text-amber-300">${modeTxt}</div>` : ''}</span><div class="flex gap-2 items-center"><span class="text-red-400">$${i.cost*i.quantity}</span><i onclick="RestockCart.splice(${idx},1);renderRestockCartList()" class="fa-solid fa-trash text-slate-500 cursor-pointer"></i></div></div>`;
             });
             const totalEl = document.getElementById('rs-cart-total');
             const mobTotal = document.getElementById('rs-mob-total');
