@@ -2656,16 +2656,17 @@
             if (t === 'extra_repair' || /額外維修成本/.test(name)) return '額外維修成本';
             if (t === 'company_misc' || /\[公司雜支\]/.test(name)) return '公司雜支';
             if (t === 'ship_exp' || /\[運費支出\]/.test(name)) return '運費';
+            if (t === 'pay_fee' || /\[金流手續費\]/.test(name)) return '金流手續費';
             if (t === 'company_food' || t === 'expense' || /公司吃喝|營運雜支/.test(name)) return '公司吃喝';
             return '其他支出';
         }
         function isBooksManualExpense(i) {
-            return ['expense', 'company_food', 'company_misc', 'ship_exp', 'net_card', 'extra_repair', 'salary', 'profit_share', 'loss', 'buy_used', 'buy_new', 'repair_parts', 'transfer_acc', 'restock'].includes(i.type);
+            return ['expense', 'company_food', 'company_misc', 'ship_exp', 'pay_fee', 'net_card', 'extra_repair', 'salary', 'profit_share', 'loss', 'buy_used', 'buy_new', 'repair_parts', 'transfer_acc', 'restock'].includes(i.type);
         }
         function isBooksOutflowType(i) {
             return isBooksManualExpense(i) || i.type === 'inventory';
         }
-        const BOOKS_EXPENSE_KEYS = ['調貨配件', '公司吃喝', '公司雜支', '運費', '薪資', '分潤支出', '虧損', '其他支出'];
+        const BOOKS_EXPENSE_KEYS = ['調貨配件', '公司吃喝', '公司雜支', '運費', '金流手續費', '薪資', '分潤支出', '虧損', '其他支出'];
         const BOOKS_MEMO_KEYS = ['維修料件', '收購二手機', '收購新機', '額外維修成本', '配件進貨', '網卡'];
         const BOOKS_MEMO_DEDUCT_KEYS = ['收購二手機', '收購新機', '額外維修成本', '配件進貨', '網卡']; // 如扣備查：付機／料錢／進貨／網卡
         function isBooksMemoSubject(subj) {
@@ -2735,7 +2736,7 @@
         }
         function buildBooksReport(rows, rangeStart, rangeEnd, periodLabel) {
             const profit = emptyBooksProfit();
-            const expense = { '維修料件': 0, '額外維修成本': 0, '調貨配件': 0, '收購二手機': 0, '收購新機': 0, '配件進貨': 0, '網卡': 0, '公司吃喝': 0, '公司雜支': 0, '運費': 0, '薪資': 0, '分潤支出': 0, '虧損': 0, '其他支出': 0 };
+            const expense = { '維修料件': 0, '額外維修成本': 0, '調貨配件': 0, '收購二手機': 0, '收購新機': 0, '配件進貨': 0, '網卡': 0, '公司吃喝': 0, '公司雜支': 0, '運費': 0, '金流手續費': 0, '薪資': 0, '分潤支出': 0, '虧損': 0, '其他支出': 0 };
             const incomeDetails = [];
             const expenseDetails = [];
             let pendingPot = 0;
@@ -3055,6 +3056,7 @@
                                     <option value="公司吃喝">公司吃喝</option>
                                     <option value="公司雜支">公司雜支</option>
                                     <option value="運費">運費</option>
+                                    <option value="金流手續費">金流手續費</option>
                                     <option value="虧損">虧損</option>
                                     <option value="收購二手機">收購二手機（備查）</option>
                                     <option value="收購新機">收購新機（備查）</option>
@@ -3960,7 +3962,8 @@
                     orderId: String(g.orderId),
                     total: Number(g.total) || 0,
                     net: Number(g.net) || 0,
-                    customer: (g.customer || '過路客').trim() || '過路客'
+                    customer: (g.customer || '過路客').trim() || '過路客',
+                    payMethod: String(g.payMethod || '')
                 };
             });
             UI.selectedPendingOrders.forEach(id => {
@@ -4273,24 +4276,42 @@
                 const m = UI.pendingOrderMeta[id] || {};
                 return `${m.customer || '過路客'} · ${id} · $${(Number(m.total) || 0).toLocaleString()}`;
             }).join('<br>');
+            const lineIds = ids.filter(id => (UI.pendingOrderMeta[id] || {}).payMethod === 'linepay' && !findPayFeeRow(id));
+            const feeHtml = lineIds.length
+                ? `<div class="text-xs text-slate-400 text-left mt-3">LINE Pay 單：填各筆實際撥款金額，差額自動記「金流手續費」。</div>` +
+                    lineIds.map(id => { const m = UI.pendingOrderMeta[id] || {}; return payFeeInputHtml(id, m.total, m.customer || '過路客'); }).join('')
+                : '';
             const r = await Swal.fire({
                 title: '確認批次入帳',
-                html: `<div class="text-left text-sm text-slate-200"><div class="mb-2">共 <b>${ids.length}</b> 筆，合計 <b class="text-yellow-400">$${total.toLocaleString()}</b></div><div class="text-xs text-slate-400 max-h-40 overflow-y-auto leading-5">${lines}</div></div>`,
+                html: `<div class="text-left text-sm text-slate-200"><div class="mb-2">共 <b>${ids.length}</b> 筆，合計 <b class="text-yellow-400">$${total.toLocaleString()}</b></div><div class="text-xs text-slate-400 max-h-40 overflow-y-auto leading-5">${lines}</div></div>${feeHtml}`,
                 icon: 'question',
                 showCancelButton: true,
                 confirmButtonText: '確認入帳',
                 cancelButtonText: '取消',
                 background: '#26221e',
-                color: 'white'
+                color: 'white',
+                preConfirm: () => {
+                    if (!lineIds.length) return { fees: {} };
+                    const res = readPayFeeInputs();
+                    if (res.err) { Swal.showValidationMessage(res.err); return false; }
+                    return res;
+                }
             });
             if (!r.isConfirmed) return;
+            const fees = (r.value && r.value.fees) || {};
             Swal.fire({ title: '入帳處理中...', allowOutsideClick: false, didOpen: () => { Swal.showLoading(); } });
             const ok = [], fail = [];
             for (const oid of ids) {
                 try {
                     const res = await API.handleTransaction({ action: 'settle', orderId: oid });
-                    if (res && res.status === 'error') fail.push({ oid, msg: res.msg || '未知錯誤' });
-                    else ok.push(oid);
+                    if (res && res.status === 'error') { fail.push({ oid, msg: res.msg || '未知錯誤' }); continue; }
+                    ok.push(oid);
+                    const fee = fees[oid] || 0;
+                    if (fee > 0) {
+                        const m = UI.pendingOrderMeta[oid] || {};
+                        const feeOk = await recordPayFee(oid, m.customer || '', fee);
+                        if (!feeOk) fail.push({ oid, msg: '已入帳，但手續費未記成功（請到記帳手動補）' });
+                    }
                 } catch (e) {
                     fail.push({ oid, msg: e.message || '請重試' });
                 }
@@ -4429,23 +4450,91 @@
             }
         }
 
+        function pendingOrderInfo(oid) {
+            const id = String(oid);
+            const meta = UI.pendingOrderMeta[id];
+            if (meta && meta.payMethod) return meta;
+            const rows = (DB.pending || []).concat(DB.sales || []).concat(DB.history || []);
+            const hit = rows.find(r => String(r.orderId) === id);
+            return {
+                orderId: id,
+                total: meta ? meta.total : 0,
+                customer: (meta && meta.customer) || (hit && hit.customer) || '過路客',
+                payMethod: (hit && hit.payMethod) || (meta && meta.payMethod) || ''
+            };
+        }
+        function findPayFeeRow(oid) {
+            const marker = '[金流手續費] ' + String(oid);
+            const rows = (DB.sales || []).concat(DB.history || []).concat(DB.pending || []);
+            return rows.find(r => r.type === 'pay_fee' && r.status !== 'Deleted' && r.status !== 'Returned' && String(r.itemName || r.name || '').includes(marker)) || null;
+        }
+        async function recordPayFee(oid, customer, fee) {
+            const amt = Math.round(Number(fee) || 0);
+            if (amt <= 0) return true;
+            if (findPayFeeRow(oid)) return true;
+            const name = `[金流手續費] ${oid} ${customer || ''}`.trim();
+            const r = await API.handleRestock({
+                items: [{ type: 'pay_fee', name, cost: amt, quantity: 1 }],
+                person: User.name,
+                orderId: 'FEE-' + oid,
+                vendorName: 'LINE Pay',
+                entryDate: ymdTaipei(new Date())
+            });
+            return !(r && r.status === 'error');
+        }
+        function payFeeInputHtml(oid, total, customer) {
+            const safeId = String(oid).replace(/[^A-Za-z0-9_-]/g, '');
+            return `<div class="text-left mt-2 p-2 rounded-lg border border-slate-700">
+                <div class="text-xs text-slate-400">${booksEscape(customer)} · ${booksEscape(oid)} · 售價 $${(Number(total) || 0).toLocaleString()}</div>
+                <input id="fee-recv-${safeId}" data-oid="${booksEscape(oid)}" data-total="${Number(total) || 0}" type="number" inputmode="numeric" class="swal2-input fee-recv-input" style="margin:6px 0 0;width:100%" placeholder="LINE Pay 實收金額" value="${Number(total) || 0}">
+            </div>`;
+        }
+        function readPayFeeInputs() {
+            const out = {};
+            let err = '';
+            document.querySelectorAll('.fee-recv-input').forEach(el => {
+                const oid = el.getAttribute('data-oid');
+                const total = Number(el.getAttribute('data-total')) || 0;
+                const recv = parseInt(el.value, 10);
+                if (isNaN(recv) || recv < 0) { err = '請填實收金額'; return; }
+                if (recv > total) { err = `${oid} 實收不能大於售價`; return; }
+                out[oid] = total - recv;
+            });
+            return { fees: out, err };
+        }
         async function settle(oid, amt) {
+            const info = pendingOrderInfo(oid);
+            const isLinePay = info.payMethod === 'linepay';
+            const feeExisting = isLinePay ? findPayFeeRow(oid) : null;
+            const askFee = isLinePay && !feeExisting;
             const r = await Swal.fire({
                 title:'確認入帳',
-                text:`此筆訂單將整筆入帳：$${(Number(amt)||0).toLocaleString()}`,
+                html: `<div class="text-sm text-slate-200">此筆訂單將整筆入帳：$${(Number(amt)||0).toLocaleString()}</div>` +
+                    (askFee ? `<div class="text-xs text-slate-400 text-left mt-3">LINE Pay：填實際撥款金額，差額自動記「金流手續費」支出。</div>${payFeeInputHtml(oid, amt, info.customer)}` : '') +
+                    (feeExisting ? `<div class="text-xs text-slate-400 mt-2">此單已記過手續費 $${(Number(feeExisting.cost) || 0).toLocaleString()}，不重複記。</div>` : ''),
                 icon:'question',
                 showCancelButton:true,
                 confirmButtonText:'確認入帳',
                 cancelButtonText:'取消',
                 background:'#26221e',
-                color:'white'
+                color:'white',
+                preConfirm: () => {
+                    if (!askFee) return { fees: {} };
+                    const res = readPayFeeInputs();
+                    if (res.err) { Swal.showValidationMessage(res.err); return false; }
+                    return res;
+                }
             });
             if(!r.isConfirmed) return;
+            const fee = (r.value && r.value.fees && r.value.fees[String(oid)]) || 0;
             try {
                 await API.handleTransaction({action:'settle', orderId:oid});
+                let feeOk = true;
+                if (fee > 0) feeOk = await recordPayFee(oid, info.customer, fee);
                 loadPending(); 
                 fetchData(); 
-                Swal.fire({icon:'success', title:'已入帳', timer:1000, background:'#26221e'});
+                if (!feeOk) Swal.fire({icon:'warning', title:'已入帳，但手續費未記成功', text:'請到記帳手動補「金流手續費」', background:'#26221e', color:'white'});
+                else Swal.fire({icon:'success', title: fee > 0 ? `已入帳（手續費 $${fee.toLocaleString()}）` : '已入帳', timer:1200, background:'#26221e'});
             } catch(e) {
                 console.error('入帳失敗:', e);
                 Swal.fire({icon:'error', title:'入帳失敗', text: e.message || '請重試', background:'#26221e'});
