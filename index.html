@@ -410,6 +410,7 @@
                     <div class="books-toolbar-actions">
                         <button type="button" onclick="openFundFlow()" class="px-3 py-2 rounded-lg bg-slate-800 border border-slate-500 text-slate-100 text-sm font-bold">資金流水</button>
                         <button type="button" onclick="exportBooksCsv()" class="px-3 py-2 rounded-lg bg-slate-800 border border-slate-600 text-slate-200 text-sm">CSV</button>
+                        <button type="button" onclick="runStockAudit()" class="px-3 py-2 rounded-lg bg-slate-800 border border-amber-800 text-amber-300 text-sm" title="檢查配件庫存扣除是否異常">庫存健檢</button>
                         <button type="button" onclick="runLedgerBackfill()" class="px-3 py-2 rounded-lg bg-slate-800 border border-emerald-800 text-emerald-300 text-sm" title="把每日流水全部同步到 Supabase">Supabase 同步</button>
                     </div>
                 </div>
@@ -692,6 +693,10 @@
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify(data)
             });
+            return await res.json();
+          },
+          stockAudit: async (days) => {
+            const res = await fetch(`${API_BASE_URL}/admin/stock-audit?days=${encodeURIComponent(days || 90)}`);
             return await res.json();
           },
           ledgerBackfill: async () => {
@@ -2320,6 +2325,56 @@
             } else if (row.orderId) orderId = String(row.orderId);
             const customer = String(row.customer || '').replace(/^薪資$/, '').trim();
             return { kindLabel, orderId, customer, name };
+        }
+        function stockAuditText(r) {
+            const L = [];
+            const c = r.counts || {};
+            L.push(`【庫存健檢】近 ${r.days} 天　品項 ${c.items}　流水 ${c.logs}`);
+            L.push('');
+            L.push(`一、結帳有賣但沒扣庫存：${c.missingDeductions} 張單`);
+            (r.missingDeductions || []).forEach(x => L.push(`  ${x.date} ${x.orderId} ${x.customer}　應扣 ${x.qty} 實扣 ${x.logged}　${x.items.join('、')}`));
+            L.push('');
+            L.push(`二、出庫品名對不到庫存品項（沒扣到任何東西）：${c.orphans} 種`);
+            (r.orphans || []).forEach(x => L.push(`  「${x.name}」出庫 ${x.outQty}／入庫 ${x.inQty}（${x.count} 筆）例：${x.sample}`));
+            L.push('');
+            L.push(`三、試算表庫存 H 與精確重算不同：${c.formulaMismatch} 項`);
+            (r.formulaMismatch || []).forEach(x => L.push(`  第${x.row}列 ${x.category}／${x.name}　試算表 ${x.sheet}　重算 ${x.exact}　差 ${x.diff > 0 ? '+' : ''}${x.diff}`));
+            L.push('');
+            L.push(`四、品名會讓公式出錯：${c.nameRisks} 項`);
+            (r.nameRisks || []).forEach(x => L.push(`  第${x.row}列「${x.name}」${x.risks.join('、')}`));
+            L.push('');
+            L.push(`五、同名撞在一起：${c.collisions} 組`);
+            (r.collisions || []).forEach(x => L.push(`  ${x.kind}：${x.name}${x.categories.length ? '（' + x.categories.join('、') + '）' : ''}`));
+            L.push('');
+            L.push(`六、流水分類寫錯（影響 Supabase）：${c.categoryMismatch} 項`);
+            (r.categoryMismatch || []).slice(0, 30).forEach(x => L.push(`  ${x.name}（應為 ${x.categories.join('、')}）錯 ${x.wrongLogs} 筆`));
+            return L.join('\n');
+        }
+        async function runStockAudit() {
+            if (!(User && User.isAdmin)) {
+                Swal.fire({ icon: 'error', title: '僅管理員可執行', background: '#26221e', color: 'white' });
+                return;
+            }
+            Swal.fire({ title: '健檢中...', background: '#26221e', color: 'white', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
+            let r;
+            try {
+                r = await API.stockAudit(90);
+                if (!r || r.status !== 'success') throw new Error((r && (r.msg || r.message)) || '健檢失敗');
+            } catch (e) {
+                Swal.fire({ icon: 'error', title: '健檢失敗', text: (e && e.message) || '', background: '#26221e', color: 'white' });
+                return;
+            }
+            const text = stockAuditText(r);
+            const res = await Swal.fire({
+                title: '庫存健檢結果',
+                html: `<pre class="text-left text-[11px] leading-5 text-slate-200 whitespace-pre-wrap max-h-[60vh] overflow-y-auto">${booksEscape(text)}</pre>`,
+                width: 760, background: '#26221e', color: 'white',
+                showCancelButton: true, confirmButtonText: '複製全部', cancelButtonText: '關閉'
+            });
+            if (res.isConfirmed) {
+                const ok = await copyTextToClipboard(text);
+                Swal.fire({ icon: ok ? 'success' : 'error', title: ok ? '已複製' : '複製失敗', toast: true, position: 'top', timer: 1500, showConfirmButton: false, background: '#26221e', color: 'white' });
+            }
         }
         async function runLedgerBackfill() {
             if (!(User && User.isAdmin)) {
@@ -5446,6 +5501,9 @@
                     if (result.status === 'error') { 
                         Swal.fire({icon:'error', title:'結帳失敗', text: result.msg || '請截圖通知管理員', background: '#26221e'}); 
                         return; 
+                    }
+                    if (result.stockLogFailed) {
+                        await Swal.fire({ icon: 'warning', title: '已結帳，但庫存沒扣到', html: `<div class="text-left text-sm">單號 ${booksEscape(result.orderId || oid)}<br>請到庫存管理手動出庫：<br>${(result.stockLogItems || []).map(booksEscape).join('<br>')}</div>`, background: '#26221e', color: 'white' });
                     }
                     Cart = [];
                     if (peerMarkChecked) savePeerMark(oid);
