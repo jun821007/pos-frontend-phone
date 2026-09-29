@@ -703,6 +703,10 @@
             const res = await fetch(`${API_BASE_URL}/admin/log-category-fix`, apply ? { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' } : undefined);
             return await res.json();
           },
+          inventoryBackfill: async () => {
+            const res = await fetch(`${API_BASE_URL}/admin/inventory-backfill`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' });
+            return await res.json();
+          },
           ledgerBackfill: async () => {
             const res = await fetch(`${API_BASE_URL}/admin/ledger-backfill`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' });
             return await res.json();
@@ -2423,8 +2427,8 @@
                 return;
             }
             const ok = await Swal.fire({
-                title: '同步每日流水到 Supabase？',
-                text: '以試算表為準全部重新同步，可重複執行，不會改動試算表。資料多時需要一兩分鐘。',
+                title: '同步到 Supabase？',
+                text: '每日流水、配件品項、進出庫流水都以試算表為準重新同步，可重複執行，不會改動試算表。資料多時需要一兩分鐘。',
                 showCancelButton: true, confirmButtonText: '開始', cancelButtonText: '取消',
                 background: '#26221e', color: 'white'
             });
@@ -2432,8 +2436,20 @@
             Swal.fire({ title: '同步中...', background: '#26221e', color: 'white', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
             try {
                 const r = await API.ledgerBackfill();
-                if (!r || r.status !== 'success') throw new Error((r && (r.msg || r.message)) || '同步失敗');
-                Swal.fire({ icon: 'success', title: '同步完成', text: `寫入 ${r.upserted} 筆，清除 ${r.removed} 筆多餘資料`, background: '#26221e', color: 'white' });
+                if (!r || r.status !== 'success') throw new Error((r && (r.msg || r.message)) || '每日流水同步失敗');
+                const inv = await API.inventoryBackfill();
+                if (!inv || inv.status !== 'success') throw new Error('每日流水已同步；配件庫存同步失敗：' + ((inv && (inv.msg || inv.message)) || ''));
+                const L = [
+                    `每日流水：寫入 ${r.upserted} 筆，清除 ${r.removed} 筆多餘資料`,
+                    `配件品項 ${inv.items} 項、進出庫流水 ${inv.logs} 筆（清除 ${inv.removedLogs} 筆流水、${inv.removedItems} 項品項）`,
+                    inv.mismatches ? `⚠ 庫存數與試算表不同：${inv.mismatches} 項` : '✅ 每個配件的庫存數都與試算表一致'
+                ];
+                (inv.mismatchSample || []).forEach(x => L.push(`  ${x.category}／${x.name}：試算表 ${x.sheet}，Supabase ${x.supabase == null ? '無' : x.supabase}`));
+                Swal.fire({
+                    icon: inv.mismatches ? 'warning' : 'success', title: '同步完成', width: 700,
+                    html: `<pre class="text-left text-[12px] leading-5 text-slate-200 whitespace-pre-wrap max-h-[55vh] overflow-y-auto">${booksEscape(L.join('\n'))}</pre>`,
+                    background: '#26221e', color: 'white'
+                });
             } catch (e) {
                 Swal.fire({ icon: 'error', title: '同步失敗', text: (e && e.message) || '', background: '#26221e', color: 'white' });
             }
