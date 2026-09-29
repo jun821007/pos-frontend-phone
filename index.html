@@ -699,6 +699,10 @@
             const res = await fetch(`${API_BASE_URL}/admin/stock-audit?days=${encodeURIComponent(days || 90)}`);
             return await res.json();
           },
+          logCategoryFix: async (apply) => {
+            const res = await fetch(`${API_BASE_URL}/admin/log-category-fix`, apply ? { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' } : undefined);
+            return await res.json();
+          },
           ledgerBackfill: async () => {
             const res = await fetch(`${API_BASE_URL}/admin/ledger-backfill`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' });
             return await res.json();
@@ -2369,11 +2373,48 @@
                 title: '庫存健檢結果',
                 html: `<pre class="text-left text-[11px] leading-5 text-slate-200 whitespace-pre-wrap max-h-[60vh] overflow-y-auto">${booksEscape(text)}</pre>`,
                 width: 760, background: '#26221e', color: 'white',
-                showCancelButton: true, confirmButtonText: '複製全部', cancelButtonText: '關閉'
+                showCancelButton: true, confirmButtonText: '複製全部', cancelButtonText: '關閉',
+                showDenyButton: !!(r.counts && r.counts.categoryMismatch), denyButtonText: '修正流水分類'
             });
             if (res.isConfirmed) {
                 const ok = await copyTextToClipboard(text);
                 Swal.fire({ icon: ok ? 'success' : 'error', title: ok ? '已複製' : '複製失敗', toast: true, position: 'top', timer: 1500, showConfirmButton: false, background: '#26221e', color: 'white' });
+            } else if (res.isDenied) {
+                await runLogCategoryFix();
+            }
+        }
+        async function runLogCategoryFix() {
+            Swal.fire({ title: '計算中...', background: '#26221e', color: 'white', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
+            let p;
+            try {
+                p = await API.logCategoryFix(false);
+                if (!p || p.status !== 'success') throw new Error((p && (p.msg || p.message)) || '預覽失敗');
+            } catch (e) {
+                Swal.fire({ icon: 'error', title: '預覽失敗', text: (e && e.message) || '', background: '#26221e', color: 'white' });
+                return;
+            }
+            if (!p.total) {
+                Swal.fire({ icon: 'success', title: '流水分類都正確', background: '#26221e', color: 'white' });
+                return;
+            }
+            const lines = [`共 ${p.total} 筆流水要改分類（只改分類，品名、數量不動，試算表庫存不會變）`, ''];
+            (p.summary || []).forEach(x => lines.push(`${x.name}：${x.from || '(空白)'} → ${x.to}　${x.count} 筆`));
+            const ok = await Swal.fire({
+                title: '修正流水分類？',
+                html: `<pre class="text-left text-[11px] leading-5 text-slate-200 whitespace-pre-wrap max-h-[55vh] overflow-y-auto">${booksEscape(lines.join('\n'))}</pre>`,
+                width: 760, background: '#26221e', color: 'white',
+                showCancelButton: true, confirmButtonText: '確認修正', cancelButtonText: '取消'
+            });
+            if (!ok.isConfirmed) return;
+            Swal.fire({ title: '修正中...', background: '#26221e', color: 'white', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
+            try {
+                const r = await API.logCategoryFix(true);
+                if (!r || r.status !== 'success') throw new Error((r && (r.msg || r.message)) || '修正失敗');
+                const sb = r.supabase || {};
+                const sbText = sb.enabled ? `Supabase 更新 ${sb.updated} 筆${(sb.errors && sb.errors.length) ? `，錯誤：${sb.errors[0]}` : ''}` : 'Supabase 未啟用';
+                Swal.fire({ icon: 'success', title: '修正完成', text: `試算表改了 ${r.total} 筆（原分類備份在「流水分類修正備份」工作表）；${sbText}`, background: '#26221e', color: 'white' });
+            } catch (e) {
+                Swal.fire({ icon: 'error', title: '修正失敗', text: (e && e.message) || '', background: '#26221e', color: 'white' });
             }
         }
         async function runLedgerBackfill() {
