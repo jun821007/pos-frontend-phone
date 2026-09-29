@@ -703,6 +703,14 @@
             const res = await fetch(`${API_BASE_URL}/admin/log-category-fix`, apply ? { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' } : undefined);
             return await res.json();
           },
+          addPeerRepairRecord: async (data) => {
+            const res = await fetch(`${API_BASE_URL}/repair-record/peer`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
+            return await res.json();
+          },
+          repairBackfill: async () => {
+            const res = await fetch(`${API_BASE_URL}/admin/repair-backfill`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' });
+            return await res.json();
+          },
           inventoryBackfill: async () => {
             const res = await fetch(`${API_BASE_URL}/admin/inventory-backfill`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' });
             return await res.json();
@@ -2446,7 +2454,7 @@
             }
             const ok = await Swal.fire({
                 title: '同步到 Supabase？',
-                text: '每日流水、配件品項、進出庫流水都以試算表為準重新同步，可重複執行，不會改動試算表。資料多時需要一兩分鐘。',
+                text: '每日流水、配件品項、進出庫流水、維修紀錄都以試算表為準重新同步，可重複執行，不會改動試算表。資料多時需要一兩分鐘。',
                 showCancelButton: true, confirmButtonText: '開始', cancelButtonText: '取消',
                 background: '#26221e', color: 'white'
             });
@@ -2457,14 +2465,19 @@
                 if (!r || r.status !== 'success') throw new Error((r && (r.msg || r.message)) || '每日流水同步失敗');
                 const inv = await API.inventoryBackfill();
                 if (!inv || inv.status !== 'success') throw new Error('每日流水已同步；配件庫存同步失敗：' + ((inv && (inv.msg || inv.message)) || ''));
+                let rep;
+                try { rep = await API.repairBackfill(); } catch (e) { rep = { status: 'error', msg: e.message }; }
                 const L = [
                     `每日流水：寫入 ${r.upserted} 筆，清除 ${r.removed} 筆多餘資料`,
                     `配件品項 ${inv.items} 項、進出庫流水 ${inv.logs} 筆（清除 ${inv.removedLogs} 筆流水、${inv.removedItems} 項品項）`,
+                    rep && rep.status === 'success'
+                        ? `維修紀錄 ${rep.records} 筆（同事維修 ${rep.peer} 筆，清除 ${rep.removed} 筆）`
+                        : `⚠ 維修紀錄同步失敗：${(rep && rep.msg) || ''}（請確認已執行 supabase_pos_repair_v4.sql）`,
                     inv.mismatches ? `⚠ 庫存數與試算表不同：${inv.mismatches} 項` : '✅ 每個配件的庫存數都與試算表一致'
                 ];
                 (inv.mismatchSample || []).forEach(x => L.push(`  ${x.category}／${x.name}：試算表 ${x.sheet}，Supabase ${x.supabase == null ? '無' : x.supabase}`));
                 Swal.fire({
-                    icon: inv.mismatches ? 'warning' : 'success', title: '同步完成', width: 700,
+                    icon: (inv.mismatches || !(rep && rep.status === 'success')) ? 'warning' : 'success', title: '同步完成', width: 700,
                     html: `<pre class="text-left text-[12px] leading-5 text-slate-200 whitespace-pre-wrap max-h-[55vh] overflow-y-auto">${booksEscape(L.join('\n'))}</pre>`,
                     background: '#26221e', color: 'white'
                 });
@@ -5286,6 +5299,7 @@
             setItemGridMode('grid');
             document.getElementById('item-grid').innerHTML = `
                 <div onclick="modalRepair()" class="glass p-6 rounded-xl border-l-4 border-yellow-500 flex flex-col items-center justify-center gap-2"><i class="fa-solid fa-screwdriver-wrench text-4xl text-yellow-500"></i><span class="font-bold">維修登記</span></div>
+                <div onclick="modalPeerRepair()" class="glass p-6 rounded-xl border-l-4 border-cyan-500 flex flex-col items-center justify-center gap-2"><i class="fa-solid fa-clipboard-list text-4xl text-cyan-400"></i><span class="font-bold">同事維修紀錄</span><span class="text-[11px] text-slate-400">只存紀錄，不算毛利</span></div>
                 <div onclick="modalWrap()" class="glass p-6 rounded-xl border-l-4 border-purple-500 flex flex-col items-center justify-center gap-2"><i class="fa-solid fa-wand-magic-sparkles text-4xl text-purple-500"></i><span class="font-bold">包膜服務</span></div>
                 <div onclick="modalNewPhone()" class="glass p-6 rounded-xl border-l-4 border-green-500 flex flex-col items-center justify-center gap-2"><i class="fa-solid fa-mobile-screen text-4xl text-green-500"></i><span class="font-bold">新機</span></div>
                 <div onclick="modalPeerTransfer()" class="glass p-6 rounded-xl border-l-4 border-blue-500 flex flex-col items-center justify-center gap-2"><i class="fa-solid fa-truck-fast text-4xl text-blue-500"></i><span class="font-bold">二手機</span></div>
@@ -6090,6 +6104,51 @@
             }
         }
 
+        async function modalPeerRepair() {
+            const lastPeer = localStorage.getItem('pos_last_repair_peer') || '';
+            const { value: v } = await Swal.fire({
+                title: '同事維修紀錄',
+                html: '<div class="text-xs text-cyan-300 mb-1">只寫入維修紀錄備查，不進流水、不算毛利</div>'
+                    + `<input id="pr0" class="swal2-input" placeholder="同事名字" value="${booksEscape(lastPeer)}">`
+                    + '<input id="r1" class="swal2-input" placeholder="型號"><input id="r2" class="swal2-input" placeholder="序號"><input id="r3" class="swal2-input" placeholder="故障原因／更換物品"><input id="r4" class="swal2-input" placeholder="客戶"><input id="r5" class="swal2-input" placeholder="電話" type="tel" inputmode="tel"><input id="r7" class="swal2-input" type="number" placeholder="維修報價（客人付的）">' + REPAIR_EXTRA_HTML,
+                background: '#26221e',
+                color: 'white',
+                didOpen: () => {
+                    const d = document.getElementById('r-deferred');
+                    if (d && d.closest('label')) d.closest('label').remove();
+                    initRepairPhotoPaste();
+                },
+                showLoaderOnConfirm: true,
+                preConfirm: async () => {
+                    const peerName = document.getElementById('pr0').value.trim();
+                    const modelName = document.getElementById('r1').value.trim();
+                    if (!peerName) { Swal.showValidationMessage('請填同事名字'); return false; }
+                    if (!modelName) { Swal.showValidationMessage('請填型號'); return false; }
+                    try {
+                        const photoUrls = await uploadAllRepairPhotos();
+                        const r = await API.addPeerRepairRecord({
+                            peerName,
+                            modelName,
+                            imei: document.getElementById('r2').value.trim(),
+                            reason: document.getElementById('r3').value.trim(),
+                            customer: document.getElementById('r4').value.trim(),
+                            customerPhone: normalizeTaiwanPhone(document.getElementById('r5').value),
+                            quote: Number(document.getElementById('r7').value) || 0,
+                            repairNotes: document.getElementById('r-notes').value.trim(),
+                            photoUrls
+                        });
+                        if (!r || r.status !== 'success') throw new Error((r && r.msg) || '寫入失敗');
+                        return peerName;
+                    } catch (err) {
+                        Swal.showValidationMessage(err.message || '寫入失敗');
+                        return false;
+                    }
+                }
+            });
+            if (!v) return;
+            localStorage.setItem('pos_last_repair_peer', v);
+            Swal.fire({ icon: 'success', title: '已存入維修紀錄', toast: true, position: 'top', timer: 1800, showConfirmButton: false, background: '#26221e', color: 'white' });
+        }
         async function modalWrap(){const {value:v}=await Swal.fire({html:'<input id="w1" class="swal2-input" placeholder="項目"><input id="w2" class="swal2-input" placeholder="售價">',background:'#26221e',preConfirm:()=>[document.getElementById('w1').value,document.getElementById('w2').value]}); if(v){Cart.push({type:'wrap',name:'包膜:'+v[0],cost:0,price:Number(v[1])||0,quantity:1,itemId:'W-'+Date.now()});renderCart();}}
         async function modalESIM(){const {value:v}=await Swal.fire({title:'eSIM',html:'<input id="es1" class="swal2-input" type="number" placeholder="成本"><input id="es2" class="swal2-input" type="number" placeholder="結帳金額">',background:'#26221e',color:'white',preConfirm:()=>[document.getElementById('es1').value,document.getElementById('es2').value]}); if(v&&v[1]){Cart.push({type:'esim',name:'eSIM',cost:Number(v[0])||0,price:Number(v[1])||0,quantity:1,itemId:'ESIM-'+Date.now()});renderCart();}}
         async function modalSoftware(){
