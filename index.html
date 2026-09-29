@@ -776,6 +776,14 @@
             const res = await fetch(`${API_BASE_URL}/pos-prefs`);
             return await res.json();
           },
+          getSalaryQueue: async () => {
+            const res = await fetch(`${API_BASE_URL}/salary-queue`);
+            return await res.json();
+          },
+          changeSalaryQueue: async (data) => {
+            const res = await fetch(`${API_BASE_URL}/salary-queue`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data || {}) });
+            return await res.json();
+          },
           savePosPrefs: async (data) => {
             const res = await fetch(`${API_BASE_URL}/pos-prefs`, {
               method: 'PUT',
@@ -2316,6 +2324,7 @@
             const monthEl = document.getElementById('salary-paid-month');
             if (monthEl && !monthEl.value) monthEl.value = ymdTaipei(new Date()).slice(0, 7);
             setSalaryTab(UI.salaryTab || 'unpaid');
+            syncSalaryQueueFromCloud();
         }
         function setSalaryTab(tab) {
             UI.salaryTab = tab === 'paid' ? 'paid' : 'unpaid';
@@ -2643,6 +2652,39 @@
         function salaryQueueRowId(orderId, kind) {
             return String(orderId) + '_' + String(kind);
         }
+        // 本機清單是快取；雲端（POS設定 salary_queue）才是各裝置共用的正本
+        function applyCloudSalaryQueue(list) {
+            const byId = new Map(loadSalaryQueue().map((r) => [salaryQueueRowId(r.orderId, r.kind), r]));
+            saveSalaryQueue((list || []).map((r) => ({ ...(byId.get(salaryQueueRowId(r.orderId, r.kind)) || {}), ...r })));
+        }
+        async function pushSalaryQueueChange(change) {
+            try {
+                const r = await API.changeSalaryQueue(change);
+                if (!r || r.status !== 'success') throw new Error((r && r.msg) || '雲端同步失敗');
+                applyCloudSalaryQueue(r.list);
+            } catch (e) {
+                Swal.fire({ icon: 'warning', title: '薪資清單雲端同步失敗', text: (e && e.message) || '', toast: true, position: 'top', timer: 2500, showConfirmButton: false, background: '#26221e', color: 'white' });
+            }
+            if (UI.salaryTab === 'unpaid' && !document.getElementById('view-salary')?.classList.contains('hidden')) renderSalaryQueue();
+        }
+        async function syncSalaryQueueFromCloud() {
+            try {
+                const r = await API.getSalaryQueue();
+                if (!r || r.status !== 'success') throw new Error((r && r.msg) || '讀取失敗');
+                const cloudIds = new Set((r.list || []).map((x) => salaryQueueRowId(x.orderId, x.kind)));
+                const migrated = localStorage.getItem('pos_salary_queue_cloud_v1') === '1';
+                const localOnly = migrated ? [] : loadSalaryQueue().filter((x) => !x.paid && !cloudIds.has(salaryQueueRowId(x.orderId, x.kind)));
+                applyCloudSalaryQueue(r.list);
+                localStorage.setItem('pos_salary_queue_cloud_v1', '1');
+                if (localOnly.length) {
+                    saveSalaryQueue(loadSalaryQueue().concat(localOnly));
+                    await pushSalaryQueueChange({ add: localOnly });
+                }
+            } catch (e) {
+                console.warn('salary queue cloud load failed:', e);
+            }
+            if (UI.salaryTab === 'unpaid') renderSalaryQueue();
+        }
         function salaryDetailText(g, kind) {
             const types = salaryTypesForKind(kind);
             const names = (g.items || [])
@@ -2705,13 +2747,16 @@
             }).join('');
         }
         function clearSalaryQueue() {
+            const ids = loadSalaryQueue().map((r) => salaryQueueRowId(r.orderId, r.kind));
             saveSalaryQueue([]);
             renderSalaryQueue();
+            if (ids.length) pushSalaryQueueChange({ remove: ids });
         }
         function removeSalaryQueueRow(rowId) {
             const list = loadSalaryQueue().filter((r) => salaryQueueRowId(r.orderId, r.kind) !== String(rowId));
             saveSalaryQueue(list);
             renderSalaryQueue();
+            pushSalaryQueueChange({ remove: [String(rowId)] });
         }
         async function copySalaryQueueRow(rowId) {
             const row = refreshSalaryQueueStatuses(loadSalaryQueue()).find((r) => salaryQueueRowId(r.orderId, r.kind) === String(rowId));
@@ -2767,21 +2812,24 @@
                 orderId: r.orderId,
                 customer: r.customer
             })));
-            const remain = refreshSalaryQueueStatuses(loadSalaryQueue()).filter((r) => !isSalaryAlreadyPaid(r.orderId, r.kind));
-            saveSalaryQueue(remain);
+            const all = refreshSalaryQueueStatuses(loadSalaryQueue());
+            const paidIds = all.filter((r) => isSalaryAlreadyPaid(r.orderId, r.kind)).map((r) => salaryQueueRowId(r.orderId, r.kind));
+            saveSalaryQueue(all.filter((r) => !isSalaryAlreadyPaid(r.orderId, r.kind)));
             renderSalaryQueue();
+            if (paidIds.length) pushSalaryQueueChange({ remove: paidIds });
         }
         function addSalaryQueueEntries(entries) {
             const list = loadSalaryQueue();
-            let added = 0;
+            const fresh = [];
             (entries || []).forEach((entry) => {
                 const id = salaryQueueRowId(entry.orderId, entry.kind);
                 if (list.some((r) => salaryQueueRowId(r.orderId, r.kind) === id)) return;
                 list.push(entry);
-                added += 1;
+                fresh.push(entry);
             });
             saveSalaryQueue(list);
-            return added;
+            if (fresh.length) pushSalaryQueueChange({ add: fresh });
+            return fresh.length;
         }
         async function openOrderSalaryPay(orderId) {
             try {
