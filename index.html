@@ -2495,7 +2495,7 @@
                     <input id="ms-amt" type="number" class="swal2-input" placeholder="金額">
                     <input id="ms-note" class="swal2-input" placeholder="備註（選填）">`,
                 background: '#26221e', color: 'white',
-                showCancelButton: true, confirmButtonText: '發放', cancelButtonText: '取消',
+                showCancelButton: true, confirmButtonText: '加入未發', cancelButtonText: '取消',
                 didOpen: () => {
                     const sel = document.getElementById('ms-kind');
                     const other = document.getElementById('ms-kind-other');
@@ -2512,27 +2512,23 @@
                 }
             });
             if (!value) return;
-            Swal.fire({ title: '發放中...', background: '#26221e', color: 'white', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
-            try {
-                const r = await API.handleRestock({
-                    items: [{ type: 'salary', name: `[薪資][${value.kind}] 手動${value.note ? ' ' + value.note : ''}`, cost: value.amount, quantity: 1 }],
-                    person: User.name,
-                    orderId: 'SAL-MAN-' + Date.now(),
-                    vendorName: '薪資',
-                    entryDate: ymdTaipei(new Date())
-                });
-                if (r && r.status === 'error') {
-                    Swal.fire({ icon: 'error', title: '發放失敗', text: r.msg || '', background: '#26221e', color: 'white' });
-                    return;
-                }
-            } catch (e) {
-                Swal.fire({ icon: 'error', title: '發放失敗', text: (e && e.message) || '', background: '#26221e', color: 'white' });
-                return;
-            }
-            await fetchData();
-            if (UI.salaryTab === 'paid') loadSalaryPaidLedger();
-            else renderSalaryQueue();
-            Swal.fire({ icon: 'success', title: `已發放 ${value.kind} $${value.amount.toLocaleString()}`, toast: true, position: 'top', timer: 1800, showConfirmButton: false, background: '#26221e', color: 'white' });
+            const meta = SALARY_KIND_META.find(m => m.label === value.kind);
+            const now = new Date();
+            addSalaryQueueEntries([{
+                orderId: 'MAN' + Date.now().toString().slice(-8),
+                customer: value.note || '手動',
+                kind: meta ? meta.key : 'type_' + value.kind,
+                label: value.kind,
+                amount: value.amount,
+                formula: '手動 $' + value.amount.toLocaleString(),
+                status: 'Completed',
+                time: now.toISOString(),
+                timeText: formatDate(now),
+                detail: '手動新增',
+                paid: false
+            }]);
+            setSalaryTab('unpaid');
+            Swal.fire({ icon: 'success', title: `已加入未發 ${value.kind} $${value.amount.toLocaleString()}`, toast: true, position: 'top', timer: 1800, showConfirmButton: false, background: '#26221e', color: 'white' });
         }
         async function loadSalaryPaidLedger() {
             const box = document.getElementById('salary-paid-list');
@@ -2635,13 +2631,14 @@
         const SALARY_QUEUE_KEY = 'pos_salary_queue_v1';
         function loadSalaryQueue() {
             try {
-                const raw = sessionStorage.getItem(SALARY_QUEUE_KEY);
+                const raw = localStorage.getItem(SALARY_QUEUE_KEY) || sessionStorage.getItem(SALARY_QUEUE_KEY);
                 const arr = raw ? JSON.parse(raw) : [];
                 return Array.isArray(arr) ? arr : [];
             } catch (e) { return []; }
         }
         function saveSalaryQueue(list) {
-            sessionStorage.setItem(SALARY_QUEUE_KEY, JSON.stringify(list || []));
+            localStorage.setItem(SALARY_QUEUE_KEY, JSON.stringify(list || []));
+            sessionStorage.removeItem(SALARY_QUEUE_KEY);
         }
         function salaryQueueRowId(orderId, kind) {
             return String(orderId) + '_' + String(kind);
