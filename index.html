@@ -1377,9 +1377,17 @@
             const tag = it && it.type === 'new_phone' ? parseConsignTag(it) : null;
             return !!(tag && tag.noCount);
         }
-        function consignFormulaLines(tag, sale, myCost) {
+        // 寄賣不記利潤的單：按贈的運費由件主負擔，從該給扣，不算店裡虧損
+        function consignOwnerShipping(items) {
+            const list = items || [];
+            if (!list.some(isConsignNoCountItem)) return 0;
+            return list.reduce((s, it) => (it.type === 'shipping' && isGiftDeduction(it)) ? s + (Number(it.cost) || 0) : s, 0);
+        }
+        function consignFormulaLines(tag, sale, myCost, ship) {
             const owner = tag.owner || '件主';
             if (tag.noCount) {
+                const sh = Number(ship) || 0;
+                if (sh > 0) return [`${owner}：${sale}-${tag.base}-運費${sh}=${sale - tag.base - sh}　該給 ${sale - sh}（不入帳）`];
                 return [`${owner}：${sale}-${tag.base}=${sale - tag.base}　該給 ${sale}（不入帳）`];
             }
             return [
@@ -1724,7 +1732,7 @@
             return false;
         }
         function calcGiftAllocation(normalized) {
-            const G = normalized.reduce((s, it) => isGiftDeduction(it) ? s + (Number(it.cost) || 0) : s, 0);
+            const G = normalized.reduce((s, it) => isGiftDeduction(it) ? s + (Number(it.cost) || 0) : s, 0) - consignOwnerShipping(normalized);
             const alloc = { used: 0, new: 0, repair: 0, acc: 0, card: 0, soft: 0 };
             if (G <= 0) return alloc;
             const hasUsed = normalized.some(it => it.type === 'phone' || it.type === 'peer_phone');
@@ -1858,9 +1866,12 @@
                 return;
             }
             if (kind === 'consign') {
+                let ownerShip = consignOwnerShipping(normalized);
                 const blocks = normalized.filter(it => it.type === 'new_phone' && parseConsignTag(it)).map(it => {
                     const tag = parseConsignTag(it);
-                    const lines = consignFormulaLines(tag, Number(it.salePrice) || 0, Number(it.cost) || 0);
+                    const ship = tag.noCount ? ownerShip : 0;
+                    if (tag.noCount) ownerShip = 0;
+                    const lines = consignFormulaLines(tag, Number(it.salePrice) || 0, Number(it.cost) || 0, ship);
                     return [`${customer}　${stripLedgerName(it.itemName || it.name || '')}`].concat(lines).join('\n');
                 });
                 if (!blocks.length) return;
@@ -3106,21 +3117,27 @@
                 const catSale = emptyBooksProfit();
                 const catCost = emptyBooksProfit();
                 const newItemsForName = [];
+                let ownerShip = consignOwnerShipping(normalized);
                 normalized.forEach(it => {
                     if (isConsignNoCountItem(it)) {
                         const when = booksCountedWhen(it) || parseLedgerDate(g.time);
                         const tag = parseConsignTag(it);
                         const sale = Number(it.salePrice) || 0;
+                        const ship = ownerShip;
+                        ownerShip = 0;
+                        const formula = ship > 0
+                            ? `${sale}-${tag.base}-運費${ship}=${sale - tag.base - ship}　該給 ${sale - ship}`
+                            : `${sale}-${tag.base}=${sale - tag.base}`;
                         expenseDetails.push({
                             date: formatBooksYmd(when),
                             ts: (when || new Date(0)).getTime(),
                             orderId: g.orderId,
                             kind: '備查',
                             subject: '寄賣代售',
-                            name: `${g.customer || '過路客'}　${stripLedgerName(it.itemName || it.name || '')}（${tag.owner} ${sale}-${tag.base}=${sale - tag.base}）`,
+                            name: `${g.customer || '過路客'}　${stripLedgerName(it.itemName || it.name || '')}（${tag.owner} ${formula}）`,
                             sale,
                             cost: tag.base,
-                            amount: sale,
+                            amount: sale - ship,
                             memo: true,
                             customer: g.customer || '',
                             person: g.person || ''
