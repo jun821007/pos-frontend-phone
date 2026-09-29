@@ -410,6 +410,7 @@
                     <div class="books-toolbar-actions">
                         <button type="button" onclick="openFundFlow()" class="px-3 py-2 rounded-lg bg-slate-800 border border-slate-500 text-slate-100 text-sm font-bold">資金流水</button>
                         <button type="button" onclick="exportBooksCsv()" class="px-3 py-2 rounded-lg bg-slate-800 border border-slate-600 text-slate-200 text-sm">CSV</button>
+                        <button type="button" onclick="runLedgerBackfill()" class="px-3 py-2 rounded-lg bg-slate-800 border border-emerald-800 text-emerald-300 text-sm" title="把每日流水全部同步到 Supabase">Supabase 同步</button>
                     </div>
                 </div>
                 <div class="books-toolbar-period">
@@ -691,6 +692,10 @@
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify(data)
             });
+            return await res.json();
+          },
+          ledgerBackfill: async () => {
+            const res = await fetch(`${API_BASE_URL}/admin/ledger-backfill`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' });
             return await res.json();
           },
           getCompanyFund: async (month) => {
@@ -2315,6 +2320,27 @@
             } else if (row.orderId) orderId = String(row.orderId);
             const customer = String(row.customer || '').replace(/^薪資$/, '').trim();
             return { kindLabel, orderId, customer, name };
+        }
+        async function runLedgerBackfill() {
+            if (!(User && User.isAdmin)) {
+                Swal.fire({ icon: 'error', title: '僅管理員可執行', background: '#26221e', color: 'white' });
+                return;
+            }
+            const ok = await Swal.fire({
+                title: '同步每日流水到 Supabase？',
+                text: '以試算表為準全部重新同步，可重複執行，不會改動試算表。資料多時需要一兩分鐘。',
+                showCancelButton: true, confirmButtonText: '開始', cancelButtonText: '取消',
+                background: '#26221e', color: 'white'
+            });
+            if (!ok.isConfirmed) return;
+            Swal.fire({ title: '同步中...', background: '#26221e', color: 'white', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
+            try {
+                const r = await API.ledgerBackfill();
+                if (!r || r.status !== 'success') throw new Error((r && (r.msg || r.message)) || '同步失敗');
+                Swal.fire({ icon: 'success', title: '同步完成', text: `寫入 ${r.upserted} 筆，清除 ${r.removed} 筆多餘資料`, background: '#26221e', color: 'white' });
+            } catch (e) {
+                Swal.fire({ icon: 'error', title: '同步失敗', text: (e && e.message) || '', background: '#26221e', color: 'white' });
+            }
         }
         async function addManualSalary() {
             if (!(User && User.isAdmin)) return;
