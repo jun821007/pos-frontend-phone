@@ -1383,6 +1383,12 @@
             if (!list.some(isConsignNoCountItem)) return 0;
             return list.reduce((s, it) => (it.type === 'shipping' && isGiftDeduction(it)) ? s + (Number(it.cost) || 0) : s, 0);
         }
+        function isOwnerBorneShipping(i) {
+            if (!i || i.type !== 'shipping' || !isGiftDeduction(i)) return false;
+            const oid = String(i.orderId || '');
+            if (!oid) return false;
+            return salaryLedgerRows().some(r => String(r.orderId) === oid && r.status !== 'Returned' && r.status !== 'Deleted' && isConsignNoCountItem(r));
+        }
         function consignFormulaLines(tag, sale, myCost, ship) {
             const owner = tag.owner || '件主';
             if (tag.noCount) {
@@ -1928,6 +1934,7 @@
                 const qty = Math.max(1, Number(it.quantity) || 1);
                 const isMultiExtra = isMultiPhoneExtraLine(it);
                 if (!isMultiExtra) giftNormalized.push(it);
+                if (isOwnerBorneShipping(it)) return;
                 const m = mapLedgerType(it.type);
                 if (!byType[m.key]) byType[m.key] = { key: m.key, label: m.label, order: m.order, sale: 0, cost: 0, costTerms: {} };
                 if (!isMultiExtra) byType[m.key].sale += sale;
@@ -1980,9 +1987,9 @@
             let details = g.items.map(it => {
                 if (BlackList.items.includes(it.orderId + '_' + it.itemId)) return ''; 
                 const isMultiExtra = it.type === 'phone' && Number(it.salePrice) === 0 && (it.itemName||'').includes(' + ');
-                let p = isMultiExtra ? 0 : (it.profit !== undefined && it.profit !== null && it.profit !== '' ? Number(it.profit) : Number(it.salePrice) - Number(it.cost));
+                let p = (isMultiExtra || isOwnerBorneShipping(it)) ? 0 : (it.profit !== undefined && it.profit !== null && it.profit !== '' ? Number(it.profit) : Number(it.salePrice) - Number(it.cost));
                 let pc = p >= 0 ? 'text-green-400' : 'text-red-400';
-                let dName = it.itemName;
+                let dName = it.itemName + (isOwnerBorneShipping(it) ? '（件主付）' : '');
                 let prefix = '';
                 if(it.type === 'new_phone') prefix = '(\u65b0)';
                 else if(it.type === 'phone' || it.type === 'peer_phone') prefix = '(\u4e8c)';
@@ -4131,7 +4138,7 @@
                     let sale = Number(i.salePrice) || 0;
                     let cost = Number(i.cost) || 0;
                     const isMultiExtra = i.type==='phone' && sale===0 && (i.itemName||'').includes(' + ');
-                    const iProfit = (i.profit !== undefined && i.profit !== null && i.profit !== '') ? Number(i.profit) : (sale - cost);
+                    const iProfit = isOwnerBorneShipping(i) ? 0 : ((i.profit !== undefined && i.profit !== null && i.profit !== '') ? Number(i.profit) : (sale - cost));
                     if (!isMultiExtra) {
                         groups[i.orderId].total += sale;
                         groups[i.orderId].net += iProfit;
@@ -4147,7 +4154,7 @@
                             if(i.type!=='wrap') stats.pot += iProfit;
                         }
                     }
-                    if (sale===0 && cost>0 && !isMultiExtra) stats.gift += cost;
+                    if (sale===0 && cost>0 && !isMultiExtra && !isOwnerBorneShipping(i)) stats.gift += cost;
                 }
             });
             const filteredExpense = expenseRows.filter(i => matchesLedgerFilter(i, tokens));
@@ -4299,7 +4306,7 @@
                 if (!groups[i.orderId].customer && i.customer) groups[i.orderId].customer = i.customer;
                 let sale = Number(i.salePrice) || 0;
                 let cost = Number(i.cost) || 0;
-                const iPendingProfit = (i.profit !== undefined && i.profit !== null && i.profit !== '') ? Number(i.profit) : (sale - cost);
+                const iPendingProfit = isOwnerBorneShipping(i) ? 0 : ((i.profit !== undefined && i.profit !== null && i.profit !== '') ? Number(i.profit) : (sale - cost));
                 groups[i.orderId].items.push(i);
                 groups[i.orderId].total += sale;
                 groups[i.orderId].net += iPendingProfit;
@@ -4432,12 +4439,13 @@
                     let sale = i.salePrice || 0;
                     let cost = i.cost || 0;
                     const isMultiExtra = i.type==='phone' && sale===0 && (i.itemName||'').includes(' + ');
-                    const iHistProfit = (i.profit !== undefined && i.profit !== null && i.profit !== '') ? Number(i.profit) : (sale - cost);
+                    const ownerShip = isOwnerBorneShipping(i);
+                    const iHistProfit = ownerShip ? 0 : ((i.profit !== undefined && i.profit !== null && i.profit !== '') ? Number(i.profit) : (sale - cost));
                     if (!isMultiExtra) { groups[i.orderId].total += sale; groups[i.orderId].net += iHistProfit; }
                     if (ledgerCountsCompletedCash(i, histRange.rangeStart, histRange.rangeEnd) && !isMultiExtra) stats.cash += sale;
                     if (ledgerCountsCompletedProfit(i, histRange.rangeStart, histRange.rangeEnd) && !isMultiExtra) stats.profit += iHistProfit;
                     else if (ledgerCountsPendingPot(i, histRange.rangeStart, histRange.rangeEnd) && !isMultiExtra) { stats.pending += sale; if(i.type!=='wrap') stats.pot += iHistProfit; }
-                    if (sale===0 && cost>0 && !isMultiExtra) stats.gift += cost;
+                    if (sale===0 && cost>0 && !isMultiExtra && !ownerShip) stats.gift += cost;
                 }
             });
             document.getElementById('h-cash').innerText = stats.cash.toLocaleString();
