@@ -3382,7 +3382,7 @@
                 return false;
             }
             const quiet = !!(opts && opts.quiet);
-            const oid = 'EXP' + Date.now().toString().slice(-6);
+            const oid = 'EXP' + Date.now().toString().slice(-6) + Math.random().toString(36).slice(2, 5);
             if (!quiet) Swal.fire({ title: '入帳中...', background: '#26221e', color: 'white', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
             try {
                 const r = await API.handleRestock({ items, person: User.name, orderId: oid, vendorName: vendorName || undefined, entryDate: entryDate || undefined });
@@ -5639,6 +5639,7 @@
         }
         async function addExpItem(type) { const { value } = await Swal.fire({ title: type, html: `<input id="ex-n" class="swal2-input" placeholder="備註 (如: 便當/抽成)"><input id="ex-a" type="number" class="swal2-input" placeholder="金額">`, background:'#26221e', color:'white', preConfirm:()=>[document.getElementById('ex-n').value, document.getElementById('ex-a').value] }); if(value && value[1]) { RestockCart.push({type: type==='薪資/抽成'?'salary':'expense', name:`[${type}] ${value[0]}`, cost:parseInt(value[1]), quantity:1}); renderRestockCartList(); } }
         function renderRestockCartList() {
+            UI.restockOid = null;
             const d = document.getElementById('rs-cart-items');
             if (!d) return;
             d.innerHTML = '';
@@ -5661,13 +5662,24 @@
             else f.classList.add('translate-y-24');
         }
 
+        let restockSubmitting = false;
         async function submitRestock() { 
-            if(RestockCart.length===0) return; 
-            const confirm = await Swal.fire({ title: '確定要送出進貨清單？', text: '送出後無法撤回。會入庫，並記「配件進貨」備查（不扣淨利，賣出才算成本）。', showCancelButton: true, confirmButtonText: '確定送出', cancelButtonText: '取消', background: '#26221e', color: 'white' });
-            if (!confirm.isConfirmed) return;
+            if(RestockCart.length===0 || restockSubmitting) return; 
+            restockSubmitting = true;
+            try {
+                const confirm = await Swal.fire({ title: '確定要送出進貨清單？', text: '送出後無法撤回。會入庫，並記「配件進貨」備查（不扣淨利，賣出才算成本）。', showCancelButton: true, confirmButtonText: '確定送出', cancelButtonText: '取消', background: '#26221e', color: 'white' });
+                if (!confirm.isConfirmed) return;
+                await doSubmitRestock();
+            } finally {
+                restockSubmitting = false;
+            }
+        }
+        async function doSubmitRestock() {
             const btn = document.getElementById('btn-submit-restock');
             if(btn){ btn.disabled=true; btn.textContent='送出中...'; }
-            const oid = 'EXP'+Date.now().toString().slice(-6);
+            // 同一份清單重送（逾時後再按）沿用同單號，後端看到已寫過就不會重複入庫
+            if (!UI.restockOid) UI.restockOid = 'EXP' + Date.now().toString().slice(-6) + Math.random().toString(36).slice(2, 5);
+            const oid = UI.restockOid;
                 const vendorName = (document.getElementById('rs-vendor-name') && document.getElementById('rs-vendor-name').value) ? document.getElementById('rs-vendor-name').value.trim() : '';
             try {
                 const r = await API.handleRestock({items:RestockCart, person:User.name, orderId:oid, vendorName: vendorName || undefined});
