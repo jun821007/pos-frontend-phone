@@ -2306,12 +2306,19 @@
             const rows = [];
             rows.push('【薪資明細】' + ymd);
             let total = 0;
+            let pendingTotal = 0;
             (lines || []).forEach((line, idx) => {
                 rows.push((idx + 1) + '. ' + line.orderId + '　' + (line.customer || '') + '　' + line.label + '　$' + (Number(line.amount || 0).toLocaleString()));
                 if (line.formula) rows.push('   ' + line.formula);
-                total += Number(line.amount) || 0;
+                if (line.pending) pendingTotal += Number(line.amount) || 0;
+                else total += Number(line.amount) || 0;
             });
-            rows.push('合計：$' + total.toLocaleString());
+            if (pendingTotal > 0) {
+                rows.push('本次該發（要結）：$' + total.toLocaleString());
+                rows.push('未結（入帳後才發）：$' + pendingTotal.toLocaleString());
+            } else {
+                rows.push('合計：$' + total.toLocaleString());
+            }
             return rows.join('\n');
         }
 
@@ -2782,7 +2789,8 @@
                 customer: r.customer,
                 label: r.label + (String(r.status) === 'Completed' ? '' : '（未結）'),
                 amount: r.amount,
-                formula: r.formula
+                formula: r.formula,
+                pending: String(r.status) !== 'Completed'
             })));
             const ok = await copyTextToClipboard(text);
             Swal.fire({ icon: ok ? 'success' : 'info', title: ok ? '已複製全部' : '請手動複製', text: ok ? '' : text, background: '#26221e', color: 'white' });
