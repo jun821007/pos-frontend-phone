@@ -1387,12 +1387,12 @@
             const owner = tag.owner || '件主';
             if (tag.noCount) {
                 const sh = Number(ship) || 0;
-                if (sh > 0) return [`${owner}：${sale}-${tag.base}-運費${sh}=${sale - tag.base - sh}　該給 ${sale - sh}（不入帳）`];
-                return [`${owner}：${sale}-${tag.base}=${sale - tag.base}　該給 ${sale}（不入帳）`];
+                if (sh > 0) return [`${owner}：${sale}-${tag.base}-運費${sh}=利潤 ${sale - tag.base - sh}　該給 ${sale - sh}（不入帳）`];
+                return [`${owner}：${sale}-${tag.base}=利潤 ${sale - tag.base}　該給 ${sale}（不入帳）`];
             }
             return [
-                `我的：${sale}-${myCost}=${sale - myCost}`,
-                `${owner}：${myCost}-${tag.base}=${myCost - tag.base}　該給 ${myCost}`
+                `我的：${sale}-${myCost}=利潤 ${sale - myCost}`,
+                `${owner}：${myCost}-${tag.base}=利潤 ${myCost - tag.base}　該給 ${myCost}`
             ];
         }
         async function addNewStockToCart(i) {
@@ -3126,8 +3126,8 @@
                         const ship = ownerShip;
                         ownerShip = 0;
                         const formula = ship > 0
-                            ? `${sale}-${tag.base}-運費${ship}=${sale - tag.base - ship}　該給 ${sale - ship}`
-                            : `${sale}-${tag.base}=${sale - tag.base}`;
+                            ? `${sale}-${tag.base}-運費${ship}=利潤 ${sale - tag.base - ship}　該給 ${sale - ship}`
+                            : `${sale}-${tag.base}=利潤 ${sale - tag.base}　該給 ${sale}`;
                         expenseDetails.push({
                             date: formatBooksYmd(when),
                             ts: (when || new Date(0)).getTime(),
