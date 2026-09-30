@@ -4467,6 +4467,7 @@
                 customerBuckets[normalizedName].net += Number(g.net) || 0;
             });
 
+            let prepaidSum = 0;
             Object.values(customerBuckets).forEach((bucket, bucketIdx) => {
                 bucket.orders.sort((a, b) => new Date(b.time || 0) - new Date(a.time || 0));
                 const netCls = bucket.net >= 0 ? 'text-green-400' : 'text-red-400';
@@ -4476,6 +4477,10 @@
                     hasLinePay ? `<span class="inline-flex items-center gap-1 text-[10px] text-green-300 border border-green-700/50 px-1.5 py-0.5 rounded"><i class="fa-brands fa-line"></i>LINE Pay</span>` : '',
                     hasCredit ? `<span class="inline-flex items-center gap-1 text-[10px] text-amber-300 border border-amber-700/50 px-1.5 py-0.5 rounded"><i class="fa-solid fa-file-invoice-dollar"></i>掛帳</span>` : ''
                 ].filter(Boolean).join('');
+                const lc = hasCredit && (LedgerCustomers.list || []).find(c => String(c.name || '').trim().toLowerCase() === bucket.name.trim().toLowerCase());
+                const creditTotal = bucket.orders.filter(o => o.payMethod === 'credit').reduce((s, o) => s + (Number(o.total) || 0), 0);
+                const prepaid = lc && lc.pool >= 0.5 ? Math.min(lc.pool, creditTotal) : 0;
+                prepaidSum += prepaid;
                 const bucketKey = 'pb' + bucketIdx;
                 UI.pendingBucketNames = UI.pendingBucketNames || {};
                 UI.pendingBucketNames[bucketKey] = bucket.name;
@@ -4496,11 +4501,8 @@
                             </div>
                         </div>
                         <div onclick="this.closest('.mb-3').querySelector('.accordion-content').classList.toggle('open')" class="text-right cursor-pointer shrink-0 ml-2">
-                            <div class="text-yellow-500 font-mono text-sm">$${bucket.total.toLocaleString()}</div>
-                            ${(() => {
-                                const lc = hasCredit && (LedgerCustomers.list || []).find(c => String(c.name || '').trim().toLowerCase() === bucket.name.trim().toLowerCase());
-                                return lc && lc.pool >= 0.5 ? `<div class="text-[10px] text-cyan-300">已先付 ${Math.round(lc.pool).toLocaleString()}・還欠 ${ledgerBalanceText(lc.balance)}</div>` : '';
-                            })()}
+                            <div class="text-yellow-500 font-mono text-sm">$${Math.round(bucket.total - prepaid).toLocaleString()}</div>
+                            ${prepaid ? `<div class="text-[10px] text-cyan-300">原 ${Math.round(bucket.total).toLocaleString()}・已先付 ${Math.round(prepaid).toLocaleString()}</div>` : ''}
                             <div class="text-xs font-mono ${netCls}">利 ${bucket.net.toLocaleString()}</div>
                         </div>
                     </div>
@@ -4510,6 +4512,7 @@
                     </div>
                 </div>`;
             });
+            if (prepaidSum) document.getElementById('pending-total-amt').innerText = Math.round(pendingTotalAmt - prepaidSum).toLocaleString();
             updatePendingBatchBar();
         }
 
@@ -6412,7 +6415,7 @@
                             const qty = Number(it.qty) || 1;
                             const unit = Math.round((Number(it.sale) || 0) / qty);
                             const nm = ledgerItemLabel(it.name);
-                            L.push(qty > 1 ? `${nm}${unit}*${qty}=${(Number(it.sale) || 0).toLocaleString()}` : `${nm}${unit}`);
+                            L.push(qty > 1 ? `${nm}${unit}*${qty}=${(Number(it.sale) || 0).toLocaleString('en-US')}` : `${nm}${unit}`);
                             terms.push(Number(it.sale) || 0);
                         });
                     } else {
