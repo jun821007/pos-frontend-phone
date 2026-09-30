@@ -296,7 +296,7 @@
                         <span id="amend-banner-text" class="truncate min-w-0">補 key 中</span>
                         <button type="button" onclick="cancelAmendOrder()" class="shrink-0 text-cyan-300 underline">取消</button>
                     </div>
-                    <div class="grid grid-cols-2 gap-1.5 md:gap-2 amend-hide-when-active"><input type="text" id="cust-name" class="w-full py-1.5 md:p-2 rounded-lg input-dark text-xs md:text-sm text-center" placeholder="客戶名稱"><div class="flex items-center justify-center py-1.5 md:p-2 bg-slate-700/50 rounded-lg"><span id="staff-name" class="text-[10px] md:text-xs font-bold">--</span></div></div>
+                    <div class="grid grid-cols-2 gap-1.5 md:gap-2 amend-hide-when-active"><input type="text" id="cust-name" list="ledger-customers" autocomplete="off" onfocus="loadLedgerCustomers()" class="w-full py-1.5 md:p-2 rounded-lg input-dark text-xs md:text-sm text-center" placeholder="客戶名稱"><datalist id="ledger-customers"></datalist><div class="flex items-center justify-center py-1.5 md:p-2 bg-slate-700/50 rounded-lg"><span id="staff-name" class="text-[10px] md:text-xs font-bold">--</span></div></div>
                     <div class="flex gap-1 md:gap-2 items-center text-center text-[10px] md:text-xs amend-hide-when-active">
                         <div class="grid grid-cols-3 flex-1 min-w-0 gap-1 md:gap-2">
                         <label><input type="radio" name="pay" value="cash" checked class="peer hidden"><div class="py-1.5 md:p-2 rounded border border-slate-600 peer-checked:bg-green-600 peer-checked:text-white cursor-pointer">現金</div></label>
@@ -352,6 +352,8 @@
             <div class="flex flex-wrap items-center gap-2 mb-2">
                 <button type="button" onclick="selectAllPendingOrders()" class="text-xs px-3 py-1.5 rounded-lg bg-slate-800 border border-slate-600 text-slate-200 hover:bg-slate-700">全選本頁</button>
                 <button type="button" onclick="clearPendingSelection()" class="text-xs px-3 py-1.5 rounded-lg bg-slate-800 border border-slate-600 text-slate-400 hover:bg-slate-700">取消全選</button>
+                <button type="button" onclick="pickLedgerCustomer()" class="text-xs px-3 py-1.5 rounded-lg bg-slate-800 border border-cyan-700 text-cyan-300 hover:bg-slate-700">客戶帳本／收款</button>
+                <button type="button" onclick="modalLedgerImport()" class="text-xs px-3 py-1.5 rounded-lg bg-slate-800 border border-cyan-700 text-cyan-300 hover:bg-slate-700">補登舊帳</button>
             </div>
             <div id="pending-batch-bar" class="hidden mb-3 px-3 py-2.5 rounded-xl bg-green-950/40 border border-green-800 flex flex-wrap items-center justify-between gap-2">
                 <span id="pending-batch-summary" class="text-sm text-green-200">已選 0 筆 · $0</span>
@@ -778,6 +780,30 @@
           },
           getPosPrefs: async () => {
             const res = await fetch(`${API_BASE_URL}/pos-prefs`);
+            return await res.json();
+          },
+          getEsimPresets: async () => {
+            const res = await fetch(`${API_BASE_URL}/esim-presets`);
+            return await res.json();
+          },
+          saveEsimPresets: async (list) => {
+            const res = await fetch(`${API_BASE_URL}/esim-presets`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ list }) });
+            return await res.json();
+          },
+          getCustomerLedger: async (customer) => {
+            const res = await fetch(`${API_BASE_URL}/customer-ledger?customer=${encodeURIComponent(customer)}`);
+            return await res.json();
+          },
+          getLedgerCustomers: async () => {
+            const res = await fetch(`${API_BASE_URL}/customer-ledger/customers`);
+            return await res.json();
+          },
+          ledgerPay: async (data) => {
+            const res = await fetch(`${API_BASE_URL}/customer-ledger/pay`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data || {}) });
+            return await res.json();
+          },
+          ledgerImport: async (data) => {
+            const res = await fetch(`${API_BASE_URL}/customer-ledger/import`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data || {}) });
             return await res.json();
           },
           getSalaryQueue: async () => {
@@ -4450,6 +4476,8 @@
                     hasCredit ? `<span class="inline-flex items-center gap-1 text-[10px] text-amber-300 border border-amber-700/50 px-1.5 py-0.5 rounded"><i class="fa-solid fa-file-invoice-dollar"></i>掛帳</span>` : ''
                 ].filter(Boolean).join('');
                 const bucketKey = 'pb' + bucketIdx;
+                UI.pendingBucketNames = UI.pendingBucketNames || {};
+                UI.pendingBucketNames[bucketKey] = bucket.name;
                 const bucketOrderIds = bucket.orders.map(o => String(o.orderId));
                 UI.pendingOrdersByCustomer[bucketKey] = bucketOrderIds;
                 const bucketIdsAttr = bucketOrderIds.join(',');
@@ -4472,6 +4500,7 @@
                         </div>
                     </div>
                     <div class="accordion-content open bg-slate-900/30">
+                        ${hasCredit ? `<div class="px-3 pt-2 flex gap-2"><button type="button" onclick="openCustomerLedger(UI.pendingBucketNames['${bucketKey}'])" class="text-[11px] px-2.5 py-1 rounded-lg bg-slate-800 border border-cyan-700 text-cyan-300">帳本／收款／對帳單</button></div>` : ''}
                         ${bucket.orders.map(g => renderOrderRow(g, { compact: true, selectable: true, idPrefix: 'group-pending', editablePending: true })).join('')}
                     </div>
                 </div>`;
@@ -5682,6 +5711,9 @@
                         Swal.fire({icon:'error', title:'結帳失敗', text: result.msg || '請截圖通知管理員', background: '#26221e'}); 
                         return; 
                     }
+                    if (result.creditApplied && result.creditApplied.length) {
+                        await Swal.fire({ icon: 'info', title: '已用儲值金結清', html: `<div class="text-left text-sm">${result.creditApplied.map(x => `${booksEscape(x.orderId)}　$${(Number(x.total) || 0).toLocaleString()}`).join('<br>')}</div>`, background: '#26221e', color: 'white' });
+                    }
                     if (result.newPhoneFailed && result.newPhoneFailed.length) {
                         await Swal.fire({ icon: 'warning', title: '已結帳，但新機出貨沒寫完', html: `<div class="text-left text-sm">單號 ${booksEscape(result.orderId || oid)}<br>${result.newPhoneFailed.map(booksEscape).join('<br>')}<br><br>請到「帳目 → 庫存健檢」按「補寫新機出貨」。</div>`, background: '#26221e', color: 'white' });
                     }
@@ -6237,7 +6269,338 @@
             Swal.fire({ icon: 'success', title: '已存入維修紀錄', toast: true, position: 'top', timer: 1800, showConfirmButton: false, background: '#26221e', color: 'white' });
         }
         async function modalWrap(){const {value:v}=await Swal.fire({html:'<input id="w1" class="swal2-input" placeholder="項目"><input id="w2" class="swal2-input" placeholder="售價">',background:'#26221e',preConfirm:()=>[document.getElementById('w1').value,document.getElementById('w2').value]}); if(v){Cart.push({type:'wrap',name:'包膜:'+v[0],cost:0,price:Number(v[1])||0,quantity:1,itemId:'W-'+Date.now()});renderCart();}}
-        async function modalESIM(){const {value:v}=await Swal.fire({title:'eSIM',html:'<input id="es1" class="swal2-input" type="number" placeholder="成本"><input id="es2" class="swal2-input" type="number" placeholder="結帳金額">',background:'#26221e',color:'white',preConfirm:()=>[document.getElementById('es1').value,document.getElementById('es2').value]}); if(v&&v[1]){Cart.push({type:'esim',name:'eSIM',cost:Number(v[0])||0,price:Number(v[1])||0,quantity:1,itemId:'ESIM-'+Date.now()});renderCart();}}
+        const DEFAULT_ESIM_PRESETS = [{ name: '馬來', price: 650, cost: 589 }, { name: 'TW', price: 650, cost: 450 }];
+        let EsimPresets = null;
+        async function loadEsimPresets(force) {
+            if (EsimPresets && !force) return EsimPresets;
+            try {
+                const r = await API.getEsimPresets();
+                if (r && r.status === 'success' && Array.isArray(r.list)) EsimPresets = r.list;
+            } catch (e) { console.warn('eSIM 清單讀取失敗', e); }
+            if (!EsimPresets) EsimPresets = DEFAULT_ESIM_PRESETS.slice();
+            return EsimPresets;
+        }
+        function findEsimPreset(name) {
+            const k = String(name || '').trim().toLowerCase();
+            return (EsimPresets || DEFAULT_ESIM_PRESETS).find(p => p.name.toLowerCase() === k) || null;
+        }
+        function addEsimToCart(name, price, cost, qty) {
+            Cart.push({ type: 'esim', name: name ? 'eSIM ' + name : 'eSIM', cost: Number(cost) || 0, price: Number(price) || 0, quantity: Math.max(1, Math.round(Number(qty) || 1)), itemId: 'ESIM-' + Date.now() });
+            renderCart();
+        }
+        function pickEsimPreset(i) {
+            const p = (EsimPresets || [])[i];
+            if (!p) return;
+            const qty = document.getElementById('es-qty');
+            addEsimToCart(p.name, p.price, p.cost, qty ? qty.value : 1);
+            Swal.close();
+        }
+        async function modalESIM() {
+            const list = await loadEsimPresets();
+            const btns = list.map((p, i) => `<button type="button" onclick="pickEsimPreset(${i})" class="px-3 py-2 rounded-lg bg-cyan-900/60 border border-cyan-600 text-white text-sm text-left"><div class="font-bold">${booksEscape(p.name)} ${p.price}</div><div class="text-[11px] text-slate-400">成本 ${p.cost}</div></button>`).join('');
+            const r = await Swal.fire({
+                title: 'eSIM',
+                html: `<div class="flex items-center justify-center gap-2 mb-3 text-sm">數量 <input id="es-qty" type="number" min="1" value="1" class="swal2-input !m-0 !w-20 text-center"></div>
+                    <div class="grid grid-cols-2 gap-2 mb-2">${btns || '<div class="text-slate-500 text-sm col-span-2">還沒有常用卡</div>'}</div>
+                    <button type="button" onclick="Swal.close();modalEsimPresets()" class="text-xs text-cyan-300 underline mb-3">管理常用卡</button>
+                    <div class="text-xs text-slate-400 text-left border-t border-slate-700 pt-2">其他卡手打：</div>
+                    <input id="es0" class="swal2-input" placeholder="卡名（可空白）"><input id="es1" class="swal2-input" type="number" placeholder="成本（單張）"><input id="es2" class="swal2-input" type="number" placeholder="售價（單張）">`,
+                showCancelButton: true, confirmButtonText: '加入手打的', cancelButtonText: '取消',
+                background: '#26221e', color: 'white',
+                preConfirm: () => {
+                    const price = Number(document.getElementById('es2').value);
+                    if (!(price > 0)) { Swal.showValidationMessage('點上面的卡，或手打售價'); return false; }
+                    return { name: document.getElementById('es0').value.trim(), cost: document.getElementById('es1').value, price, qty: document.getElementById('es-qty').value };
+                }
+            });
+            if (r.isConfirmed && r.value) addEsimToCart(r.value.name, r.value.price, r.value.cost, r.value.qty);
+        }
+        async function modalEsimPresets() {
+            const list = await loadEsimPresets(true);
+            const text = list.map(p => `${p.name} ${p.price} ${p.cost}`).join('\n');
+            const r = await Swal.fire({
+                title: '常用 eSIM',
+                html: `<div class="text-xs text-slate-400 text-left mb-2">一行一張：<b>卡名 售價 成本</b>（例：馬來 650 589）。刪掉那行就是刪除。</div><textarea id="es-presets" class="swal2-textarea !m-0 !w-full" rows="8">${booksEscape(text)}</textarea>`,
+                showCancelButton: true, confirmButtonText: '儲存', cancelButtonText: '取消',
+                background: '#26221e', color: 'white',
+                preConfirm: () => {
+                    const out = [];
+                    for (const line of document.getElementById('es-presets').value.split('\n')) {
+                        const s = line.trim();
+                        if (!s) continue;
+                        const m = s.match(/^(.+?)\s+(\d+(?:\.\d+)?)\s+(\d+(?:\.\d+)?)$/);
+                        if (!m) { Swal.showValidationMessage('看不懂這行：' + s); return false; }
+                        out.push({ name: m[1].trim(), price: Number(m[2]), cost: Number(m[3]) });
+                    }
+                    return out;
+                }
+            });
+            if (!r.isConfirmed) return;
+            try {
+                const res = await API.saveEsimPresets(r.value);
+                if (!res || res.status !== 'success') throw new Error((res && res.msg) || '儲存失敗');
+                EsimPresets = res.list;
+                Swal.fire({ icon: 'success', title: '已儲存', timer: 1000, showConfirmButton: false, background: '#26221e', color: 'white' });
+            } catch (e) {
+                Swal.fire({ icon: 'error', title: '儲存失敗', text: e.message || '', background: '#26221e', color: 'white' });
+            }
+        }
+
+        // ---- 客戶帳本：掛帳收款／儲值金／對帳單 ----
+        let LedgerCustomers = { at: 0, list: [] };
+        async function loadLedgerCustomers(force) {
+            if (!force && Date.now() - LedgerCustomers.at < 5 * 60 * 1000) return LedgerCustomers.list;
+            try {
+                const r = await API.getLedgerCustomers();
+                if (r && r.status === 'success') LedgerCustomers = { at: Date.now(), list: r.customers || [] };
+            } catch (e) { console.warn('客戶清單讀取失敗', e); }
+            const dl = document.getElementById('ledger-customers');
+            if (dl) dl.innerHTML = LedgerCustomers.list.map(c => `<option value="${booksEscape(c.name)}"></option>`).join('');
+            return LedgerCustomers.list;
+        }
+        function ledgerBalanceText(b) {
+            const n = Math.round(Number(b) || 0);
+            return n < 0 ? '儲值金+' + (-n).toLocaleString() : n.toLocaleString();
+        }
+        function mdTaipeiFromIso(iso) {
+            if (!iso) return '?';
+            const [, m, d] = ymdTaipei(new Date(iso)).split('-');
+            return `${Number(m)}/${Number(d)}`;
+        }
+        function ledgerItemLabel(name) {
+            return String(name || '').replace(/^\([^)]*\)\s*/, '').replace(/^eSIM\s*/i, '').trim() || 'eSIM';
+        }
+        function buildLedgerStatement(ledger, fromStart) {
+            const events = ledger.events || [];
+            const start = fromStart ? 0 : (ledger.statementStart || 0);
+            const L = [];
+            let prev = start > 0 ? events[start - 1].balance : 0;
+            const groups = [];
+            events.slice(start).forEach(e => {
+                const d = mdTaipeiFromIso(e.time);
+                if (!groups.length || groups[groups.length - 1].d !== d) groups.push({ d, evs: [] });
+                groups[groups.length - 1].evs.push(e);
+            });
+            groups.forEach(g => {
+                L.push(g.d);
+                const terms = [];
+                g.evs.forEach(e => {
+                    if (e.type === 'sale') {
+                        (e.items || []).forEach(it => {
+                            const qty = Number(it.qty) || 1;
+                            const unit = Math.round((Number(it.sale) || 0) / qty);
+                            const nm = ledgerItemLabel(it.name);
+                            L.push(qty > 1 ? `${nm}${unit}*${qty}=${(Number(it.sale) || 0).toLocaleString()}` : `${nm}${unit}`);
+                            terms.push(Number(it.sale) || 0);
+                        });
+                    } else {
+                        L.push(`${e.note === '結清' ? '結清' : '儲值金'}${Math.round(e.amount)}`);
+                        terms.push(-(Number(e.amount) || 0));
+                    }
+                });
+                const bal = g.evs[g.evs.length - 1].balance;
+                const parts = prev !== 0 ? [prev, ...terms] : terms;
+                if (parts.length > 1 || bal < 0) {
+                    const expr = parts.map((n, i) => i === 0 ? String(Math.round(n)) : (n < 0 ? '-' : '+') + Math.round(Math.abs(n))).join('');
+                    L.push(`${expr}=${ledgerBalanceText(bal)}`);
+                }
+                L.push('');
+                prev = bal;
+            });
+            if (!groups.length) L.push('目前沒有未結清的掛帳');
+            return L.join('\n').trim();
+        }
+        async function pickLedgerCustomer() {
+            Swal.fire({ title: '讀取客戶...', background: '#26221e', color: 'white', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
+            const list = await loadLedgerCustomers(true);
+            const active = list.filter(c => Math.abs(c.balance) >= 0.5 || c.pool >= 0.5);
+            const rows = active.map((c, i) => `<button type="button" onclick="Swal.close();openCustomerLedger(LedgerCustomers.list[${list.indexOf(c)}].name)" class="w-full flex justify-between px-3 py-2 rounded-lg bg-slate-800 border border-slate-700 text-sm mb-1"><span>${booksEscape(c.name)}</span><span class="${c.balance < 0 ? 'text-cyan-300' : 'text-yellow-400'} font-mono">${ledgerBalanceText(c.balance)}</span></button>`).join('');
+            const r = await Swal.fire({
+                title: '客戶帳本',
+                html: `<input id="lc-name" list="ledger-customers" class="swal2-input !m-0 !w-full mb-2" placeholder="輸入客戶名稱"><div class="text-xs text-slate-400 text-left mb-1">有欠款或儲值金的客戶：</div><div class="max-h-[45vh] overflow-y-auto text-left">${rows || '<div class="text-slate-500 text-sm">目前沒有</div>'}</div>`,
+                showCancelButton: true, confirmButtonText: '開啟', cancelButtonText: '關閉',
+                background: '#26221e', color: 'white',
+                preConfirm: () => {
+                    const v = document.getElementById('lc-name').value.trim();
+                    if (!v) { Swal.showValidationMessage('請輸入或點選客戶'); return false; }
+                    return v;
+                }
+            });
+            if (r.isConfirmed && r.value) openCustomerLedger(r.value);
+        }
+        async function openCustomerLedger(name, fromStart) {
+            if (!name) return;
+            Swal.fire({ title: '讀取帳本...', background: '#26221e', color: 'white', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
+            let ledger;
+            try {
+                ledger = await API.getCustomerLedger(name);
+                if (!ledger || ledger.status !== 'success') throw new Error((ledger && ledger.msg) || '讀取失敗');
+            } catch (e) {
+                Swal.fire({ icon: 'error', title: '讀取帳本失敗', text: e.message || '', background: '#26221e', color: 'white' });
+                return;
+            }
+            const text = buildLedgerStatement(ledger, fromStart);
+            const r = await Swal.fire({
+                title: booksEscape(ledger.customer),
+                html: `<div class="grid grid-cols-3 gap-2 text-center text-xs mb-3">
+                        <div class="glass p-2 rounded-lg"><div class="text-slate-400">未結掛帳</div><div class="text-yellow-400 font-bold">$${Math.round(ledger.owed).toLocaleString()}</div></div>
+                        <div class="glass p-2 rounded-lg"><div class="text-slate-400">儲值金</div><div class="text-cyan-300 font-bold">$${Math.round(ledger.pool).toLocaleString()}</div></div>
+                        <div class="glass p-2 rounded-lg"><div class="text-slate-400">目前</div><div class="font-bold ${ledger.balance < 0 ? 'text-cyan-300' : 'text-yellow-400'}">${ledgerBalanceText(ledger.balance)}</div></div>
+                    </div>
+                    <pre class="text-left text-[12px] leading-5 text-slate-200 whitespace-pre-wrap max-h-[45vh] overflow-y-auto bg-slate-900/60 rounded-lg p-2">${booksEscape(text)}</pre>
+                    <button type="button" onclick="Swal.close();openCustomerLedger(${JSON.stringify(ledger.customer).replace(/"/g, '&quot;')}, ${!fromStart})" class="text-xs text-cyan-300 underline mt-2">${fromStart ? '只看未結清的部分' : '從頭看全部'}</button>`,
+                showDenyButton: true, showCancelButton: true,
+                confirmButtonText: '收款', denyButtonText: '複製對帳單', cancelButtonText: '關閉',
+                confirmButtonColor: '#16a34a', denyButtonColor: '#0e7490',
+                background: '#26221e', color: 'white'
+            });
+            if (r.isDenied) {
+                try { await navigator.clipboard.writeText(text); Swal.fire({ icon: 'success', title: '已複製', timer: 1000, showConfirmButton: false, background: '#26221e', color: 'white' }); }
+                catch (e) { Swal.fire({ title: '請手動複製', html: `<textarea class="swal2-textarea !w-full" rows="10">${booksEscape(text)}</textarea>`, background: '#26221e', color: 'white' }); }
+            } else if (r.isConfirmed) {
+                receiveLedgerPayment(ledger);
+            }
+        }
+        async function receiveLedgerPayment(ledger) {
+            const r = await Swal.fire({
+                title: `收款：${booksEscape(ledger.customer)}`,
+                html: `<div class="text-sm text-slate-300 mb-2">目前 ${ledgerBalanceText(ledger.balance)}</div>
+                    <input id="lp-amt" type="number" class="swal2-input" placeholder="客戶給的金額" value="${ledger.balance > 0 ? Math.round(ledger.balance) : ''}">
+                    <select id="lp-method" class="swal2-select"><option value="cash">現金</option><option value="linepay">Line Pay</option><option value="transfer">轉帳</option></select>
+                    <input id="lp-note" class="swal2-input" placeholder="備註（可空白）">
+                    <div class="text-xs text-slate-400 text-left mt-2">會從最舊的掛帳單開始結清（夠付整張才結清）；多給的變儲值金，下次掛帳自動扣。</div>`,
+                showCancelButton: true, confirmButtonText: '確認收款', cancelButtonText: '取消',
+                background: '#26221e', color: 'white',
+                preConfirm: () => {
+                    const amount = Number(document.getElementById('lp-amt').value);
+                    if (!(amount > 0)) { Swal.showValidationMessage('請輸入金額'); return false; }
+                    return { amount, method: document.getElementById('lp-method').value, note: document.getElementById('lp-note').value.trim() };
+                }
+            });
+            if (!r.isConfirmed) return;
+            Swal.fire({ title: '收款處理中...', background: '#26221e', color: 'white', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
+            try {
+                const res = await API.ledgerPay({ customer: ledger.customer, person: User.name, ...r.value });
+                if (!res || res.status !== 'success') throw new Error((res && res.msg) || '收款失敗');
+                const lines = (res.settled || []).map(x => `結清 ${x.orderId}　$${Math.round(x.total).toLocaleString()}`);
+                if (Number(res.pool) > 0) lines.push(`儲值金剩 $${Math.round(res.pool).toLocaleString()}`);
+                loadLedgerCustomers(true);
+                loadPending();
+                fetchData();
+                await Swal.fire({ icon: 'success', title: '已收款', html: `<div class="text-left text-sm">${lines.map(booksEscape).join('<br>') || '尚未結清任何單（金額不夠付最舊那張）'}</div>`, background: '#26221e', color: 'white' });
+                openCustomerLedger(ledger.customer);
+            } catch (e) {
+                Swal.fire({ icon: 'error', title: '收款失敗', text: e.message || '', background: '#26221e', color: 'white' });
+            }
+        }
+
+        // 備忘錄格式：日期行「8/4」、賣出「馬來650*2=1,300（589x2)」「Tw650」、收款「儲值金100」、算式「1300-100=1,200」
+        function parseLedgerMemo(text, year) {
+            const entries = [], warnings = [], checks = [];
+            const today = ymdTaipei(new Date());
+            let date = null;
+            const toNum = s => Number(String(s || '').replace(/[,，]/g, ''));
+            String(text || '').split('\n').forEach(raw => {
+                const line = raw.trim().replace(/＝/g, '=').replace(/＊/g, '*').replace(/＋/g, '+');
+                if (!line) return;
+                let m = line.match(/^(\d{1,2})\s*[\/月]\s*(\d{1,2})\s*日?$/);
+                if (m) {
+                    let y = Number(year);
+                    let ymd = `${y}-${String(m[1]).padStart(2, '0')}-${String(m[2]).padStart(2, '0')}`;
+                    if (ymd > today) ymd = `${y - 1}-${String(m[1]).padStart(2, '0')}-${String(m[2]).padStart(2, '0')}`;
+                    date = ymd;
+                    return;
+                }
+                if (!date) { warnings.push('沒有日期：' + line); return; }
+                m = line.match(/^(?:儲值金|還款|付款|收款|付|收)\s*\+?\s*([\d,]+)$/);
+                if (m) { entries.push({ date, kind: 'pay', amount: toNum(m[1]) }); return; }
+                m = line.match(/=\s*儲值金\s*\+?\s*([\d,]+)\s*$/);
+                if (m && /^[\d,\s+\-*x×()]+=/.test(line)) { checks.push({ date, expect: -toNum(m[1]), line }); return; }
+                if (/^[\d,\s+\-*x×().]+=\s*-?[\d,]+$/.test(line)) { checks.push({ date, expect: toNum(line.split('=').pop()), line }); return; }
+                m = line.match(/^(.*?\D)\s*(\d[\d,]*)\s*(?:[*x×]\s*(\d+))?\s*(?:=\s*[\d,]+)?\s*(?:[（(]\s*(\d[\d,]*)\s*(?:[*x×]\s*\d+)?\s*[)）])?$/);
+                if (m && m[1].trim()) {
+                    const rawName = m[1].trim();
+                    const preset = findEsimPreset(rawName);
+                    const cost = m[4] ? toNum(m[4]) : (preset ? preset.cost : null);
+                    entries.push({ date, kind: 'sale', name: 'eSIM ' + (preset ? preset.name : rawName), label: preset ? preset.name : rawName, qty: m[3] ? Number(m[3]) : 1, price: toNum(m[2]), cost });
+                    return;
+                }
+                warnings.push('看不懂：' + line);
+            });
+            // 逐日核對備忘錄上的算式結果
+            let bal = 0;
+            const byDate = {};
+            entries.forEach(e => { bal += e.kind === 'sale' ? e.price * e.qty : -e.amount; byDate[e.date] = bal; });
+            checks.forEach(c => {
+                const got = byDate[c.date];
+                if (got != null && Math.round(got) !== Math.round(c.expect)) warnings.push(`${c.date.slice(5).replace('-', '/')} 備忘錄算到 ${ledgerBalanceText(c.expect)}，照明細算是 ${ledgerBalanceText(got)}（${c.line}）`);
+            });
+            return { entries, warnings, balance: bal };
+        }
+        async function modalLedgerImport(prefill) {
+            await Promise.all([loadEsimPresets(), loadLedgerCustomers()]);
+            const p = prefill || {};
+            const r = await Swal.fire({
+                title: '補登舊帳',
+                html: `<input id="li-cust" list="ledger-customers" class="swal2-input !m-0 !w-full mb-2" placeholder="客戶名稱" value="${booksEscape(p.customer || '')}">
+                    <div class="flex items-center gap-2 text-sm mb-2">年份 <input id="li-year" type="number" class="swal2-input !m-0 !w-24" value="${p.year || ymdTaipei(new Date()).slice(0, 4)}"><span class="text-[11px] text-slate-500">比今天晚的日期自動算去年</span></div>
+                    <textarea id="li-text" class="swal2-textarea !m-0 !w-full" rows="12" placeholder="整段貼上這位客戶的備忘錄，例：&#10;8/4&#10;馬來650*2=1,300（589x2)&#10;儲值金100&#10;1300-100=1,200">${booksEscape(p.text || '')}</textarea>
+                    <div class="text-[11px] text-slate-400 text-left mt-1">一次貼一位客戶。沒寫成本的卡會用常用卡清單的成本（名稱要一樣，大小寫不拘）。</div>`,
+                showCancelButton: true, confirmButtonText: '解析預覽', cancelButtonText: '取消',
+                background: '#26221e', color: 'white', width: 560,
+                preConfirm: () => {
+                    const customer = document.getElementById('li-cust').value.trim();
+                    const text = document.getElementById('li-text').value;
+                    const year = Number(document.getElementById('li-year').value) || Number(ymdTaipei(new Date()).slice(0, 4));
+                    if (!customer) { Swal.showValidationMessage('請輸入客戶名稱'); return false; }
+                    if (!text.trim()) { Swal.showValidationMessage('請貼上備忘錄'); return false; }
+                    return { customer, text, year };
+                }
+            });
+            if (!r.isConfirmed) return;
+            const { customer, text, year } = r.value;
+            const parsed = parseLedgerMemo(text, year);
+            const noCost = parsed.entries.filter(e => e.kind === 'sale' && (e.cost == null || !Number.isFinite(e.cost)));
+            if (!parsed.entries.length || noCost.length) {
+                const msg = [];
+                if (!parsed.entries.length) msg.push('沒有解析到任何賣出或收款。');
+                if (noCost.length) msg.push('這些卡找不到成本，請在文字後面補（成本x數量），或先到 eSIM「管理常用卡」新增：', ...[...new Set(noCost.map(e => e.label))].map(n => '　' + n));
+                await Swal.fire({ icon: 'warning', title: '還不能補登', html: `<pre class="text-left text-[12px] whitespace-pre-wrap">${booksEscape(msg.concat(parsed.warnings).join('\n'))}</pre>`, confirmButtonText: '回去修改', background: '#26221e', color: 'white' });
+                return modalLedgerImport(r.value);
+            }
+            const L = [];
+            let lastDate = '';
+            parsed.entries.forEach(e => {
+                if (e.date !== lastDate) { L.push(e.date.replace(/-/g, '/')); lastDate = e.date; }
+                L.push(e.kind === 'sale' ? `　${e.label} ${e.price}${e.qty > 1 ? ' x' + e.qty : ''}　成本 ${e.cost}${e.qty > 1 ? ' x' + e.qty : ''}` : `　收款 ${e.amount}`);
+            });
+            L.push('', `補登後：${ledgerBalanceText(parsed.balance)}`);
+            if (parsed.warnings.length) L.push('', '⚠ 注意：', ...parsed.warnings);
+            const ok = await Swal.fire({
+                title: `確認補登：${booksEscape(customer)}`,
+                html: `<pre class="text-left text-[12px] leading-5 text-slate-200 whitespace-pre-wrap max-h-[50vh] overflow-y-auto">${booksEscape(L.join('\n'))}</pre><div class="text-[11px] text-slate-400 text-left mt-2">賣出照日期寫成掛帳單（每天一張），收款照日期記；寫完用收款從最舊的單開始結清，結清的單利潤算今天。<b>同一段不要補登兩次。</b></div>`,
+                showDenyButton: true, showCancelButton: true,
+                confirmButtonText: '確認補登', denyButtonText: '回去修改', cancelButtonText: '取消',
+                background: '#26221e', color: 'white', width: 560
+            });
+            if (ok.isDenied) return modalLedgerImport(r.value);
+            if (!ok.isConfirmed) return;
+            Swal.fire({ title: '補登中...', background: '#26221e', color: 'white', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
+            try {
+                const entries = parsed.entries.map(e => e.kind === 'sale'
+                    ? { date: e.date, kind: 'sale', name: e.name, qty: e.qty, price: e.price, cost: e.cost }
+                    : { date: e.date, kind: 'pay', amount: e.amount });
+                const res = await API.ledgerImport({ customer, person: User.name, entries });
+                if (!res || res.status !== 'success') throw new Error((res && res.msg) || '補登失敗');
+                loadLedgerCustomers(true);
+                loadPending();
+                fetchData();
+                await Swal.fire({ icon: 'success', title: '補登完成', html: `<div class="text-left text-sm">掛帳單 ${res.orders} 張（${res.items} 筆）、收款 ${res.payments} 筆<br>用收款結清 ${(res.settled || []).length} 張${Number(res.pool) > 0 ? `<br>儲值金剩 $${Math.round(res.pool).toLocaleString()}` : ''}</div>`, background: '#26221e', color: 'white' });
+                openCustomerLedger(customer);
+            } catch (e) {
+                Swal.fire({ icon: 'error', title: '補登失敗', text: e.message || '', background: '#26221e', color: 'white' });
+            }
+        }
         async function modalSoftware(){
             const { value: mode } = await Swal.fire({
                 title:'\u8edf\u9ad4',
