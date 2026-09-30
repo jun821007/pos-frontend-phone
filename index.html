@@ -6511,55 +6511,98 @@
             }
         }
 
-        // 備忘錄格式：日期行「8/4」、賣出「馬來650*2=1,300（589x2)」「Tw650」、收款「儲值金100」、算式「1300-100=1,200」
+        // 備忘錄格式（逐日）：日期「9/6」；卡「馬來650*2=1,300（589x2)」「86 30g」「香港3天2g 108」（數字等於常用卡成本就當成本）；
+        // 收款「儲值金100」；單價算式「120*2=240」；餘額算式「540+240=780」「1850-2000=儲值金+150」。
+        // 卡沒寫售價時，從當天餘額算式扣掉上次餘額、已知的卡和收款後剩下的數字補上；剩下的負數當收款。
         function parseLedgerMemo(text, year) {
-            const entries = [], warnings = [], checks = [];
+            const warnings = [], errors = [], days = [];
             const today = ymdTaipei(new Date());
-            let date = null;
-            const toNum = s => Number(String(s || '').replace(/[,，]/g, ''));
+            const toNum = s => Number(String(s || '').replace(/[,，\s]/g, ''));
+            const termVal = s => { const m = String(s).match(/^(\d[\d,]*)(?:\s*[*x×]\s*(\d+))?$/); return m ? toNum(m[1]) * (m[2] ? Number(m[2]) : 1) : NaN; };
+            let day = null;
             String(text || '').split('\n').forEach(raw => {
-                const line = raw.trim().replace(/＝/g, '=').replace(/＊/g, '*').replace(/＋/g, '+');
+                const line = raw.trim().replace(/＝/g, '=').replace(/＊/g, '*').replace(/＋/g, '+').replace(/[－—]/g, '-');
                 if (!line) return;
                 let m = line.match(/^(\d{1,2})\s*[\/月]\s*(\d{1,2})\s*日?$/);
                 if (m) {
-                    let y = Number(year);
-                    let ymd = `${y}-${String(m[1]).padStart(2, '0')}-${String(m[2]).padStart(2, '0')}`;
-                    if (ymd > today) ymd = `${y - 1}-${String(m[1]).padStart(2, '0')}-${String(m[2]).padStart(2, '0')}`;
-                    date = ymd;
+                    const y = Number(year), mm = String(m[1]).padStart(2, '0'), dd = String(m[2]).padStart(2, '0');
+                    let ymd = `${y}-${mm}-${dd}`;
+                    if (ymd > today) ymd = `${y - 1}-${mm}-${dd}`;
+                    day = { date: ymd, md: `${Number(m[1])}/${Number(m[2])}`, items: [], pays: [], bal: null };
+                    days.push(day);
                     return;
                 }
-                if (!date) { warnings.push('沒有日期：' + line); return; }
+                if (!day) { warnings.push('沒有日期：' + line); return; }
                 m = line.match(/^(?:儲值金|還款|付款|收款|付|收)\s*\+?\s*([\d,]+)$/);
-                if (m) { entries.push({ date, kind: 'pay', amount: toNum(m[1]) }); return; }
-                m = line.match(/=\s*儲值金\s*\+?\s*([\d,]+)\s*$/);
-                if (m && /^[\d,\s+\-*x×()]+=/.test(line)) { checks.push({ date, expect: -toNum(m[1]), line }); return; }
-                if (/^[\d,\s+\-*x×().]+=\s*-?[\d,]+$/.test(line)) { checks.push({ date, expect: toNum(line.split('=').pop()), line }); return; }
-                // 整行就是常用卡名（可帶 *數量），售價用清單的；清單沒售價就標出來
-                m = line.match(/^(.+?)\s*(?:[*x×]\s*(\d+))?$/);
-                const whole = m && findEsimPreset(m[1]);
-                if (whole) {
-                    entries.push({ date, kind: 'sale', name: 'eSIM ' + whole.name, label: whole.name, qty: m[2] ? Number(m[2]) : 1, price: Number(whole.price) > 0 ? Number(whole.price) : null, cost: whole.cost });
+                if (m) { day.pays.push({ amount: toNum(m[1]) }); return; }
+                m = line.match(/^(\d[\d,]*)\s*[*x×]\s*(\d+)\s*=\s*[\d,]+$/);
+                if (m) {
+                    const unit = toNum(m[1]), qty = Number(m[2]);
+                    const it = [...day.items].reverse().find(x => x.price == null || x.price === unit);
+                    if (it) { it.price = unit; it.qty = qty; } else warnings.push(`${day.md} 對不到卡：${line}`);
                     return;
                 }
-                m = line.match(/^(.*?\D)\s*(\d[\d,]*)\s*(?:[*x×]\s*(\d+))?\s*(?:=\s*[\d,]+)?\s*(?:[（(]\s*(\d[\d,]*)\s*(?:[*x×]\s*\d+)?\s*[)）])?$/);
+                m = line.match(/^([-+]?\s*\d[\d,\s+\-*x×]*)=\s*(儲值金\s*\+?\s*)?(-?[\d,]+)$/);
+                if (m && (/\d\s*[+-]\s*\d/.test(m[1]) || /^\d[\d,]*$/.test(m[1].trim()))) {
+                    const terms = [], re = /([+-]?)\s*(\d[\d,]*(?:\s*[*x×]\s*\d+)?)/g;
+                    let t;
+                    while ((t = re.exec(m[1]))) terms.push((t[1] === '-' ? -1 : 1) * termVal(t[2]));
+                    day.bal = { terms, result: (m[2] ? -1 : 1) * toNum(m[3]), line };
+                    return;
+                }
+                let rest = line, cost = null;
+                m = rest.match(/[（(]\s*(\d[\d,]*)(?:\s*[*x×]\s*\d+)?\s*[)）]?\s*$/);
+                if (m) { cost = toNum(m[1]); rest = rest.slice(0, m.index).trim(); }
+                m = rest.match(/^(.+?)\s*(?:[*x×]\s*(\d+))?$/);
+                let preset = m && findEsimPreset(m[1]);
+                if (preset) {
+                    day.items.push({ label: preset.name, qty: m[2] ? Number(m[2]) : 1, price: Number(preset.price) > 0 ? Number(preset.price) : null, cost: cost != null ? cost : preset.cost });
+                    return;
+                }
+                m = rest.match(/^(.*?\D)\s*(\d[\d,]*)\s*(?:[*x×]\s*(\d+))?\s*(?:=\s*[\d,]+)?$/);
                 if (m && m[1].trim()) {
-                    const rawName = m[1].trim();
-                    const preset = findEsimPreset(rawName);
-                    const cost = m[4] ? toNum(m[4]) : (preset ? preset.cost : null);
-                    entries.push({ date, kind: 'sale', name: 'eSIM ' + (preset ? preset.name : rawName), label: preset ? preset.name : rawName, qty: m[3] ? Number(m[3]) : 1, price: toNum(m[2]), cost });
+                    const label = m[1].trim(), n = toNum(m[2]);
+                    preset = findEsimPreset(label);
+                    let price = n;
+                    if (preset && cost == null && n === Number(preset.cost) && n !== Number(preset.price)) {
+                        cost = n;
+                        price = Number(preset.price) > 0 ? Number(preset.price) : null;
+                    }
+                    day.items.push({ label: preset ? preset.name : label, qty: m[3] ? Number(m[3]) : 1, price, cost: cost != null ? cost : (preset ? preset.cost : null) });
                     return;
                 }
+                if (cost != null && rest) { day.items.push({ label: rest, qty: 1, price: null, cost }); return; }
                 warnings.push('看不懂：' + line);
             });
-            // 逐日核對備忘錄上的算式結果
-            let bal = 0;
-            const byDate = {};
-            entries.forEach(e => { bal += e.kind === 'sale' ? e.price * e.qty : -e.amount; byDate[e.date] = bal; });
-            checks.forEach(c => {
-                const got = byDate[c.date];
-                if (got != null && Math.round(got) !== Math.round(c.expect)) warnings.push(`${c.date.slice(5).replace('-', '/')} 備忘錄算到 ${ledgerBalanceText(c.expect)}，照明細算是 ${ledgerBalanceText(got)}（${c.line}）`);
+
+            const entries = [];
+            let prev = null;
+            days.forEach(d => {
+                if (d.bal) {
+                    const terms = d.bal.terms.slice();
+                    const take = pred => { const k = terms.findIndex(pred); if (k < 0) return null; return terms.splice(k, 1)[0]; };
+                    if (prev != null && Math.abs(prev) >= 0.5) take(v => Math.abs(v - prev) < 0.5);
+                    d.items.filter(it => it.price != null).forEach(it => take(v => Math.abs(v - it.price * it.qty) < 0.5));
+                    d.pays.forEach(p => take(v => Math.abs(v + p.amount) < 0.5));
+                    d.items.filter(it => it.price == null).forEach(it => { const v = take(x => x > 0); if (v != null) it.price = v / it.qty; });
+                    terms.forEach(v => {
+                        if (v < 0) d.pays.push({ amount: -v, note: prev == null ? '期初儲值金' : '補登' });
+                        else if (prev == null) errors.push(`${d.md} 算式裡的 ${v} 對不到任何卡（可能是之前的欠款），請從欠款歸零那天開始貼`);
+                        else warnings.push(`${d.md} 算式裡的 ${v} 對不到任何卡`);
+                    });
+                }
+                let bal = prev || 0;
+                d.items.forEach(it => {
+                    if (it.price == null) { errors.push(`${d.md} ${it.label} 沒有售價（卡名後空一格打售價，或寫在當天算式裡）`); return; }
+                    if (it.cost == null) { errors.push(`${d.md} ${it.label} 找不到成本（後面寫「（成本」或先加進常用卡）`); return; }
+                    entries.push({ date: d.date, kind: 'sale', name: 'eSIM ' + it.label, label: it.label, qty: it.qty, price: it.price, cost: it.cost });
+                    bal += it.price * it.qty;
+                });
+                d.pays.forEach(p => { entries.push({ date: d.date, kind: 'pay', amount: p.amount, note: p.note || '' }); bal -= p.amount; });
+                if (d.bal && Math.round(bal) !== Math.round(d.bal.result)) warnings.push(`${d.md} 備忘錄算到 ${ledgerBalanceText(d.bal.result)}，照明細算是 ${ledgerBalanceText(bal)}（${d.bal.line}）`);
+                prev = bal;
             });
-            return { entries, warnings, balance: bal };
+            return { entries, warnings, errors, balance: prev || 0 };
         }
         async function modalLedgerImport(prefill) {
             await Promise.all([loadEsimPresets(), loadLedgerCustomers()]);
@@ -6584,13 +6627,10 @@
             if (!r.isConfirmed) return;
             const { customer, text, year } = r.value;
             const parsed = parseLedgerMemo(text, year);
-            const noCost = parsed.entries.filter(e => e.kind === 'sale' && (e.cost == null || !Number.isFinite(e.cost)));
-            const noPrice = parsed.entries.filter(e => e.kind === 'sale' && !(Number(e.price) > 0));
-            if (!parsed.entries.length || noCost.length || noPrice.length) {
+            if (!parsed.entries.length || parsed.errors.length) {
                 const msg = [];
                 if (!parsed.entries.length) msg.push('沒有解析到任何賣出或收款。');
-                if (noPrice.length) msg.push('這些卡沒寫售價，請在卡名後面空一格打售價（例：香港3天2g 200）：', ...noPrice.map(e => `　${e.date.slice(5).replace('-', '/')} ${e.label}`));
-                if (noCost.length) msg.push('這些卡找不到成本，請在文字後面補（成本x數量），或先到 eSIM「管理常用卡」新增：', ...[...new Set(noCost.map(e => e.label))].map(n => '　' + n));
+                msg.push(...parsed.errors);
                 await Swal.fire({ icon: 'warning', title: '還不能補登', html: `<pre class="text-left text-[12px] whitespace-pre-wrap">${booksEscape(msg.concat(parsed.warnings).join('\n'))}</pre>`, confirmButtonText: '回去修改', background: '#26221e', color: 'white' });
                 return modalLedgerImport(r.value);
             }
@@ -6598,7 +6638,7 @@
             let lastDate = '';
             parsed.entries.forEach(e => {
                 if (e.date !== lastDate) { L.push(e.date.replace(/-/g, '/')); lastDate = e.date; }
-                L.push(e.kind === 'sale' ? `　${e.label} ${e.price}${e.qty > 1 ? ' x' + e.qty : ''}　成本 ${e.cost}${e.qty > 1 ? ' x' + e.qty : ''}` : `　收款 ${e.amount}`);
+                L.push(e.kind === 'sale' ? `　${e.label} ${e.price}${e.qty > 1 ? ' x' + e.qty : ''}　成本 ${e.cost}${e.qty > 1 ? ' x' + e.qty : ''}` : `　收款 ${e.amount}${e.note ? '（' + e.note + '）' : ''}`);
             });
             L.push('', `補登後：${ledgerBalanceText(parsed.balance)}`);
             if (parsed.warnings.length) L.push('', '⚠ 注意：', ...parsed.warnings);
@@ -6615,7 +6655,7 @@
             try {
                 const entries = parsed.entries.map(e => e.kind === 'sale'
                     ? { date: e.date, kind: 'sale', name: e.name, qty: e.qty, price: e.price, cost: e.cost }
-                    : { date: e.date, kind: 'pay', amount: e.amount });
+                    : { date: e.date, kind: 'pay', amount: e.amount, note: e.note || '' });
                 const res = await API.ledgerImport({ customer, person: User.name, entries });
                 if (!res || res.status !== 'success') throw new Error((res && res.msg) || '補登失敗');
                 loadLedgerCustomers(true);
