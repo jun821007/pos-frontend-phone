@@ -711,6 +711,10 @@
             const res = await fetch(`${API_BASE_URL}/admin/repair-backfill`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' });
             return await res.json();
           },
+          newPhoneFix: async () => {
+            const res = await fetch(`${API_BASE_URL}/admin/newphone-fix`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' });
+            return await res.json();
+          },
           inventoryBackfill: async () => {
             const res = await fetch(`${API_BASE_URL}/admin/inventory-backfill`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' });
             return await res.json();
@@ -2398,7 +2402,33 @@
             L.push('');
             L.push(`六、流水分類寫錯（影響 Supabase）：${c.categoryMismatch} 項`);
             (r.categoryMismatch || []).slice(0, 30).forEach(x => L.push(`  ${x.name}（應為 ${x.categories.join('、')}）錯 ${x.wrongLogs} 筆`));
+            L.push('');
+            L.push(`七、新機賣出但沒轉已售出／沒寫出貨紀錄：${c.newPhoneGaps || 0} 筆`);
+            (r.newPhoneGaps || []).forEach(x => L.push(`  ${x.time} ${x.orderId} ${x.customer}　${x.name}${x.notSold ? '　庫存未轉已售出' : ''}${x.noRecord ? '　沒寫出貨紀錄' : ''}`));
             return L.join('\n');
+        }
+        async function runNewPhoneFix() {
+            const ok = await Swal.fire({
+                title: '補寫新機出貨？',
+                text: '把這些單的新機庫存改成已售出，並補寫新機出貨紀錄（已做過的會略過，不會重複）。',
+                showCancelButton: true, confirmButtonText: '補寫', cancelButtonText: '取消',
+                background: '#26221e', color: 'white'
+            });
+            if (!ok.isConfirmed) return;
+            Swal.fire({ title: '補寫中...', background: '#26221e', color: 'white', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
+            try {
+                const r = await API.newPhoneFix();
+                if (!r || r.status !== 'success') throw new Error((r && (r.msg || r.message)) || '補寫失敗');
+                const L = [`補寫完成 ${r.fixed.length} 筆`].concat(r.fixed.map(x => '  ' + x));
+                if (r.failed.length) L.push(`失敗 ${r.failed.length} 筆（請稍後再按一次）`, ...r.failed.map(x => '  ' + x));
+                Swal.fire({
+                    icon: r.failed.length ? 'warning' : 'success', title: '新機出貨補寫',
+                    html: `<pre class="text-left text-[12px] leading-5 text-slate-200 whitespace-pre-wrap">${booksEscape(L.join('\n'))}</pre>`,
+                    background: '#26221e', color: 'white'
+                });
+            } catch (e) {
+                Swal.fire({ icon: 'error', title: '補寫失敗', text: (e && e.message) || '', background: '#26221e', color: 'white' });
+            }
         }
         async function runStockAudit() {
             if (!(User && User.isAdmin)) {
@@ -2417,7 +2447,8 @@
             const text = stockAuditText(r);
             const res = await Swal.fire({
                 title: '庫存健檢結果',
-                html: `<pre class="text-left text-[11px] leading-5 text-slate-200 whitespace-pre-wrap max-h-[60vh] overflow-y-auto">${booksEscape(text)}</pre>`,
+                html: `<pre class="text-left text-[11px] leading-5 text-slate-200 whitespace-pre-wrap max-h-[60vh] overflow-y-auto">${booksEscape(text)}</pre>`
+                    + ((r.counts && r.counts.newPhoneGaps) ? `<button type="button" onclick="runNewPhoneFix()" class="mt-3 px-3 py-2 rounded-lg bg-amber-700 text-white text-sm">補寫新機出貨（${r.counts.newPhoneGaps} 筆）</button>` : ''),
                 width: 760, background: '#26221e', color: 'white',
                 showCancelButton: true, confirmButtonText: '複製全部', cancelButtonText: '關閉',
                 showDenyButton: !!(r.counts && r.counts.categoryMismatch), denyButtonText: '修正流水分類'
@@ -5650,6 +5681,9 @@
                     if (result.status === 'error') { 
                         Swal.fire({icon:'error', title:'結帳失敗', text: result.msg || '請截圖通知管理員', background: '#26221e'}); 
                         return; 
+                    }
+                    if (result.newPhoneFailed && result.newPhoneFailed.length) {
+                        await Swal.fire({ icon: 'warning', title: '已結帳，但新機出貨沒寫完', html: `<div class="text-left text-sm">單號 ${booksEscape(result.orderId || oid)}<br>${result.newPhoneFailed.map(booksEscape).join('<br>')}<br><br>請到「帳目 → 庫存健檢」按「補寫新機出貨」。</div>`, background: '#26221e', color: 'white' });
                     }
                     if (result.stockLogFailed) {
                         await Swal.fire({ icon: 'warning', title: '已結帳，但庫存沒扣到', html: `<div class="text-left text-sm">單號 ${booksEscape(result.orderId || oid)}<br>請到庫存管理手動出庫：<br>${(result.stockLogItems || []).map(booksEscape).join('<br>')}</div>`, background: '#26221e', color: 'white' });
