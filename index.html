@@ -4408,6 +4408,7 @@
                 const res = await API.getPendingOrders(); 
                 DB.pending = res || [];
                 renderPendingList(); 
+                loadLedgerCustomers(true).then(() => renderPendingList());
             } catch(e) {
                 console.error('載入未結帳款失敗:', e);
                 d.innerHTML = '<div class="text-center text-red-500 mt-10">載入失敗，請重試</div>';
@@ -4496,6 +4497,10 @@
                         </div>
                         <div onclick="this.closest('.mb-3').querySelector('.accordion-content').classList.toggle('open')" class="text-right cursor-pointer shrink-0 ml-2">
                             <div class="text-yellow-500 font-mono text-sm">$${bucket.total.toLocaleString()}</div>
+                            ${(() => {
+                                const lc = hasCredit && (LedgerCustomers.list || []).find(c => String(c.name || '').trim().toLowerCase() === bucket.name.trim().toLowerCase());
+                                return lc && lc.pool >= 0.5 ? `<div class="text-[10px] text-cyan-300">已先付 ${Math.round(lc.pool).toLocaleString()}・還欠 ${ledgerBalanceText(lc.balance)}</div>` : '';
+                            })()}
                             <div class="text-xs font-mono ${netCls}">利 ${bucket.net.toLocaleString()}</div>
                         </div>
                     </div>
@@ -6377,7 +6382,7 @@
         }
         function ledgerBalanceText(b) {
             const n = Math.round(Number(b) || 0);
-            return n < 0 ? '儲值金+' + (-n).toLocaleString() : n.toLocaleString();
+            return n < 0 ? '儲值金+' + (-n).toLocaleString('en-US') : n.toLocaleString('en-US');
         }
         function mdTaipeiFromIso(iso) {
             if (!iso) return '?';
@@ -6461,8 +6466,8 @@
                 title: booksEscape(ledger.customer),
                 html: `<div class="grid grid-cols-3 gap-2 text-center text-xs mb-3">
                         <div class="glass p-2 rounded-lg"><div class="text-slate-400">未結掛帳</div><div class="text-yellow-400 font-bold">$${Math.round(ledger.owed).toLocaleString()}</div></div>
-                        <div class="glass p-2 rounded-lg"><div class="text-slate-400">儲值金</div><div class="text-cyan-300 font-bold">$${Math.round(ledger.pool).toLocaleString()}</div></div>
-                        <div class="glass p-2 rounded-lg"><div class="text-slate-400">目前</div><div class="font-bold ${ledger.balance < 0 ? 'text-cyan-300' : 'text-yellow-400'}">${ledgerBalanceText(ledger.balance)}</div></div>
+                        <div class="glass p-2 rounded-lg"><div class="text-slate-400">${ledger.owed > 0 ? '已先付' : '儲值金'}</div><div class="text-cyan-300 font-bold">$${Math.round(ledger.pool).toLocaleString()}</div></div>
+                        <div class="glass p-2 rounded-lg"><div class="text-slate-400">${ledger.balance < 0 ? '目前' : '還欠'}</div><div class="font-bold ${ledger.balance < 0 ? 'text-cyan-300' : 'text-yellow-400'}">${ledgerBalanceText(ledger.balance)}</div></div>
                     </div>
                     <pre class="text-left text-[12px] leading-5 text-slate-200 whitespace-pre-wrap max-h-[45vh] overflow-y-auto bg-slate-900/60 rounded-lg p-2">${booksEscape(text)}</pre>
                     <button type="button" onclick="Swal.close();openCustomerLedger(${JSON.stringify(ledger.customer).replace(/"/g, '&quot;')}, ${!fromStart})" class="text-xs text-cyan-300 underline mt-2">${fromStart ? '只看未結清的部分' : '從頭看全部'}</button>`,
