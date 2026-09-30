@@ -6281,8 +6281,9 @@
             return EsimPresets;
         }
         function findEsimPreset(name) {
-            const k = String(name || '').trim().toLowerCase();
-            return (EsimPresets || DEFAULT_ESIM_PRESETS).find(p => p.name.toLowerCase() === k) || null;
+            const norm = s => String(s || '').replace(/\s+/g, '').toLowerCase();
+            const k = norm(name);
+            return (EsimPresets || DEFAULT_ESIM_PRESETS).find(p => norm(p.name) === k) || null;
         }
         function addEsimToCart(name, price, cost, qty) {
             Cart.push({ type: 'esim', name: name ? 'eSIM ' + name : 'eSIM', cost: Number(cost) || 0, price: Number(price) || 0, quantity: Math.max(1, Math.round(Number(qty) || 1)), itemId: 'ESIM-' + Date.now() });
@@ -6533,6 +6534,13 @@
                 m = line.match(/=\s*儲值金\s*\+?\s*([\d,]+)\s*$/);
                 if (m && /^[\d,\s+\-*x×()]+=/.test(line)) { checks.push({ date, expect: -toNum(m[1]), line }); return; }
                 if (/^[\d,\s+\-*x×().]+=\s*-?[\d,]+$/.test(line)) { checks.push({ date, expect: toNum(line.split('=').pop()), line }); return; }
+                // 整行就是常用卡名（可帶 *數量），售價用清單的；清單沒售價就標出來
+                m = line.match(/^(.+?)\s*(?:[*x×]\s*(\d+))?$/);
+                const whole = m && findEsimPreset(m[1]);
+                if (whole) {
+                    entries.push({ date, kind: 'sale', name: 'eSIM ' + whole.name, label: whole.name, qty: m[2] ? Number(m[2]) : 1, price: Number(whole.price) > 0 ? Number(whole.price) : null, cost: whole.cost });
+                    return;
+                }
                 m = line.match(/^(.*?\D)\s*(\d[\d,]*)\s*(?:[*x×]\s*(\d+))?\s*(?:=\s*[\d,]+)?\s*(?:[（(]\s*(\d[\d,]*)\s*(?:[*x×]\s*\d+)?\s*[)）])?$/);
                 if (m && m[1].trim()) {
                     const rawName = m[1].trim();
@@ -6577,9 +6585,11 @@
             const { customer, text, year } = r.value;
             const parsed = parseLedgerMemo(text, year);
             const noCost = parsed.entries.filter(e => e.kind === 'sale' && (e.cost == null || !Number.isFinite(e.cost)));
-            if (!parsed.entries.length || noCost.length) {
+            const noPrice = parsed.entries.filter(e => e.kind === 'sale' && !(Number(e.price) > 0));
+            if (!parsed.entries.length || noCost.length || noPrice.length) {
                 const msg = [];
                 if (!parsed.entries.length) msg.push('沒有解析到任何賣出或收款。');
+                if (noPrice.length) msg.push('這些卡沒寫售價，請在卡名後面空一格打售價（例：香港3天2g 200）：', ...noPrice.map(e => `　${e.date.slice(5).replace('-', '/')} ${e.label}`));
                 if (noCost.length) msg.push('這些卡找不到成本，請在文字後面補（成本x數量），或先到 eSIM「管理常用卡」新增：', ...[...new Set(noCost.map(e => e.label))].map(n => '　' + n));
                 await Swal.fire({ icon: 'warning', title: '還不能補登', html: `<pre class="text-left text-[12px] whitespace-pre-wrap">${booksEscape(msg.concat(parsed.warnings).join('\n'))}</pre>`, confirmButtonText: '回去修改', background: '#26221e', color: 'white' });
                 return modalLedgerImport(r.value);
