@@ -6288,16 +6288,30 @@
             Cart.push({ type: 'esim', name: name ? 'eSIM ' + name : 'eSIM', cost: Number(cost) || 0, price: Number(price) || 0, quantity: Math.max(1, Math.round(Number(qty) || 1)), itemId: 'ESIM-' + Date.now() });
             renderCart();
         }
-        function pickEsimPreset(i) {
+        async function pickEsimPreset(i) {
             const p = (EsimPresets || [])[i];
             if (!p) return;
-            const qty = document.getElementById('es-qty');
-            addEsimToCart(p.name, p.price, p.cost, qty ? qty.value : 1);
+            const qtyEl = document.getElementById('es-qty');
+            const qty = qtyEl ? qtyEl.value : 1;
             Swal.close();
+            let price = Number(p.price) || 0;
+            if (!(price > 0)) {
+                const r = await Swal.fire({
+                    title: `${booksEscape(p.name)} 售價`,
+                    html: `<div class="text-xs text-slate-400">成本 ${p.cost}（單張）</div>`,
+                    input: 'number', inputPlaceholder: '單張售價',
+                    showCancelButton: true, confirmButtonText: '加入', cancelButtonText: '取消',
+                    background: '#26221e', color: 'white',
+                    inputValidator: v => (Number(v) > 0 ? undefined : '請輸入售價')
+                });
+                if (!r.isConfirmed) return;
+                price = Number(r.value);
+            }
+            addEsimToCart(p.name, price, p.cost, qty);
         }
         async function modalESIM() {
             const list = await loadEsimPresets();
-            const btns = list.map((p, i) => `<button type="button" onclick="pickEsimPreset(${i})" class="px-3 py-2 rounded-lg bg-cyan-900/60 border border-cyan-600 text-white text-sm text-left"><div class="font-bold">${booksEscape(p.name)} ${p.price}</div><div class="text-[11px] text-slate-400">成本 ${p.cost}</div></button>`).join('');
+            const btns = list.map((p, i) => `<button type="button" onclick="pickEsimPreset(${i})" class="px-3 py-2 rounded-lg bg-cyan-900/60 border border-cyan-600 text-white text-sm text-left"><div class="font-bold">${booksEscape(p.name)} ${p.price > 0 ? p.price : '<span class="text-[11px] text-slate-400">售價現打</span>'}</div><div class="text-[11px] text-slate-400">成本 ${p.cost}</div></button>`).join('');
             const r = await Swal.fire({
                 title: 'eSIM',
                 html: `<div class="flex items-center justify-center gap-2 mb-3 text-sm">數量 <input id="es-qty" type="number" min="1" value="1" class="swal2-input !m-0 !w-20 text-center"></div>
@@ -6317,10 +6331,10 @@
         }
         async function modalEsimPresets() {
             const list = await loadEsimPresets(true);
-            const text = list.map(p => `${p.name} ${p.price} ${p.cost}`).join('\n');
+            const text = list.map(p => p.price > 0 ? `${p.name} ${p.price} ${p.cost}` : `${p.name} ${p.cost}`).join('\n');
             const r = await Swal.fire({
                 title: '常用 eSIM',
-                html: `<div class="text-xs text-slate-400 text-left mb-2">一行一張：<b>卡名 售價 成本</b>（例：馬來 650 589）。刪掉那行就是刪除。</div><textarea id="es-presets" class="swal2-textarea !m-0 !w-full" rows="8">${booksEscape(text)}</textarea>`,
+                html: `<div class="text-xs text-slate-400 text-left mb-2">一行一張：<b>卡名 售價 成本</b>（例：馬來 650 589）；售價不固定就只打 <b>卡名 成本</b>（例：香港3天2g 108），賣的時候再問售價。卡名和數字中間要空一格。刪掉那行就是刪除。</div><textarea id="es-presets" class="swal2-textarea !m-0 !w-full" rows="8">${booksEscape(text)}</textarea>`,
                 showCancelButton: true, confirmButtonText: '儲存', cancelButtonText: '取消',
                 background: '#26221e', color: 'white',
                 preConfirm: () => {
@@ -6328,9 +6342,11 @@
                     for (const line of document.getElementById('es-presets').value.split('\n')) {
                         const s = line.trim();
                         if (!s) continue;
-                        const m = s.match(/^(.+?)\s+(\d+(?:\.\d+)?)\s+(\d+(?:\.\d+)?)$/);
-                        if (!m) { Swal.showValidationMessage('看不懂這行：' + s); return false; }
-                        out.push({ name: m[1].trim(), price: Number(m[2]), cost: Number(m[3]) });
+                        const m3 = s.match(/^(.+?)\s+(\d+(?:\.\d+)?)\s+(\d+(?:\.\d+)?)$/);
+                        const m2 = !m3 && s.match(/^(.+?)\s+(\d+(?:\.\d+)?)$/);
+                        if (m3) out.push({ name: m3[1].trim(), price: Number(m3[2]), cost: Number(m3[3]) });
+                        else if (m2) out.push({ name: m2[1].trim(), price: 0, cost: Number(m2[2]) });
+                        else { Swal.showValidationMessage('看不懂這行：' + s); return false; }
                     }
                     return out;
                 }
