@@ -785,6 +785,14 @@
             const res = await fetch(`${API_BASE_URL}/pos-prefs`);
             return await res.json();
           },
+          getAuditAck: async () => {
+            const res = await fetch(`${API_BASE_URL}/audit-ack`);
+            return await res.json();
+          },
+          changeAuditAck: async (data) => {
+            const res = await fetch(`${API_BASE_URL}/audit-ack`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data || {}) });
+            return await res.json();
+          },
           getEsimPresets: async () => {
             const res = await fetch(`${API_BASE_URL}/esim-presets`);
             return await res.json();
@@ -2414,6 +2422,7 @@
             const c = r.counts || {};
             L.push(`【庫存健檢】近 ${r.days} 天　品項 ${c.items}　流水 ${c.logs}`);
             L.push('');
+            if (r.ackHidden) L.push(`（已確認隱藏：第一項 ${r.ackHidden.missing} 張、第二項 ${r.ackHidden.orphans} 種）`, '');
             L.push(`一、結帳有賣但沒扣庫存：${c.missingDeductions} 張單`);
             (r.missingDeductions || []).forEach(x => L.push(`  ${x.date} ${x.orderId} ${x.customer}　應扣 ${x.qty} 實扣 ${x.logged}　${x.items.join('、')}`));
             L.push('');
@@ -2459,7 +2468,29 @@
                 Swal.fire({ icon: 'error', title: '補寫失敗', text: (e && e.message) || '', background: '#26221e', color: 'white' });
             }
         }
-        async function runStockAudit() {
+        const auditAckKeyMissing = x => 'order:' + x.orderId;
+        const auditAckKeyOrphan = x => `orphan:${x.name}|${x.count}`;
+        async function ackStockAudit() {
+            const r = UI.lastStockAudit;
+            if (!r) return;
+            const add = [...(r.missingDeductions || []).map(auditAckKeyMissing), ...(r.orphans || []).map(auditAckKeyOrphan)];
+            if (!add.length) return;
+            const ok = await Swal.fire({
+                title: '確認這些都校正好了？',
+                text: `第一項 ${(r.missingDeductions || []).length} 張、第二項 ${(r.orphans || []).length} 種會藏起來，之後健檢只顯示新的。第二項的品名之後若又有新的出庫，會再出現。`,
+                showCancelButton: true, confirmButtonText: '已確認', cancelButtonText: '取消',
+                background: '#26221e', color: 'white'
+            });
+            if (!ok.isConfirmed) return;
+            try {
+                const res = await API.changeAuditAck({ add });
+                if (!res || res.status !== 'success') throw new Error((res && res.msg) || '儲存失敗');
+                runStockAudit();
+            } catch (e) {
+                Swal.fire({ icon: 'error', title: '儲存失敗', text: e.message || '', background: '#26221e', color: 'white' });
+            }
+        }
+        async function runStockAudit(showAll) {
             if (!(User && User.isAdmin)) {
                 Swal.fire({ icon: 'error', title: '僅管理員可執行', background: '#26221e', color: 'white' });
                 return;
@@ -2467,17 +2498,34 @@
             Swal.fire({ title: '健檢中...', background: '#26221e', color: 'white', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
             let r;
             try {
-                r = await API.stockAudit(90);
+                const [audit, ack] = await Promise.all([API.stockAudit(90), API.getAuditAck().catch(() => null)]);
+                r = audit;
                 if (!r || r.status !== 'success') throw new Error((r && (r.msg || r.message)) || '健檢失敗');
+                const acked = new Set((ack && ack.status === 'success' && ack.list) || []);
+                if (!showAll && acked.size) {
+                    const missing = (r.missingDeductions || []).filter(x => !acked.has(auditAckKeyMissing(x)));
+                    const orphans = (r.orphans || []).filter(x => !acked.has(auditAckKeyOrphan(x)));
+                    const hidden = { missing: (r.missingDeductions || []).length - missing.length, orphans: (r.orphans || []).length - orphans.length };
+                    r.missingDeductions = missing;
+                    r.orphans = orphans;
+                    r.counts = { ...(r.counts || {}), missingDeductions: missing.length, orphans: orphans.length };
+                    if (hidden.missing || hidden.orphans) r.ackHidden = hidden;
+                }
             } catch (e) {
                 Swal.fire({ icon: 'error', title: '健檢失敗', text: (e && e.message) || '', background: '#26221e', color: 'white' });
                 return;
             }
+            UI.lastStockAudit = r;
             const text = stockAuditText(r);
+            const canAck = (r.missingDeductions || []).length + (r.orphans || []).length > 0;
             const res = await Swal.fire({
                 title: '庫存健檢結果',
                 html: `<pre class="text-left text-[11px] leading-5 text-slate-200 whitespace-pre-wrap max-h-[60vh] overflow-y-auto">${booksEscape(text)}</pre>`
-                    + ((r.counts && r.counts.newPhoneGaps) ? `<button type="button" onclick="runNewPhoneFix()" class="mt-3 px-3 py-2 rounded-lg bg-amber-700 text-white text-sm">補寫新機出貨（${r.counts.newPhoneGaps} 筆）</button>` : ''),
+                    + '<div class="flex flex-wrap justify-center gap-2 mt-3">'
+                    + ((r.counts && r.counts.newPhoneGaps) ? `<button type="button" onclick="runNewPhoneFix()" class="px-3 py-2 rounded-lg bg-amber-700 text-white text-sm">補寫新機出貨（${r.counts.newPhoneGaps} 筆）</button>` : '')
+                    + (canAck ? `<button type="button" onclick="ackStockAudit()" class="px-3 py-2 rounded-lg bg-emerald-800 text-white text-sm">一、二項已確認（之後只顯示新的）</button>` : '')
+                    + (r.ackHidden ? `<button type="button" onclick="runStockAudit(true)" class="px-3 py-2 rounded-lg bg-slate-700 text-slate-200 text-sm">顯示已確認的</button>` : '')
+                    + '</div>',
                 width: 760, background: '#26221e', color: 'white',
                 showCancelButton: true, confirmButtonText: '複製全部', cancelButtonText: '關閉',
                 showDenyButton: !!(r.counts && r.counts.categoryMismatch), denyButtonText: '修正流水分類'
@@ -4576,6 +4624,19 @@
             }
             document.getElementById('h-end').value = end;
             document.getElementById('h-start').value = start;
+            doHistorySearch();
+        }
+        // 以目前開始日期所在月份為基準跳整個月；跳到本月時結束日為今天
+        function shiftHistoryMonth(delta) {
+            const today = ymdTaipei(new Date());
+            const cur = document.getElementById('h-start').value;
+            const base = /^\d{4}-\d{2}/.test(cur) ? cur : today;
+            const n = Number(base.slice(0, 4)) * 12 + Number(base.slice(5, 7)) - 1 + delta;
+            const y = Math.floor(n / 12), m = n % 12 + 1;
+            const ym = `${y}-${String(m).padStart(2, '0')}`;
+            const last = `${ym}-${String(new Date(y, m, 0).getDate()).padStart(2, '0')}`;
+            document.getElementById('h-start').value = `${ym}-01`;
+            document.getElementById('h-end').value = ym === today.slice(0, 7) ? today : last;
             doHistorySearch();
         }
         async function doHistorySearch() { 
