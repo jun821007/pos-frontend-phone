@@ -6415,19 +6415,44 @@
             const qty = qtyEl ? qtyEl.value : 1;
             Swal.close();
             let price = Number(p.price) || 0;
+            let finalQty = qty;
             if (!(price > 0)) {
                 const r = await Swal.fire({
                     title: `${booksEscape(p.name)} 售價`,
-                    html: `<div class="text-xs text-slate-400">成本 ${p.cost}（單張）</div>`,
-                    input: 'number', inputPlaceholder: '單張售價',
+                    html: `<div class="text-xs text-slate-400 mb-2">成本 ${p.cost}（單張）</div>
+                        <input id="esp-price" type="number" min="1" class="swal2-input !mt-0" placeholder="單張售價">
+                        <div class="flex items-center justify-center gap-2 mt-3 text-sm">數量 <input id="esp-qty" type="number" min="1" value="${Math.max(1, parseInt(qty, 10) || 1)}" class="swal2-input !m-0 !w-24 text-center"></div>
+                        <div id="esp-sum" class="text-xs text-slate-400 mt-2"></div>`,
                     showCancelButton: true, confirmButtonText: '加入', cancelButtonText: '取消',
                     background: '#26221e', color: 'white',
-                    inputValidator: v => (Number(v) > 0 ? undefined : '請輸入售價')
+                    didOpen: () => {
+                        const priceEl = document.getElementById('esp-price');
+                        const qtyEl2 = document.getElementById('esp-qty');
+                        const sumEl = document.getElementById('esp-sum');
+                        const update = () => {
+                            const pr = Number(priceEl.value) || 0;
+                            const q = parseInt(qtyEl2.value, 10) || 0;
+                            sumEl.textContent = pr > 0 && q > 0 ? `小計 ${(pr * q).toLocaleString('en-US')}（利潤 ${((pr - (Number(p.cost) || 0)) * q).toLocaleString('en-US')}）` : '';
+                        };
+                        priceEl.addEventListener('input', update);
+                        qtyEl2.addEventListener('input', update);
+                        priceEl.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); qtyEl2.focus(); qtyEl2.select(); } });
+                        qtyEl2.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); Swal.clickConfirm(); } });
+                        priceEl.focus();
+                    },
+                    preConfirm: () => {
+                        const pr = Number(document.getElementById('esp-price').value);
+                        const q = parseInt(document.getElementById('esp-qty').value, 10);
+                        if (!(pr > 0)) { Swal.showValidationMessage('請輸入售價'); return false; }
+                        if (!(q > 0)) { Swal.showValidationMessage('數量至少 1'); return false; }
+                        return { price: pr, qty: q };
+                    }
                 });
-                if (!r.isConfirmed) return;
-                price = Number(r.value);
+                if (!r.isConfirmed || !r.value) return;
+                price = r.value.price;
+                finalQty = r.value.qty;
             }
-            addEsimToCart(p.name, price, p.cost, qty);
+            addEsimToCart(p.name, price, p.cost, finalQty);
         }
         async function modalESIM() {
             const list = await loadEsimPresets();
