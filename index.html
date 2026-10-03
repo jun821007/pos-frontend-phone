@@ -555,6 +555,15 @@
                     <input type="text" id="new-acc-category" class="hidden input-dark p-2 rounded text-sm" placeholder="新分類名稱">
                     <label class="text-xs text-slate-400 mt-1">品項名稱</label>
                     <input type="text" id="new-acc-name" class="input-dark p-2 rounded text-sm" placeholder="品項名稱">
+                    <div class="grid grid-cols-3 gap-2 mt-1">
+                        <label class="text-xs text-slate-400">成本</label>
+                        <label class="text-xs text-slate-400">售價</label>
+                        <label class="text-xs text-slate-400">最低庫存</label>
+                        <input type="number" id="new-acc-cost" min="0" class="input-dark p-2 rounded text-sm" placeholder="0">
+                        <input type="number" id="new-acc-price" min="0" class="input-dark p-2 rounded text-sm" placeholder="0">
+                        <input type="number" id="new-acc-min" min="0" class="input-dark p-2 rounded text-sm" placeholder="0">
+                    </div>
+                    <p class="text-[11px] text-slate-500">售價是結帳時預設帶入的價格；庫存低於等於最低庫存會進補貨清單</p>
                     <button onclick="addNewAccessory()" class="bg-amber-600 hover:bg-amber-500 text-white rounded font-bold text-sm py-2 mt-1">新增</button>
                 </div>
             </div>
@@ -757,11 +766,11 @@
             const res = await fetch(`${API_BASE_URL}/company-template/${encodeURIComponent(name)}`, { method: 'DELETE' });
             return await res.json();
           },
-          addAccessory: async (category, name) => {
+          addAccessory: async (category, name, extra = {}) => {
             const res = await fetch(`${API_BASE_URL}/accessory`, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ category, name })
+              body: JSON.stringify({ category, name, ...extra })
             });
             return await res.json();
           },
@@ -5520,7 +5529,7 @@
             renderCart();
         }
         async function addNewCompanyTemplate() { const n = document.getElementById('new-cp-name').value.trim(); const c = document.getElementById('new-cp-cost').value; const p = document.getElementById('new-cp-price').value; if(!n || !c || !p) { Swal.fire({icon:'warning', title:'請填寫完整', toast:true, position:'top', background:'#26221e'}); return; } try { const res = await API.addCompanyTemplate(n, c, p); if(res.status === 'success') { Swal.fire({icon:'success', title:'已新增', toast:true, position:'top', background:'#26221e'}); document.getElementById('new-cp-name').value=''; document.getElementById('new-cp-cost').value=''; document.getElementById('new-cp-price').value=''; fetchData(); renderCompanyTemplateList(); } else { Swal.fire({icon:'error', title:'新增失敗', text: res.msg || '', background:'#26221e'}); } } catch(e) { Swal.fire({icon:'error', title:'新增失敗', text: e.message || '請重試', background:'#26221e'}); } }
-        async function addNewAccessory(){const sel=document.getElementById('new-acc-category-select');const selVal=sel?sel.value:'__new__';const cat=(selVal==='__new__'?document.getElementById('new-acc-category').value:selVal).trim();const nm=document.getElementById('new-acc-name').value.trim();if(!cat||!nm){Swal.fire({icon:'warning',title:'請選擇分類並填寫品項名稱',toast:true,position:'top',background:'#26221e'});return;}if(DB.inv.some(i=>i.type==='accessory'&&String(i.name||'').trim()===nm)){Swal.fire({icon:'warning',title:'已有同名品項',text:nm,background:'#26221e',color:'white'});return;}try{const res=await API.addAccessory(cat,nm);if(res.status==='success'){Swal.fire({icon:'success',title:'已新增 '+res.id,toast:true,background:'#26221e'});document.getElementById('new-acc-category').value='';document.getElementById('new-acc-name').value='';await fetchData();renderNewAccCategoryOptions(cat);}else{Swal.fire({icon:'error',title:'新增失敗',text:res.msg||'',background:'#26221e'});}}catch(e){Swal.fire({icon:'error',title:'新增失敗',text:e.message||'',background:'#26221e'});}}
+        async function addNewAccessory(){const sel=document.getElementById('new-acc-category-select');const selVal=sel?sel.value:'__new__';const cat=(selVal==='__new__'?document.getElementById('new-acc-category').value:selVal).trim();const nm=document.getElementById('new-acc-name').value.trim();if(!cat||!nm){Swal.fire({icon:'warning',title:'請選擇分類並填寫品項名稱',toast:true,position:'top',background:'#26221e'});return;}if(DB.inv.some(i=>i.type==='accessory'&&String(i.name||'').trim()===nm)){Swal.fire({icon:'warning',title:'已有同名品項',text:nm,background:'#26221e',color:'white'});return;}const numOf=id=>{const v=Number(document.getElementById(id).value);return v>0?v:0;};const cost=numOf('new-acc-cost'),price=numOf('new-acc-price'),minStock=Math.round(numOf('new-acc-min'));try{const res=await API.addAccessory(cat,nm,{cost,price,minStock});if(res.status==='success'){if(minStock>0&&res.minStockSaved===false){Swal.fire({icon:'warning',title:'已新增 '+res.id,text:'但庫存清單找不到「最低庫存」欄位（標題要含 安全／最低／警戒），最低庫存沒寫入',background:'#26221e',color:'white'});}else{Swal.fire({icon:'success',title:'已新增 '+res.id,toast:true,background:'#26221e'});}['new-acc-category','new-acc-name','new-acc-cost','new-acc-price','new-acc-min'].forEach(id=>{document.getElementById(id).value='';});await fetchData();renderNewAccCategoryOptions(cat);}else{Swal.fire({icon:'error',title:'新增失敗',text:res.msg||'',background:'#26221e'});}}catch(e){Swal.fire({icon:'error',title:'新增失敗',text:e.message||'',background:'#26221e'});}}
         function renderCompanyTemplateList(){const el=document.getElementById('company-template-list');if(!el)return;el.innerHTML='';(DB.companyTemplates||[]).forEach(t=>{el.innerHTML+='<div class="flex justify-between p-2 bg-slate-800 rounded"><span>'+t.name+'</span><button onclick="deleteCompanyTemplate(&quot;'+t.name.replace(/"/g,'&quot;')+'&quot;)" class="text-red-400"><i class="fa-solid fa-trash"></i></button></div>';});}
         async function deleteCompanyTemplate(name){const r=await Swal.fire({title:'確定刪除？',text:name,showCancelButton:true,background:'#26221e',color:'white'});if(!r.isConfirmed)return;try{const res=await API.deleteCompanyTemplate(name);if(res.status==='success'){Swal.fire({icon:'success',title:'已刪除',toast:true,background:'#26221e'});fetchData();renderCompanyTemplateList();}else{Swal.fire({icon:'error',title:'刪除失敗',text:res.msg||'',background:'#26221e'});}}catch(e){Swal.fire({icon:'error',title:'刪除失敗',text:e.message||'',background:'#26221e'});}}
         async function changeStatus(id, s) { 
