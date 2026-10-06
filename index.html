@@ -2160,9 +2160,11 @@
                         <div class="text-xs font-mono ${netColor}">利 ${(Number(g.net) || 0).toLocaleString()}</div>
                     </div>
                     </div>
-                    <div class="w-16 text-right text-xs flex flex-col items-end gap-1 shrink-0">
+                    <div class="min-w-[4rem] text-right text-xs flex flex-col items-end gap-1 shrink-0">
                         <div class="flex items-center gap-1">${statusHtml}${payBadge}</div>
                         ${g.status === 'Pending' ? `<button onclick="event.stopPropagation(); settle('${g.orderId}', ${g.total})" class="text-[10px] bg-green-900 text-green-200 px-1.5 rounded border border-green-700 hover:bg-green-800">入帳</button>` : ''}
+                        ${editablePending && g.payMethod === 'credit' ? `<button type="button" onclick="event.stopPropagation(); changePendingPayMethod('${oidEsc}', 'linepay')" class="text-[10px] bg-green-950 text-green-300 px-1.5 rounded border border-green-700 hover:bg-green-900 whitespace-nowrap">改LINE Pay</button>` : ''}
+                        ${editablePending && g.payMethod === 'linepay' ? `<button type="button" onclick="event.stopPropagation(); changePendingPayMethod('${oidEsc}', 'credit')" class="text-[10px] bg-amber-950 text-amber-300 px-1.5 rounded border border-amber-700 hover:bg-amber-900 whitespace-nowrap">改掛帳</button>` : ''}
                         ${opts.allowAmend ? `<button onclick="event.stopPropagation(); startAmendOrder('${oidEsc}')" class="text-[10px] bg-cyan-900 text-cyan-200 px-1.5 rounded border border-cyan-700 hover:bg-cyan-800">補 key</button>` : ''}
                         ${(User && User.isAdmin) ? `<button type="button" onclick="event.preventDefault(); event.stopPropagation(); window.openOrderSalaryPay && window.openOrderSalaryPay('${oidEsc}')" class="text-[10px] bg-amber-900 text-amber-200 px-1.5 rounded border border-amber-700 hover:bg-amber-800 relative z-10">薪資</button>` : ''}
                         <button onclick="event.stopPropagation(); confirmDeleteOrder('${g.orderId}')" class="text-[10px] bg-red-900 text-red-200 px-1.5 rounded border border-red-700 hover:bg-red-800">刪單</button>
@@ -4608,6 +4610,7 @@
                 UI.pendingOrdersByCustomer[bucketKey] = bucketOrderIds;
                 const bucketIdsAttr = bucketOrderIds.join(',');
                 const bucketAllSelected = bucketOrderIds.length > 0 && bucketOrderIds.every(id => UI.selectedPendingOrders.has(id));
+                const bucketOpen = (UI.pendingOpenBuckets || new Set()).has(bucket.name.trim().toLowerCase());
                 d.innerHTML += `
                 <div class="mb-3 rounded-xl border border-slate-700 overflow-hidden">
                     <div class="px-3 py-2 bg-slate-800/70 flex justify-between items-center">
@@ -4615,18 +4618,19 @@
                             <label class="shrink-0 flex items-center" onclick="event.stopPropagation()" title="全選此客戶">
                                 <input type="checkbox" class="pending-customer-cb accent-yellow-500 w-4 h-4" data-bucket-key="${bucketKey}" data-order-ids="${bucketIdsAttr}" ${bucketAllSelected ? 'checked' : ''} onchange="togglePendingCustomerSelect('${bucketKey}', this.checked)">
                             </label>
-                            <div onclick="this.closest('.mb-3').querySelector('.accordion-content').classList.toggle('open')" class="flex items-center gap-2 min-w-0 cursor-pointer flex-1">
+                            <div onclick="togglePendingBucket(this, '${bucketKey}')" class="flex items-center gap-2 min-w-0 cursor-pointer flex-1">
+                                <i class="pending-bucket-chevron fa-solid fa-chevron-${bucketOpen ? 'down' : 'right'} text-[10px] text-slate-500 w-3"></i>
                                 <div class="text-white font-bold truncate">${bucket.name}</div>
                                 ${methodBadges}
                             </div>
                         </div>
-                        <div onclick="this.closest('.mb-3').querySelector('.accordion-content').classList.toggle('open')" class="text-right cursor-pointer shrink-0 ml-2">
+                        <div onclick="togglePendingBucket(this, '${bucketKey}')" class="text-right cursor-pointer shrink-0 ml-2">
                             <div class="text-yellow-500 font-mono text-sm">$${Math.round(bucket.total - prepaid).toLocaleString()}</div>
                             ${prepaid ? `<div class="text-[10px] text-cyan-300">原 ${Math.round(bucket.total).toLocaleString()}・已先付 ${Math.round(prepaid).toLocaleString()}</div>` : ''}
                             <div class="text-xs font-mono ${netCls}">利 ${bucket.net.toLocaleString()}</div>
                         </div>
                     </div>
-                    <div class="accordion-content open bg-slate-900/30">
+                    <div class="accordion-content${bucketOpen ? ' open' : ''} bg-slate-900/30">
                         ${hasCredit ? `<div class="px-3 pt-2 flex gap-2"><button type="button" onclick="openCustomerLedger(UI.pendingBucketNames['${bucketKey}'])" class="text-[11px] px-2.5 py-1 rounded-lg bg-slate-800 border border-cyan-700 text-cyan-300">帳本／收款／對帳單</button></div>` : ''}
                         ${bucket.orders.map(g => renderOrderRow(g, { compact: true, selectable: true, idPrefix: 'group-pending', editablePending: true })).join('')}
                     </div>
@@ -4634,6 +4638,18 @@
             });
             if (prepaidSum) document.getElementById('pending-total-amt').innerText = Math.round(pendingTotalAmt - prepaidSum).toLocaleString();
             updatePendingBatchBar();
+        }
+
+        function togglePendingBucket(el, bucketKey) {
+            const box = el.closest('.mb-3');
+            const content = box && box.querySelector('.accordion-content');
+            if (!content) return;
+            const open = content.classList.toggle('open');
+            const chev = box.querySelector('.pending-bucket-chevron');
+            if (chev) chev.className = `pending-bucket-chevron fa-solid fa-chevron-${open ? 'down' : 'right'} text-[10px] text-slate-500 w-3`;
+            const name = String((UI.pendingBucketNames || {})[bucketKey] || '').trim().toLowerCase();
+            if (!UI.pendingOpenBuckets) UI.pendingOpenBuckets = new Set();
+            if (open) UI.pendingOpenBuckets.add(name); else UI.pendingOpenBuckets.delete(name);
         }
 
         function openHistory() { switchView('history'); applyStatsPanelState('history'); setQuickDate('month'); }
@@ -4981,6 +4997,31 @@
             } catch (e) {
                 console.error('改回未結失敗:', e);
                 Swal.fire({ icon: 'error', title: '操作失敗', text: e.message || '請重試', background: '#26221e', color: 'white' });
+            }
+        }
+
+        async function changePendingPayMethod(orderId, to) {
+            const meta = UI.pendingOrderMeta[String(orderId)] || {};
+            const label = to === 'linepay' ? 'LINE Pay' : '掛帳';
+            const r = await Swal.fire({
+                title: `改成${label}？`,
+                html: `<div class="text-sm text-left">${booksEscape(meta.customer || '')}　${booksEscape(String(orderId))}　$${(Number(meta.total) || 0).toLocaleString()}</div>`
+                    + (to === 'linepay'
+                        ? '<div class="text-xs text-slate-400 text-left mt-2">改完會從客戶帳本的欠款移除，等 LINE Pay 撥款後再按「入帳」，可填實收記手續費。</div>'
+                        : '<div class="text-xs text-slate-400 text-left mt-2">改完會算進客戶帳本的欠款；客戶有儲值金且夠付這張時會自動扣抵結清。</div>'),
+                showCancelButton: true, confirmButtonText: '確定', cancelButtonText: '取消',
+                background: '#26221e', color: 'white'
+            });
+            if (!r.isConfirmed) return;
+            Swal.fire({ title: '更新中...', allowOutsideClick: false, background: '#26221e', color: 'white', didOpen: () => Swal.showLoading() });
+            try {
+                const res = await API.handleTransaction({ action: 'change_pay_method', orderId, payMethod: to, person: User.name });
+                if (!res || res.status !== 'success') throw new Error((res && res.msg) || '請重試');
+                await loadPending();
+                const applied = (res.creditApplied || []).length;
+                Swal.fire({ icon: 'success', title: `已改成${label}`, text: applied ? `已用儲值金結清 ${applied} 張` : '', toast: !applied, position: applied ? 'center' : 'top', timer: applied ? undefined : 1500, showConfirmButton: !!applied, background: '#26221e', color: 'white' });
+            } catch (e) {
+                Swal.fire({ icon: 'error', title: '更新失敗', text: e.message || '', background: '#26221e', color: 'white' });
             }
         }
 
