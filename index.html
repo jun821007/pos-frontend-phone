@@ -3516,8 +3516,35 @@
                 ...(report.incomeDetails || []).map(r => ({ ...r, income: r.amount, outgo: '', memo: false })),
                 ...(report.expenseDetails || []).map(r => ({ ...r, income: '', outgo: r.amount, memo: !!r.memo }))
             ].sort((a, b) => (b.ts || 0) - (a.ts || 0) || (b.seq || 0) - (a.seq || 0));
-            const mCards = details.length
-                ? details.map(r => {
+            const detFilter = UI.booksDetFilter || '';
+            const shown = detFilter ? details.filter(r => r.subject === detFilter) : details;
+            const subjCount = new Map();
+            details.forEach(r => subjCount.set(r.subject, (subjCount.get(r.subject) || 0) + 1));
+            const subjOrder = [...BOOKS_PROFIT_KEYS.map(({ label }) => label + '純毛利'), ...BOOKS_EXPENSE_KEYS, ...BOOKS_MEMO_KEYS];
+            const subjList = [...subjCount.keys()].sort((a, b) => {
+                const ia = subjOrder.indexOf(a), ib = subjOrder.indexOf(b);
+                return (ia < 0 ? 999 : ia) - (ib < 0 ? 999 : ib) || a.localeCompare(b);
+            });
+            if (detFilter && !subjCount.has(detFilter)) subjList.push(detFilter);
+            const memoSubj = new Set(details.filter(r => r.memo).map(r => r.subject));
+            BOOKS_MEMO_KEYS.forEach(k => memoSubj.add(k));
+            const subjLabel = s => {
+                const prof = BOOKS_PROFIT_KEYS.find(({ label }) => label + '純毛利' === s);
+                if (prof) return prof.label === '其他' ? '其他收入' : prof.label;
+                return memoSubj.has(s) ? s + '（備查）' : s;
+            };
+            const filterSelect = id => `<select id="${id}" onchange="setBooksDetFilter(this.value)" style="background:#26221e;color:#e8dfd4;border:1px solid #3d3731;border-radius:6px;padding:3px 8px;font-size:11px;max-width:100%;">
+                    <option value="">全部科目（${details.length}）</option>
+                    ${subjList.map(s => `<option value="${booksEscape(s)}"${s === detFilter ? ' selected' : ''}>${booksEscape(subjLabel(s))}（${subjCount.get(s) || 0}）</option>`).join('')}
+                </select>`;
+            const shownIncome = shown.reduce((s, r) => s + (r.income === '' ? 0 : Number(r.income) || 0), 0);
+            const shownOutgo = shown.reduce((s, r) => s + (r.outgo === '' ? 0 : Number(r.outgo) || 0), 0);
+            const filterSummary = detFilter
+                ? `<div class="text-[12px] text-slate-300 mb-2">${booksEscape(subjLabel(detFilter))}　共 ${shown.length} 筆${shownIncome ? `　收入 <span class="text-green-400">${money(shownIncome)}</span>` : ''}${shownOutgo ? `　支出 <span class="${memoSubj.has(detFilter) ? 'text-slate-400' : 'text-red-400'}">${money(shownOutgo)}</span>` : ''}${memoSubj.has(detFilter) ? '<span class="text-slate-500">（備查不扣淨利）</span>' : ''}</div>`
+                : '';
+            const emptyText = detFilter ? '此科目本期沒有資料' : '此期間沒有已入帳資料';
+            const mCards = shown.length
+                ? shown.map(r => {
                     const isMemo = !!r.memo;
                     const isOut = r.outgo !== '';
                     const amt = isOut ? r.outgo : r.income;
@@ -3538,7 +3565,7 @@
                         ${bits.length ? `<div class="books-card-meta">${booksEscape(bits.join('　'))}</div>` : ''}
                     </article>`;
                 }).join('')
-                : '<div class="books-kv mute">此期間沒有已入帳資料</div>';
+                : `<div class="books-kv mute">${emptyText}</div>`;
             const sumRows = [
                 `<tr class="sec"><td colspan="2">收入／純毛利</td></tr>`,
                 ...BOOKS_PROFIT_KEYS.map(({ key, label }) => `<tr><td>${label}純毛利</td><td class="num inc">${sc(key)}</td></tr>`),
@@ -3554,8 +3581,8 @@
                 `<tr class="tot"><td>如扣備查本期淨利（含收購、料錢、進貨）</td><td class="num net">${money(netAfterMemo)}</td></tr>`,
                 `<tr><td class="mute">未入帳潛在毛利（未列入）</td><td class="num mute">${money(report.pendingPot)}</td></tr>`
             ].join('');
-            const detBody = details.length
-                ? details.map(r => {
+            const detBody = shown.length
+                ? shown.map(r => {
                     const dateHtml = (r.checkoutDate && r.checkoutDate !== r.date)
                         ? `${booksEscape(r.date)}<div class="text-[10px] text-slate-500">結帳 ${booksEscape(r.checkoutDate)}</div>`
                         : booksEscape(r.date);
@@ -3571,7 +3598,7 @@
                     <td>${booksEscape(r.person)}</td>
                 </tr>`;
                 }).join('')
-                : '<tr><td colspan="9" class="mute">此期間沒有已入帳資料</td></tr>';
+                : `<tr><td colspan="9" class="mute">${emptyText}</td></tr>`;
             box.innerHTML = `
                 <div class="books-m">
                     <div class="books-hero">
@@ -3592,7 +3619,7 @@
                     ${mMemo}
                     ${memoNetRow}
                     <div class="books-kv"><span class="lab mute">未入帳潛在毛利</span><span class="num mute">${money(report.pendingPot)}</span></div>
-                    ${isYear ? `<div class="books-kv mute"><span class="lab mute">一年不列逐筆明細，請改選一個月</span><span></span></div>` : `<div class="books-sec">明細　收購／料錢／維修料件為備查</div>${mCards}`}
+                    ${isYear ? `<div class="books-kv mute"><span class="lab mute">一年不列逐筆明細，請改選一個月</span><span></span></div>` : `<div class="books-sec">明細　收購／料錢／維修料件為備查</div><div class="mb-2">${filterSelect('books-det-filter-m')}</div>${filterSummary}${mCards}`}
                 </div>
                 <div class="books-d">
                     <div class="mb-5">
@@ -3613,36 +3640,11 @@
                         <div class="flex items-center justify-between mb-2">
                             <div class="text-xs font-bold tracking-[0.2em] text-slate-400">明細帳</div>
                             <div class="flex items-center gap-2">
-                                <select id="books-det-filter" onchange="filterBooksDetail()" style="background:#26221e;color:#e8dfd4;border:1px solid #3d3731;border-radius:6px;padding:3px 8px;font-size:11px;">
-                                    <option value="">全部科目</option>
-                                    <option value="二手機純毛利">二手機</option>
-                                    <option value="新機純毛利">新機</option>
-                                    <option value="配件純毛利">配件</option>
-                                    <option value="維修料件調貨純毛利">維修料件調貨</option>
-                                    <option value="維修純毛利">維修</option>
-                                    <option value="軟體純毛利">軟體</option>
-                                    <option value="包膜純毛利">包膜</option>
-                                    <option value="網卡純毛利">網卡</option>
-                                    <option value="其他純毛利">其他收入</option>
-                                    <option value="調貨配件">調貨配件</option>
-                                    <option value="薪資">薪資</option>
-                                    <option value="分潤支出">分潤支出</option>
-                                    <option value="公司吃喝">公司吃喝</option>
-                                    <option value="公司雜支">公司雜支</option>
-                                    <option value="運費">運費</option>
-                                    <option value="金流手續費">金流手續費</option>
-                                    <option value="虧損">虧損</option>
-                                    <option value="收購二手機">收購二手機（備查）</option>
-                                    <option value="收購新機">收購新機（備查）</option>
-                                    <option value="寄賣代售">寄賣代售（備查）</option>
-                                    <option value="額外維修成本">額外維修成本（備查）</option>
-                                    <option value="維修料件">維修料件（備查）</option>
-                                    <option value="配件進貨">配件進貨（備查）</option>
-                                    <option value="網卡">網卡（備查）</option>
-                                </select>
+                                ${filterSelect('books-det-filter')}
                                 <div class="text-[11px] text-slate-500">備查不列入支出合計</div>
                             </div>
                         </div>
+                        ${filterSummary}
                         <table class="books-sheet" id="books-det-table">
                             <thead><tr>
                                 <th>入帳日</th><th>單號</th><th>摘要</th><th>科目</th>
@@ -3650,26 +3652,18 @@
                             </tr></thead>
                             <tbody>${detBody}</tbody>
                             <tfoot><tr class="tot">
-                                <td colspan="6">合計</td>
-                                <td class="num inc">${money(report.profitTotal)}</td>
-                                <td class="num exp">${money(report.expenseTotal)}</td>
+                                <td colspan="6">${detFilter ? booksEscape(subjLabel(detFilter)) + ' 小計' : '合計'}</td>
+                                <td class="num inc">${money(detFilter ? shownIncome : report.profitTotal)}</td>
+                                <td class="num ${detFilter && memoSubj.has(detFilter) ? 'mute' : 'exp'}">${money(detFilter ? shownOutgo : report.expenseTotal)}</td>
                                 <td></td>
                             </tr></tfoot>
                         </table>
                     </div>`}
                 </div>`;
         }
-        function filterBooksDetail() {
-            const sel = document.getElementById('books-det-filter');
-            const tbody = document.querySelector('#books-det-table tbody');
-            if (!sel || !tbody) return;
-            const val = sel.value;
-            tbody.querySelectorAll('tr').forEach(tr => {
-                if (!val) { tr.style.display = ''; return; }
-                const subjectCell = tr.cells[3];
-                const subject = subjectCell ? subjectCell.textContent.replace('（備查）', '').trim() : '';
-                tr.style.display = subject.includes(val) ? '' : 'none';
-            });
+        function setBooksDetFilter(val) {
+            UI.booksDetFilter = val || '';
+            if (UI.lastBooksReport) renderBooksReport(UI.lastBooksReport);
         }
         async function submitBooksLedger(items, vendorName, entryDate, opts) {
             if (!(User && User.isAdmin)) {
