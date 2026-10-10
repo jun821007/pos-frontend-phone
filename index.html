@@ -2090,20 +2090,27 @@
                 } else if(it.stock_id && !dName.includes('#')) { 
                     dName += ` #${it.stock_id}`; 
                 }
-                if(it.salePrice === 0 && it.cost > 0 && !dName.includes('(贈)') && !(it.type === 'phone' && dName.includes(' + ')) && !it.isMultiPhoneExtra) { dName += ' <span class="text-red-400 text-[10px] border border-red-400 px-1 rounded">贈</span>'; }
+                const needPrice = parseNeedsPriceName(it.itemName);
+                if (needPrice) dName = booksEscape(needPrice.name) + ` <span class="text-[10px] text-slate-500">成本 ${needPrice.cost.toLocaleString()}</span>`;
+                if(!needPrice && it.salePrice === 0 && it.cost > 0 && !dName.includes('(贈)') && !(it.type === 'phone' && dName.includes(' + ')) && !it.isMultiPhoneExtra) { dName += ' <span class="text-red-400 text-[10px] border border-red-400 px-1 rounded">贈</span>'; }
                 let itemKey = `RET_${it.orderId}_${it.itemId}`;
                 ItemRegistry[itemKey] = { ...it, customer: g.customer };
                 let safeCost = Number(it.cost) || 0;
                 const iidEsc = String(it.itemId || '').replace(/\\/g, '\\\\').replace(/'/g, "\\'");
                 const isIncludedLine = it.type === 'phone' && Number(it.salePrice) === 0 && (it.itemName || '').includes(' + ');
                 const saleNum = Number(it.salePrice) || 0;
-                const isPendingGift = !isIncludedLine && saleNum === 0 && safeCost > 0;
+                const isPendingGift = !needPrice && !isIncludedLine && saleNum === 0 && safeCost > 0;
+                const needPriceTag = '<span class="text-[10px] font-bold text-orange-300 border border-orange-500 bg-orange-950/50 px-1.5 py-0.5 rounded">待填價</span>';
                 const priceHtml = isIncludedLine
                     ? '<span class="text-slate-500 text-[10px]">含於上筆</span>'
+                    : needPrice
+                    ? (editablePending
+                        ? `<button type="button" onclick="event.stopPropagation(); editPendingItemAmount('${oidEsc}', '${iidEsc}', 0, ${needPrice.cost}, true)" title="點擊補售價">${needPriceTag}</button>`
+                        : needPriceTag)
                     : editablePending
                         ? `<button type="button" onclick="event.stopPropagation(); editPendingItemAmount('${oidEsc}', '${iidEsc}', ${saleNum}, ${safeCost})" class="text-yellow-500 hover:text-yellow-300 underline decoration-dotted decoration-yellow-600/50" title="點擊修改金額">${isPendingGift ? '<span class="text-red-400">贈</span>' : '$' + saleNum.toLocaleString()}</button>`
                         : (isPendingGift ? '<span class="text-red-400">贈</span>' : `$${saleNum.toLocaleString()}`);
-                const giftBtnHtml = editablePending && !isIncludedLine
+                const giftBtnHtml = editablePending && !isIncludedLine && !needPrice
                     ? `<button type="button" onclick="event.stopPropagation(); togglePendingItemGift('${oidEsc}', '${iidEsc}', ${isPendingGift}, ${saleNum}, ${safeCost})" class="text-xs border px-1 rounded shrink-0 ${isPendingGift ? 'text-red-400 border-red-400' : 'text-slate-500 border-slate-600'}" title="${isPendingGift ? '改為收費' : '改為贈品'}">贈</button>`
                     : '';
                 const priceColHtml = isIncludedLine
@@ -2157,6 +2164,7 @@
                     </div>
                     <div class="w-24 text-right shrink-0">
                         <div id="total-${g.orderId}" class="text-yellow-500 font-mono text-sm">$${(Number(g.total) || 0).toLocaleString()}</div>
+                        ${g.status === 'Pending' && orderNeedsPriceCount(g.orderId) ? `<div class="text-[10px] text-orange-300">待填價 ${orderNeedsPriceCount(g.orderId)} 項</div>` : ''}
                         <div class="text-xs font-mono ${netColor}">利 ${(Number(g.net) || 0).toLocaleString()}</div>
                     </div>
                     </div>
@@ -2203,6 +2211,17 @@
             return parseDate(v);
         }
         function isDeferredPayMethod(pm) { return pm === 'linepay' || pm === 'credit'; }
+        // eSIM 後台出貨找不到價格的卡：品名後綴「［待填價 成本N］」，售價／成本先記 0
+        function parseNeedsPriceName(name) {
+            const s = String(name || '');
+            const m = s.match(/\s*［待填價(?:\s*成本(\d+(?:\.\d+)?))?］/);
+            if (!m) return null;
+            return { name: s.replace(m[0], '').trim(), cost: Number(m[1]) || 0 };
+        }
+        function orderNeedsPriceCount(orderId) {
+            const reg = OrderRegistry[orderId];
+            return reg ? (reg.items || []).filter(it => it.status !== 'Returned' && parseNeedsPriceName(it.itemName)).length : 0;
+        }
         function ledgerTodayRange() {
             const n = new Date();
             const rangeStart = new Date(n); rangeStart.setHours(0, 0, 0, 0);
@@ -4591,7 +4610,8 @@
                 const hasCredit = bucket.orders.some(o => o.status === 'Pending' && o.payMethod === 'credit');
                 const methodBadges = [
                     hasLinePay ? `<span class="inline-flex items-center gap-1 text-[10px] text-green-300 border border-green-700/50 px-1.5 py-0.5 rounded"><i class="fa-brands fa-line"></i>LINE Pay</span>` : '',
-                    hasCredit ? `<span class="inline-flex items-center gap-1 text-[10px] text-amber-300 border border-amber-700/50 px-1.5 py-0.5 rounded"><i class="fa-solid fa-file-invoice-dollar"></i>掛帳</span>` : ''
+                    hasCredit ? `<span class="inline-flex items-center gap-1 text-[10px] text-amber-300 border border-amber-700/50 px-1.5 py-0.5 rounded"><i class="fa-solid fa-file-invoice-dollar"></i>掛帳</span>` : '',
+                    (() => { const n = bucket.orders.reduce((s, o) => s + (o.items || []).filter(it => it.status !== 'Returned' && parseNeedsPriceName(it.itemName)).length, 0); return n ? `<span class="text-[10px] font-bold text-orange-300 border border-orange-500 bg-orange-950/50 px-1.5 py-0.5 rounded">待填價 ${n}</span>` : ''; })()
                 ].filter(Boolean).join('');
                 const lc = hasCredit && (LedgerCustomers.list || []).find(c => String(c.name || '').trim().toLowerCase() === bucket.name.trim().toLowerCase());
                 const creditTotal = bucket.orders.filter(o => o.payMethod === 'credit').reduce((s, o) => s + (Number(o.total) || 0), 0);
@@ -4910,6 +4930,11 @@
         async function batchSettlePending() {
             const ids = Array.from(UI.selectedPendingOrders);
             if (!ids.length) return;
+            const unpriced = ids.filter(id => orderNeedsPriceCount(id));
+            if (unpriced.length) {
+                Swal.fire({ icon: 'warning', title: '還有待填價', html: `下列單還有「待填價」品項，請先補售價或取消勾選：<br>${unpriced.map(id => booksEscape(`${(UI.pendingOrderMeta[id] || {}).customer || ''} · ${id}`)).join('<br>')}`, background: '#26221e', color: 'white' });
+                return;
+            }
             const total = ids.reduce((s, id) => s + (UI.pendingOrderMeta[id]?.total || 0), 0);
             const lines = ids.map(id => {
                 const m = UI.pendingOrderMeta[id] || {};
@@ -5065,14 +5090,15 @@
             }
         }
 
-        async function editPendingItemAmount(orderId, itemId, currentSale, cost) {
+        async function editPendingItemAmount(orderId, itemId, currentSale, cost, needsPrice) {
             const item = (OrderRegistry[orderId]?.items || []).find(it => String(it.itemId) === String(itemId));
-            const name = stripLedgerName(item?.itemName || item?.name || '品項');
+            const rawName = item?.itemName || item?.name || '品項';
+            const name = stripLedgerName(needsPrice ? (parseNeedsPriceName(rawName) || { name: rawName }).name : rawName);
             const costNum = Number(cost) || 0;
             const curSale = Number(currentSale) || 0;
-            const isGiftNow = curSale === 0 && costNum > 0;
+            const isGiftNow = !!needsPrice || (curSale === 0 && costNum > 0);
             const { value: newSale, isConfirmed } = await Swal.fire({
-                title: isGiftNow ? '改為收費' : '修改金額',
+                title: needsPrice ? '補售價' : (isGiftNow ? '改為收費' : '修改金額'),
                 html: `<div class="text-left text-sm"><div class="text-slate-300 mb-3 font-bold">${name}</div>
                     <label class="text-xs text-slate-500 block text-left mb-1">售價</label>
                     <div class="flex items-center gap-2"><input id="sw-pending-sale" type="number" min="0" step="1" class="swal2-input !my-0 flex-1" value="${isGiftNow ? '' : curSale}" placeholder="${isGiftNow ? '請輸入售價' : '0'}">
@@ -5107,7 +5133,7 @@
             });
             if (!isConfirmed || newSale === undefined) return;
             try {
-                await applyPendingItemSale(orderId, itemId, newSale, currentSale);
+                await applyPendingItemSale(orderId, itemId, newSale, needsPrice ? -1 : currentSale);
             } catch (e) {
                 console.error('修改金額失敗:', e);
                 Swal.fire({ icon: 'error', title: '更新失敗', text: e.message || '請重試', background: '#26221e', color: 'white' });
@@ -5167,6 +5193,11 @@
             return { fees: out, err };
         }
         async function settle(oid, amt) {
+            const np = orderNeedsPriceCount(oid);
+            if (np) {
+                Swal.fire({ icon: 'warning', title: '還有待填價', text: `這張單還有 ${np} 項「待填價」，請先點橘色標籤補售價再入帳`, background: '#26221e', color: 'white' });
+                return;
+            }
             const info = pendingOrderInfo(oid);
             const isLinePay = info.payMethod === 'linepay';
             const feeExisting = isLinePay ? findPayFeeRow(oid) : null;
@@ -6586,7 +6617,9 @@
             return `${Number(m)}/${Number(d)}`;
         }
         function ledgerItemLabel(name) {
-            return String(name || '').replace(/^\([^)]*\)\s*/, '').replace(/^eSIM\s*/i, '').trim() || 'eSIM';
+            const np = parseNeedsPriceName(name);
+            const label = String(np ? np.name : name || '').replace(/^\([^)]*\)\s*/, '').replace(/^eSIM\s*/i, '').trim() || 'eSIM';
+            return np ? label + '（待填價）' : label;
         }
         function buildLedgerStatement(ledger, fromStart) {
             const events = ledger.events || [];
