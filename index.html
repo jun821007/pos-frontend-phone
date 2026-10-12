@@ -820,6 +820,10 @@
             const res = await fetch(`${API_BASE_URL}/salary-queue`);
             return await res.json();
           },
+          syncStockInSalary: async () => {
+            const res = await fetch(`${API_BASE_URL}/salary-queue/sync-stockin`, { method: 'POST' });
+            return await res.json();
+          },
           changeSalaryQueue: async (data) => {
             const res = await fetch(`${API_BASE_URL}/salary-queue`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data || {}) });
             return await res.json();
@@ -2834,6 +2838,10 @@
         }
         async function syncSalaryQueueFromCloud() {
             try {
+                try {
+                    const s = await API.syncStockInSalary();
+                    if (s && s.status === 'success' && s.added) Swal.fire({ icon: 'info', title: `新入庫二手機 ${s.added} 台已加入未發`, text: '點金額可填發放金額', toast: true, position: 'top', timer: 2500, showConfirmButton: false, background: '#26221e', color: 'white' });
+                } catch (e) { console.warn('stock-in salary sync failed:', e); }
                 const r = await API.getSalaryQueue();
                 if (!r || r.status !== 'success') throw new Error((r && r.msg) || '讀取失敗');
                 const cloudIds = new Set((r.list || []).map((x) => salaryQueueRowId(x.orderId, x.kind)));
@@ -2903,7 +2911,8 @@
                 return `<div class="flex items-start gap-2 py-2.5 border-b border-slate-800 ${row.paid ? 'opacity-40' : ''}">
                     <div class="w-24 shrink-0 text-[11px] text-slate-400 leading-tight pt-0.5">${timeTxt}<div class="mt-1">${badge}</div></div>
                     <div class="flex-1 min-w-0 text-sm text-slate-100">${detail}<div class="text-[11px] text-slate-500 mt-0.5">${salaryEsc(row.formula || '')}</div></div>
-                    <div class="w-20 shrink-0 text-right font-mono text-yellow-400 text-sm pt-0.5">$${(Number(row.amount) || 0).toLocaleString()}</div>
+                    ${row.paid ? `<div class="w-20 shrink-0 text-right font-mono text-yellow-400 text-sm pt-0.5">$${(Number(row.amount) || 0).toLocaleString()}</div>`
+                        : `<button type="button" onclick="editSalaryQueueAmount('${rid.replace(/'/g, "\\'")}')" class="w-20 shrink-0 text-right font-mono text-sm pt-0.5 ${(Number(row.amount) || 0) > 0 ? 'text-yellow-400' : 'text-orange-400 underline'}">${(Number(row.amount) || 0) > 0 ? '$' + (Number(row.amount) || 0).toLocaleString() : '填金額'} <i class="fa-solid fa-pen text-[10px] opacity-60"></i></button>`}
                     <div class="w-14 shrink-0 flex flex-col gap-1 items-end">
                         <button type="button" onclick="copySalaryQueueRow('${rid.replace(/'/g, "\\'")}')" class="text-[10px] px-1.5 py-1 rounded bg-slate-800 border border-slate-600 text-slate-200">複製</button>
                         <button type="button" onclick="removeSalaryQueueRow('${rid.replace(/'/g, "\\'")}')" class="text-[10px] px-1.5 py-1 rounded text-slate-500">移除</button>
@@ -2922,6 +2931,28 @@
             saveSalaryQueue(list);
             renderSalaryQueue();
             pushSalaryQueueChange({ remove: [String(rowId)] });
+        }
+        async function editSalaryQueueAmount(rowId) {
+            const row = loadSalaryQueue().find((r) => salaryQueueRowId(r.orderId, r.kind) === String(rowId));
+            if (!row || row.paid) return;
+            const { value } = await Swal.fire({
+                title: '發放金額',
+                html: `<div class="text-xs text-slate-400 mb-1">${salaryEsc(row.label)}　${salaryEsc(row.customer || '')}</div><div class="text-[11px] text-slate-500">${salaryEsc(row.detail || '')}</div><input id="sw-sal-amt" type="number" inputmode="numeric" class="swal2-input" value="${(Number(row.amount) || 0) || ''}" placeholder="金額">`,
+                background: '#26221e', color: 'white',
+                showCancelButton: true, confirmButtonText: '儲存', cancelButtonText: '取消',
+                didOpen: () => { const el = document.getElementById('sw-sal-amt'); if (el) { el.focus(); el.select(); } },
+                preConfirm: () => {
+                    const v = document.getElementById('sw-sal-amt').value;
+                    const n = Math.round(Number(v));
+                    if (v === '' || !Number.isFinite(n) || n < 0) { Swal.showValidationMessage('請填 0 以上的金額'); return false; }
+                    return n;
+                }
+            });
+            if (value == null) return;
+            const updated = { ...row, amount: value, formula: value > 0 ? '手填 $' + value.toLocaleString() : '待填金額（點金額可改）' };
+            saveSalaryQueue(loadSalaryQueue().map((r) => (salaryQueueRowId(r.orderId, r.kind) === String(rowId) ? updated : r)));
+            renderSalaryQueue();
+            pushSalaryQueueChange({ remove: [String(rowId)], add: [updated] });
         }
         async function copySalaryQueueRow(rowId) {
             const row = refreshSalaryQueueStatuses(loadSalaryQueue()).find((r) => salaryQueueRowId(r.orderId, r.kind) === String(rowId));
