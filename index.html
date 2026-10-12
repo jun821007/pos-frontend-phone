@@ -2910,12 +2910,14 @@
                 const detail = `${salaryEsc(row.label)}　${salaryEsc(row.customer || '')}<div class="text-[11px] text-slate-500 mt-0.5">${salaryEsc(row.orderId)}　${salaryEsc(row.detail || '')}</div>`;
                 return `<div class="flex items-start gap-2 py-2.5 border-b border-slate-800 ${row.paid ? 'opacity-40' : ''}">
                     <div class="w-24 shrink-0 text-[11px] text-slate-400 leading-tight pt-0.5">${timeTxt}<div class="mt-1">${badge}</div></div>
-                    <div class="flex-1 min-w-0 text-sm text-slate-100">${detail}<div class="text-[11px] text-slate-500 mt-0.5">${salaryEsc(row.formula || '')}</div></div>
+                    <div class="flex-1 min-w-0 text-sm text-slate-100${row.paid ? '' : ' cursor-pointer'}"${row.paid ? '' : ` onclick="editSalaryQueueAmount('${rid.replace(/'/g, "\\'")}')"`}>${detail}<div class="text-[11px] text-slate-500 mt-0.5">${salaryEsc(row.formula || '')}</div></div>
                     ${row.paid ? `<div class="w-20 shrink-0 text-right font-mono text-yellow-400 text-sm pt-0.5">$${(Number(row.amount) || 0).toLocaleString()}</div>`
                         : `<button type="button" onclick="editSalaryQueueAmount('${rid.replace(/'/g, "\\'")}')" class="w-20 shrink-0 text-right font-mono text-sm pt-0.5 ${(Number(row.amount) || 0) > 0 ? 'text-yellow-400' : 'text-orange-400 underline'}">${(Number(row.amount) || 0) > 0 ? '$' + (Number(row.amount) || 0).toLocaleString() : '填金額'} <i class="fa-solid fa-pen text-[10px] opacity-60"></i></button>`}
                     <div class="w-14 shrink-0 flex flex-col gap-1 items-end">
                         <button type="button" onclick="copySalaryQueueRow('${rid.replace(/'/g, "\\'")}')" class="text-[10px] px-1.5 py-1 rounded bg-slate-800 border border-slate-600 text-slate-200">複製</button>
-                        <button type="button" onclick="removeSalaryQueueRow('${rid.replace(/'/g, "\\'")}')" class="text-[10px] px-1.5 py-1 rounded text-slate-500">移除</button>
+                        ${row.kind === 'type_二手入庫' && !row.paid
+                            ? `<button type="button" onclick="excludeSalaryQueueRow('${rid.replace(/'/g, "\\'")}')" class="text-[10px] px-1.5 py-1 rounded border border-red-800 text-red-300">排除</button>`
+                            : `<button type="button" onclick="removeSalaryQueueRow('${rid.replace(/'/g, "\\'")}')" class="text-[10px] px-1.5 py-1 rounded text-slate-500">移除</button>`}
                     </div>
                 </div>`;
             }).join('');
@@ -2932,9 +2934,17 @@
             renderSalaryQueue();
             pushSalaryQueueChange({ remove: [String(rowId)] });
         }
+        async function excludeSalaryQueueRow(rowId) {
+            const row = loadSalaryQueue().find((r) => salaryQueueRowId(r.orderId, r.kind) === String(rowId));
+            if (!row) return;
+            const ok = await Swal.fire({ title: '排除這台不發放？', text: `${row.customer || ''}　排除後不會再出現`, icon: 'question', showCancelButton: true, confirmButtonText: '排除', cancelButtonText: '取消', confirmButtonColor: '#b91c1c', background: '#26221e', color: 'white' });
+            if (!ok.isConfirmed) return;
+            removeSalaryQueueRow(rowId);
+        }
         async function editSalaryQueueAmount(rowId) {
             const row = loadSalaryQueue().find((r) => salaryQueueRowId(r.orderId, r.kind) === String(rowId));
-            if (!row || row.paid) return;
+            if (!row) { Swal.fire({ icon: 'warning', title: '找不到這筆，請重新整理後再試', background: '#26221e', color: 'white' }); return; }
+            if (row.paid) return;
             const { value } = await Swal.fire({
                 title: '發放金額',
                 html: `<div class="text-xs text-slate-400 mb-1">${salaryEsc(row.label)}　${salaryEsc(row.customer || '')}</div><div class="text-[11px] text-slate-500">${salaryEsc(row.detail || '')}</div><input id="sw-sal-amt" type="number" inputmode="numeric" class="swal2-input" value="${(Number(row.amount) || 0) || ''}" placeholder="金額">`,
