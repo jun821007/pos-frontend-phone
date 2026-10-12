@@ -135,6 +135,8 @@
         .phone-row-check { display: none; width: 22px; flex-shrink: 0; margin-top: 3px; color: #7a7168; font-size: 16px; text-align: center; }
         .phone-list.is-multiselect .phone-row-check { display: block; }
         .phone-row.is-selected .phone-row-check { color: #e8a04a; }
+        .phone-row.in-cart { background: rgba(232, 160, 74, 0.22); border-left-color: #e8a04a; }
+        .phone-row.in-cart .phone-row-name, .phone-row.in-cart .phone-row-id { color: #f5b860; }
         .phone-row-main { flex: 1; min-width: 0; }
         .phone-row-top { display: flex; align-items: baseline; gap: 4px; }
         .phone-row-name { font-size: 15px; font-weight: 700; color: #f3ebe3; line-height: 1.35; min-width: 0; word-break: break-word; }
@@ -1389,10 +1391,11 @@
                 list.forEach(i => {
                     const sid = String(i.id);
                     const selected = UI.selectedPhones.has(sid);
+                    const inCart = Cart.some(c => String(c.itemId) === sid);
                     let specs = '';
                     if (i.battery) specs += `<span class="spec-tag"><i class="fa-solid fa-battery-half mr-1"></i>${i.battery}%</span>`;
                     if (i.ios) specs += `<span class="spec-tag">iOS ${i.ios}</span>`;
-                    grid.innerHTML += `<div onclick="triggerAddToCart('${sid}')" class="phone-row${selected ? ' is-selected' : ''}" id="card-${sid}" data-id="${sid}">
+                    grid.innerHTML += `<div onclick="triggerAddToCart('${sid}')" class="phone-row${selected ? ' is-selected' : ''}${inCart ? ' in-cart' : ''}" id="card-${sid}" data-id="${sid}">
                         <div class="phone-row-check"><i class="fa-solid fa-circle-check"></i></div>
                         <div class="phone-row-main">
                             <div class="phone-row-top"><span class="phone-row-id">#${i.stock_id}</span><div class="phone-row-name">${i.name}</div></div>
@@ -5660,7 +5663,12 @@
                 <div onclick="modalSoftware()" class="glass p-6 rounded-xl border-l-4 border-indigo-500 flex flex-col items-center justify-center gap-2"><i class="fa-solid fa-mobile-screen-button text-4xl text-indigo-400"></i><span class="font-bold">軟體</span></div>`;
         }
         async function addToCart(id) { const i = DB.inv.find(x => x.id == id); if(!i) return; let p = i.price, q = 1; let defPrice = i.defaultPrice > 0 ? i.defaultPrice : (i.price > 0 ? i.price : ''); if (i.type === 'accessory' || i.price === 0) { let isGift = false; const html = `<input id="sw-p" type="number" class="swal2-input" placeholder="單價" value="${defPrice}"><div class="flex items-center justify-center gap-2 mt-2"><button type="button" id="sw-gift-btn" class="px-3 py-2 rounded bg-red-900/50 text-red-400 border border-red-700 text-sm">贈</button><button type="button" id="sw-cost-btn" class="px-3 py-2 rounded bg-emerald-900/50 text-emerald-400 border border-emerald-700 text-sm">本</button><div style="display:flex;align-items:center;justify-content:center;gap:12px"><button type="button" onclick="var el=document.getElementById('sw-q');el.value=Math.max(1,parseInt(el.value||1)-1)" style="width:52px;height:52px;font-size:26px;border-radius:12px;background:#3d3731;color:white;border:none;cursor:pointer">-</button><input id="sw-q" type="number" value="1" min="1" style="width:72px;height:52px;font-size:22px;text-align:center;background:#26221e;color:white;border:2px solid #4a433c;border-radius:12px;outline:none"><button type="button" onclick="var el=document.getElementById('sw-q');el.value=parseInt(el.value||1)+1" style="width:52px;height:52px;font-size:26px;border-radius:12px;background:#3d3731;color:white;border:none;cursor:pointer">+</button></div></div>`; const { value } = await Swal.fire({ title: i.name, html, background: '#26221e', color: 'white', didOpen: () => { document.getElementById('sw-gift-btn').onclick = () => { isGift = true; Swal.clickConfirm(); }; const costBtn = document.getElementById('sw-cost-btn'); if (costBtn) costBtn.onclick = () => { const el = document.getElementById('sw-p'); if (el) { el.value = String(Number(i.cost) || 0); el.focus(); } }; }, preConfirm: () => isGift ? (function(){var _gq=parseInt(String(document.getElementById('sw-q').value||'1'),10); if(isNaN(_gq)||_gq<1)_gq=1; return [0,_gq,true];})() : [document.getElementById('sw-p').value, document.getElementById('sw-q').value, false] }); if(value===undefined) return; if(value[2]) { var _gq3=parseInt(String(value[1]),10); if(isNaN(_gq3)||_gq3<1)_gq3=1; Cart.push({ ...i, name: i.name + ' (贈)', price: 0, quantity: _gq3, itemId: i.id, originalPrice: defPrice||0, isGift: true }); } else { p = parseInt(value[0]); q = parseInt(value[1]); Cart.push({ ...i, price: p, quantity: q, itemId: i.id, originalPrice: p, isGift: false }); } } else { Cart.push({ ...i, price: p, quantity: q, itemId: i.id, originalPrice: p, isGift: false }); } renderCart(); }
+        function refreshPhoneInCart() {
+            const ids = new Set(Cart.map(c => String(c.itemId)));
+            document.querySelectorAll('.phone-row').forEach(el => el.classList.toggle('in-cart', ids.has(String(el.dataset.id || ''))));
+        }
         function renderCart() { 
+            refreshPhoneInCart();
             const c = document.getElementById('cart-items'); 
             c.innerHTML = ''; 
             let t = 0, cn = 0; 
