@@ -2907,7 +2907,10 @@
                         : '<span class="text-[10px] text-red-300 border border-red-800 px-1 rounded">未結</span>');
                 const rid = salaryQueueRowId(row.orderId, row.kind);
                 const timeTxt = salaryEsc(row.timeText || formatDate(row.time) || '');
-                const detail = `${salaryEsc(row.label)}　${salaryEsc(row.customer || '')}<div class="text-[11px] text-slate-500 mt-0.5">${salaryEsc(row.orderId)}　${salaryEsc(row.detail || '')}</div>`;
+                const stockInfo = row.kind === 'type_二手入庫'
+                    ? `${row.purchaseCustomer ? `<div class="text-[11px] text-slate-400 mt-0.5">收購：${salaryEsc(row.purchaseCustomer)}</div>` : ''}<div class="text-[12px] text-amber-200 mt-0.5">備註：${salaryEsc(row.note || '（無）')}</div>`
+                    : '';
+                const detail = `${salaryEsc(row.label)}　${salaryEsc(row.customer || '')}<div class="text-[11px] text-slate-500 mt-0.5">${salaryEsc(row.orderId)}　${salaryEsc(row.detail || '')}</div>${stockInfo}`;
                 return `<div class="flex items-start gap-2 py-2.5 border-b border-slate-800 ${row.paid ? 'opacity-40' : ''}">
                     <div class="w-24 shrink-0 text-[11px] text-slate-400 leading-tight pt-0.5">${timeTxt}<div class="mt-1">${badge}</div></div>
                     <div class="flex-1 min-w-0 text-sm text-slate-100${row.paid ? '' : ' cursor-pointer'}"${row.paid ? '' : ` onclick="editSalaryQueueAmount('${rid.replace(/'/g, "\\'")}')"`}>${detail}<div class="text-[11px] text-slate-500 mt-0.5">${salaryEsc(row.formula || '')}</div></div>
@@ -2947,7 +2950,7 @@
             if (row.paid) return;
             const { value } = await Swal.fire({
                 title: '發放金額',
-                html: `<div class="text-xs text-slate-400 mb-1">${salaryEsc(row.label)}　${salaryEsc(row.customer || '')}</div><div class="text-[11px] text-slate-500">${salaryEsc(row.detail || '')}</div><input id="sw-sal-amt" type="number" inputmode="numeric" class="swal2-input" value="${(Number(row.amount) || 0) || ''}" placeholder="金額">`,
+                html: `<div class="text-xs text-slate-400 mb-1">${salaryEsc(row.label)}　${salaryEsc(row.customer || '')}</div><div class="text-[11px] text-slate-500">${salaryEsc(row.detail || '')}</div>${row.kind === 'type_二手入庫' ? `<div class="text-[12px] text-amber-200 mt-1">備註：${salaryEsc(row.note || '（無）')}</div>` : ''}<input id="sw-sal-amt" type="number" inputmode="numeric" class="swal2-input" value="${(Number(row.amount) || 0) || ''}" placeholder="金額">`,
                 background: '#26221e', color: 'white',
                 showCancelButton: true, confirmButtonText: '儲存', cancelButtonText: '取消',
                 didOpen: () => { const el = document.getElementById('sw-sal-amt'); if (el) { el.focus(); el.select(); } },
@@ -3279,6 +3282,12 @@
             return isBooksManualExpense(i) || i.type === 'inventory';
         }
         const BOOKS_EXPENSE_KEYS = ['調貨配件', '公司吃喝', '公司雜支', '運費', '金流手續費', '薪資', '分潤支出', '虧損', '其他支出'];
+        function booksWhoText(r) {
+            const c = String((r && r.customer) || '').trim();
+            if (/^收購/.test(String(r && r.subject))) return (!c || c === '收購') ? '來源：未填' : '來源：' + c;
+            if (!c || c === '廠商/雜支') return '';
+            return r.memo ? c : '客人：' + c;
+        }
         const BOOKS_MEMO_KEYS = ['維修料件', '收購二手機', '收購新機', '額外維修成本', '配件進貨', '網卡'];
         const BOOKS_MEMO_DEDUCT_KEYS = ['收購二手機', '收購新機', '額外維修成本', '配件進貨', '網卡']; // 如扣備查：付機／料錢／進貨／網卡
         function isBooksMemoSubject(subj) {
@@ -3619,7 +3628,8 @@
                     if (r.sale !== '' && r.sale != null) bits.push('售 ' + money(r.sale));
                     if (r.cost !== '' && r.cost != null) bits.push('成本 ' + money(r.cost));
                     if (r.checkoutDate && r.checkoutDate !== r.date) bits.push('結帳 ' + r.checkoutDate);
-                    if (r.customer) bits.push(r.customer);
+                    const who = booksWhoText(r);
+                    if (who) bits.push(who);
                     if (r.orderId) bits.push(r.orderId);
                     if (r.person) bits.push(r.person);
                     if (isMemo) bits.push('不扣淨利');
@@ -3653,10 +3663,11 @@
                     const dateHtml = (r.checkoutDate && r.checkoutDate !== r.date)
                         ? `${booksEscape(r.date)}<div class="text-[10px] text-slate-500">結帳 ${booksEscape(r.checkoutDate)}</div>`
                         : booksEscape(r.date);
+                    const who = booksWhoText(r);
                     return `<tr>
                     <td>${dateHtml}</td>
                     <td>${booksEscape(r.orderId)}</td>
-                    <td>${booksEscape(r.name)}</td>
+                    <td>${booksEscape(r.name)}${who ? `<div class="text-[11px] text-amber-200/80">${booksEscape(who)}</div>` : ''}</td>
                     <td>${booksEscape(r.memo ? r.subject + '（備查）' : r.subject)}</td>
                     <td class="num">${moneyCell(r.sale)}</td>
                     <td class="num">${moneyCell(r.cost)}</td>
