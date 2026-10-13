@@ -238,7 +238,7 @@
         <button type="button" id="d-nav-history" onclick="openHistory()" class="nav-btn w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-slate-500 hover:text-yellow-400 transition"><i class="fa-solid fa-chart-pie w-5 text-center text-lg shrink-0"></i><span class="nav-label text-sm font-semibold">歷史</span></button>
         <button type="button" id="d-nav-pending" onclick="openPending()" class="nav-btn w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-slate-500 hover:text-yellow-400 transition"><i class="fa-solid fa-wallet w-5 text-center text-lg shrink-0"></i><span class="nav-label text-sm font-semibold">未結</span></button>
         <button type="button" id="d-nav-restock" onclick="switchView('restock')" class="nav-btn w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-slate-500 hover:text-yellow-400 transition"><i class="fa-solid fa-dolly w-5 text-center text-lg shrink-0"></i><span class="nav-label text-sm font-semibold">進貨</span></button>
-        <button type="button" id="d-nav-restockalert" onclick="openRestockAlert()" class="nav-btn w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-slate-500 hover:text-yellow-400 transition"><i class="fa-solid fa-bell w-5 text-center text-lg shrink-0"></i><span class="nav-label text-sm font-semibold">補貨通知</span><span id="restock-alert-badge" class="hidden ml-auto text-[10px] font-bold bg-red-600 text-white rounded-full px-1.5 min-w-[1.25rem] text-center"></span></button>
+        <button type="button" id="d-nav-restockalert" onclick="openRestockAlert()" class="nav-btn w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-slate-500 hover:text-yellow-400 transition"><i class="fa-solid fa-bell w-5 text-center text-lg shrink-0"></i><span class="nav-label text-sm font-semibold">補貨</span></button>
         <button type="button" id="d-nav-books" onclick="openBooks()" style="display:none" class="nav-btn w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-slate-500 hover:text-yellow-400 transition"><i class="fa-solid fa-book w-5 text-center text-lg shrink-0"></i><span class="nav-label text-sm font-semibold">記帳</span></button>
         <button type="button" id="d-nav-salary" onclick="openSalary()" style="display:none" class="nav-btn w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-slate-500 hover:text-yellow-400 transition"><i class="fa-solid fa-sack-dollar w-5 text-center text-lg shrink-0"></i><span class="nav-label text-sm font-semibold">薪資</span></button>
         <button type="button" id="d-nav-setting" onclick="switchView('setting')" class="nav-btn w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-slate-500 hover:text-yellow-400 transition"><i class="fa-solid fa-gear w-5 text-center text-lg shrink-0"></i><span class="nav-label text-sm font-semibold">設定</span></button>
@@ -463,7 +463,7 @@
         <div id="view-restockalert" class="hidden view-section flex-1 flex flex-col overflow-hidden books-page">
             <div class="books-toolbar shrink-0 mb-2">
                 <div class="books-toolbar-top">
-                    <h2>補貨通知</h2>
+                    <h2>補貨</h2>
                     <div class="books-toolbar-actions flex flex-wrap gap-2">
                         <select id="ra-days" onchange="loadRestockAlert()" class="input-dark p-2 rounded text-sm">
                             <option value="7">近 7 天</option>
@@ -1126,7 +1126,6 @@
                 else if(UI.tab === 'new') { const a = document.querySelector('#sub-cat-scroll .pill-btn.active'); filterItems('stocktype', a ? a.innerText : '自有'); }
                 else if(UI.tab === 'accessory') { const a = document.querySelector('#sub-cat-scroll .pill-btn.active'); if(a) { const t = a.innerText; if(t.includes('常用')) { renderFavSubNav(); renderFavAccessoryGrid(); } else if(t === '公司貨') renderCompanyAccessoryGrid(); else if(t === '調貨') renderDirectTransferGrid(); else filterItems(null, t); } }
                 renderReport(); 
-                loadRestockAlert(false, true);
             } catch(e) { 
                 console.error('Data Parse Error', e); 
                 document.getElementById('sync-status').innerHTML = '<span class="text-red-500">● 連線失敗</span>'; 
@@ -2578,8 +2577,6 @@
             const box = document.getElementById('ra-list');
             const all = restockAlertRows();
             const need = all.filter(r => r.level);
-            const badge = document.getElementById('restock-alert-badge');
-            if (badge) { badge.textContent = need.length > 99 ? '99+' : String(need.length); badge.classList.toggle('hidden', !need.length); }
             if (!box || !UI.raSales) return;
             const catSel = document.getElementById('ra-cat');
             const prevCat = catSel.value;
