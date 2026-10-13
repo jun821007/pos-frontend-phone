@@ -552,7 +552,10 @@
                 <h3 class="font-bold text-lg text-amber-400">新增配件品項</h3>
                 <p class="text-xs text-slate-500">ID 自動流水，原始庫存=0</p>
                 <div class="grid grid-cols-1 gap-2">
-                    <label class="text-xs text-slate-400">分類</label>
+                    <label class="text-xs text-slate-400">大分類（試算表 B 欄 類型）</label>
+                    <select id="new-acc-group-select" onchange="onNewAccGroupChange()" class="input-dark p-2 rounded text-sm"></select>
+                    <input type="text" id="new-acc-group" class="hidden input-dark p-2 rounded text-sm" placeholder="新大分類名稱（例如 ⭕殼類）">
+                    <label class="text-xs text-slate-400 mt-1">分類</label>
                     <select id="new-acc-category-select" onchange="onNewAccCategoryChange()" class="input-dark p-2 rounded text-sm"></select>
                     <input type="text" id="new-acc-category" class="hidden input-dark p-2 rounded text-sm" placeholder="新分類名稱">
                     <label class="text-xs text-slate-400 mt-1">品項名稱</label>
@@ -1179,15 +1182,49 @@
             if (tab === 'company') renderCompanyTemplateList();
             if (tab === 'add') renderNewAccCategoryOptions();
         }
-        function renderNewAccCategoryOptions(keep) {
+        // 分類 → 大分類（取該分類最多列使用的 B 欄）；大分類依收銀分類順序排列
+        function accCategoryGroups() {
+            const counts = new Map();
+            DB.inv.filter(i => i.type === 'accessory' && i.category).forEach(i => {
+                const m = counts.get(i.category) || new Map();
+                const g = String(i.group || '');
+                m.set(g, (m.get(g) || 0) + 1);
+                counts.set(i.category, m);
+            });
+            const catGroup = new Map();
+            counts.forEach((m, c) => catGroup.set(c, [...m.entries()].sort((a, b) => b[1] - a[1])[0][0]));
+            const order = getOrderedCategories();
+            const allCats = [...order, ...[...catGroup.keys()].filter(c => !order.includes(c)).sort()];
+            const groups = [];
+            allCats.forEach(c => { const g = catGroup.get(c) || ''; if (!groups.includes(g)) groups.push(g); });
+            return { catGroup, groups, allCats };
+        }
+        function renderNewAccCategoryOptions(keep, keepGroup) {
+            const gsel = document.getElementById('new-acc-group-select');
+            if (!gsel) return;
+            const { catGroup, groups } = accCategoryGroups();
+            const prevG = keepGroup !== undefined ? keepGroup : (keep && catGroup.has(keep) ? catGroup.get(keep) : gsel.value);
+            gsel.innerHTML = '<option value="__pick__">請選擇大分類</option>'
+                + groups.map(g => `<option value="${booksEscape(g)}">${booksEscape(g || '（未設大分類）')}</option>`).join('')
+                + '<option value="__new__">＋ 新大分類（手打）</option>';
+            gsel.value = (prevG === '__new__' || groups.includes(prevG)) ? prevG : '__pick__';
+            onNewAccGroupChange(keep);
+        }
+        function onNewAccGroupChange(keepCat) {
+            const gsel = document.getElementById('new-acc-group-select');
+            const ginput = document.getElementById('new-acc-group');
             const sel = document.getElementById('new-acc-category-select');
-            if (!sel) return;
-            const prev = keep !== undefined ? keep : sel.value;
-            const cats = getOrderedCategories();
-            sel.innerHTML = '<option value="">請選擇分類</option>'
+            if (!gsel || !sel) return;
+            const g = gsel.value;
+            ginput.classList.toggle('hidden', g !== '__new__');
+            if (g === '__new__' && keepCat === undefined) ginput.focus();
+            const { catGroup, allCats } = accCategoryGroups();
+            const cats = (g === '__pick__' || g === '__new__') ? [] : allCats.filter(c => (catGroup.get(c) || '') === g);
+            const prev = keepCat !== undefined ? keepCat : sel.value;
+            sel.innerHTML = (g === '__pick__' ? '<option value="">先選大分類</option>' : '<option value="">請選擇分類</option>')
                 + cats.map(c => `<option value="${booksEscape(c)}">${booksEscape(c)}</option>`).join('')
-                + '<option value="__new__">＋ 新分類（手打）</option>';
-            sel.value = prev && (prev === '__new__' || cats.includes(prev)) ? prev : '';
+                + (g === '__pick__' ? '' : '<option value="__new__">＋ 新分類（手打）</option>');
+            sel.value = g === '__new__' ? '__new__' : (cats.includes(prev) ? prev : '');
             onNewAccCategoryChange();
         }
         function onNewAccCategoryChange() {
@@ -1196,7 +1233,17 @@
             if (!sel || !input) return;
             const isNew = sel.value === '__new__';
             input.classList.toggle('hidden', !isNew);
-            if (isNew) input.focus();
+            if (isNew && document.getElementById('new-acc-group-select').value !== '__new__') input.focus();
+        }
+        async function placeNewCategoryInOrder(cat, group) {
+            const order = getOrderedCategories().filter(c => c !== cat);
+            const { catGroup } = accCategoryGroups();
+            let at = -1;
+            order.forEach((c, i) => { if ((catGroup.get(c) || '') === group) at = i; });
+            order.splice(at >= 0 ? at + 1 : order.length, 0, cat);
+            UI.categoryOrder = order;
+            cachePosPrefsLocally();
+            try { await API.savePosPrefs({ categoryOrder: order }); } catch (e) { console.warn('save category order failed:', e); }
         }
         function openCategorySortPage() {
             document.getElementById('view-setting').classList.add('hidden');
@@ -5681,7 +5728,32 @@
             renderCart();
         }
         async function addNewCompanyTemplate() { const n = document.getElementById('new-cp-name').value.trim(); const c = document.getElementById('new-cp-cost').value; const p = document.getElementById('new-cp-price').value; if(!n || !c || !p) { Swal.fire({icon:'warning', title:'請填寫完整', toast:true, position:'top', background:'#26221e'}); return; } try { const res = await API.addCompanyTemplate(n, c, p); if(res.status === 'success') { Swal.fire({icon:'success', title:'已新增', toast:true, position:'top', background:'#26221e'}); document.getElementById('new-cp-name').value=''; document.getElementById('new-cp-cost').value=''; document.getElementById('new-cp-price').value=''; fetchData(); renderCompanyTemplateList(); } else { Swal.fire({icon:'error', title:'新增失敗', text: res.msg || '', background:'#26221e'}); } } catch(e) { Swal.fire({icon:'error', title:'新增失敗', text: e.message || '請重試', background:'#26221e'}); } }
-        async function addNewAccessory(){const sel=document.getElementById('new-acc-category-select');const selVal=sel?sel.value:'__new__';const cat=(selVal==='__new__'?document.getElementById('new-acc-category').value:selVal).trim();const nm=document.getElementById('new-acc-name').value.trim();if(!cat||!nm){Swal.fire({icon:'warning',title:'請選擇分類並填寫品項名稱',toast:true,position:'top',background:'#26221e'});return;}if(DB.inv.some(i=>i.type==='accessory'&&String(i.name||'').trim()===nm)){Swal.fire({icon:'warning',title:'已有同名品項',text:nm,background:'#26221e',color:'white'});return;}const numOf=id=>{const v=Number(document.getElementById(id).value);return v>0?v:0;};const cost=numOf('new-acc-cost'),price=numOf('new-acc-price'),minStock=Math.round(numOf('new-acc-min'));try{const res=await API.addAccessory(cat,nm,{cost,price,minStock});if(res.status==='success'){if(minStock>0&&res.minStockSaved===false){Swal.fire({icon:'warning',title:'已新增 '+res.id,text:'但庫存清單找不到「最低庫存」欄位（標題要含 安全／最低／警戒），最低庫存沒寫入',background:'#26221e',color:'white'});}else{Swal.fire({icon:'success',title:'已新增 '+res.id,toast:true,background:'#26221e'});}['new-acc-category','new-acc-name','new-acc-cost','new-acc-price','new-acc-min'].forEach(id=>{document.getElementById(id).value='';});await fetchData();renderNewAccCategoryOptions(cat);}else{Swal.fire({icon:'error',title:'新增失敗',text:res.msg||'',background:'#26221e'});}}catch(e){Swal.fire({icon:'error',title:'新增失敗',text:e.message||'',background:'#26221e'});}}
+        async function addNewAccessory(){
+            const gsel=document.getElementById('new-acc-group-select');
+            const gVal=gsel?gsel.value:'__pick__';
+            const group=(gVal==='__new__'?document.getElementById('new-acc-group').value:(gVal==='__pick__'?'':gVal)).trim();
+            const sel=document.getElementById('new-acc-category-select');
+            const selVal=sel?sel.value:'__new__';
+            const cat=(selVal==='__new__'?document.getElementById('new-acc-category').value:selVal).trim();
+            const nm=document.getElementById('new-acc-name').value.trim();
+            if(gVal==='__pick__'||(gVal==='__new__'&&!group)){Swal.fire({icon:'warning',title:'請選擇或填寫大分類',toast:true,position:'top',background:'#26221e'});return;}
+            if(!cat||!nm){Swal.fire({icon:'warning',title:'請選擇分類並填寫品項名稱',toast:true,position:'top',background:'#26221e'});return;}
+            if(DB.inv.some(i=>i.type==='accessory'&&String(i.name||'').trim()===nm)){Swal.fire({icon:'warning',title:'已有同名品項',text:nm,background:'#26221e',color:'white'});return;}
+            const isNewCat=!DB.inv.some(i=>i.type==='accessory'&&i.category===cat);
+            const numOf=id=>{const v=Number(document.getElementById(id).value);return v>0?v:0;};
+            const cost=numOf('new-acc-cost'),price=numOf('new-acc-price'),minStock=Math.round(numOf('new-acc-min'));
+            try{
+                const res=await API.addAccessory(cat,nm,{cost,price,minStock,group});
+                if(res.status==='success'){
+                    if(minStock>0&&res.minStockSaved===false){Swal.fire({icon:'warning',title:'已新增 '+res.id,text:'但庫存清單找不到「最低庫存」欄位（標題要含 安全／最低／警戒），最低庫存沒寫入',background:'#26221e',color:'white'});}
+                    else{Swal.fire({icon:'success',title:'已新增 '+res.id,text:isNewCat?'新分類已排在「'+(group||'未設大分類')+'」的分類後面':'',toast:true,background:'#26221e',color:'white'});}
+                    ['new-acc-group','new-acc-category','new-acc-name','new-acc-cost','new-acc-price','new-acc-min'].forEach(id=>{document.getElementById(id).value='';});
+                    await fetchData();
+                    if(isNewCat)await placeNewCategoryInOrder(cat,group);
+                    renderNewAccCategoryOptions(cat,group);
+                }else{Swal.fire({icon:'error',title:'新增失敗',text:res.msg||'',background:'#26221e'});}
+            }catch(e){Swal.fire({icon:'error',title:'新增失敗',text:e.message||'',background:'#26221e'});}
+        }
         function renderCompanyTemplateList(){const el=document.getElementById('company-template-list');if(!el)return;el.innerHTML='';(DB.companyTemplates||[]).forEach(t=>{el.innerHTML+='<div class="flex justify-between p-2 bg-slate-800 rounded"><span>'+t.name+'</span><button onclick="deleteCompanyTemplate(&quot;'+t.name.replace(/"/g,'&quot;')+'&quot;)" class="text-red-400"><i class="fa-solid fa-trash"></i></button></div>';});}
         async function deleteCompanyTemplate(name){const r=await Swal.fire({title:'確定刪除？',text:name,showCancelButton:true,background:'#26221e',color:'white'});if(!r.isConfirmed)return;try{const res=await API.deleteCompanyTemplate(name);if(res.status==='success'){Swal.fire({icon:'success',title:'已刪除',toast:true,background:'#26221e'});fetchData();renderCompanyTemplateList();}else{Swal.fire({icon:'error',title:'刪除失敗',text:res.msg||'',background:'#26221e'});}}catch(e){Swal.fire({icon:'error',title:'刪除失敗',text:e.message||'',background:'#26221e'});}}
         async function changeStatus(id, s) { 
