@@ -238,6 +238,7 @@
         <button type="button" id="d-nav-history" onclick="openHistory()" class="nav-btn w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-slate-500 hover:text-yellow-400 transition"><i class="fa-solid fa-chart-pie w-5 text-center text-lg shrink-0"></i><span class="nav-label text-sm font-semibold">歷史</span></button>
         <button type="button" id="d-nav-pending" onclick="openPending()" class="nav-btn w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-slate-500 hover:text-yellow-400 transition"><i class="fa-solid fa-wallet w-5 text-center text-lg shrink-0"></i><span class="nav-label text-sm font-semibold">未結</span></button>
         <button type="button" id="d-nav-restock" onclick="switchView('restock')" class="nav-btn w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-slate-500 hover:text-yellow-400 transition"><i class="fa-solid fa-dolly w-5 text-center text-lg shrink-0"></i><span class="nav-label text-sm font-semibold">進貨</span></button>
+        <button type="button" id="d-nav-restockalert" onclick="openRestockAlert()" class="nav-btn w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-slate-500 hover:text-yellow-400 transition"><i class="fa-solid fa-bell w-5 text-center text-lg shrink-0"></i><span class="nav-label text-sm font-semibold">補貨通知</span><span id="restock-alert-badge" class="hidden ml-auto text-[10px] font-bold bg-red-600 text-white rounded-full px-1.5 min-w-[1.25rem] text-center"></span></button>
         <button type="button" id="d-nav-books" onclick="openBooks()" style="display:none" class="nav-btn w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-slate-500 hover:text-yellow-400 transition"><i class="fa-solid fa-book w-5 text-center text-lg shrink-0"></i><span class="nav-label text-sm font-semibold">記帳</span></button>
         <button type="button" id="d-nav-salary" onclick="openSalary()" style="display:none" class="nav-btn w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-slate-500 hover:text-yellow-400 transition"><i class="fa-solid fa-sack-dollar w-5 text-center text-lg shrink-0"></i><span class="nav-label text-sm font-semibold">薪資</span></button>
         <button type="button" id="d-nav-setting" onclick="switchView('setting')" class="nav-btn w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-slate-500 hover:text-yellow-400 transition"><i class="fa-solid fa-gear w-5 text-center text-lg shrink-0"></i><span class="nav-label text-sm font-semibold">設定</span></button>
@@ -459,6 +460,41 @@
             <div id="books-tables" class="flex-1 overflow-auto min-h-0"></div>
         </div>
 
+        <div id="view-restockalert" class="hidden view-section flex-1 flex flex-col overflow-hidden books-page">
+            <div class="books-toolbar shrink-0 mb-2">
+                <div class="books-toolbar-top">
+                    <h2>補貨通知</h2>
+                    <div class="books-toolbar-actions flex flex-wrap gap-2">
+                        <select id="ra-days" onchange="loadRestockAlert()" class="input-dark p-2 rounded text-sm">
+                            <option value="7">近 7 天</option>
+                            <option value="14">近 14 天</option>
+                            <option value="30" selected>近 30 天</option>
+                            <option value="60">近 60 天</option>
+                        </select>
+                        <button type="button" onclick="loadRestockAlert(true)" class="px-3 py-2 rounded-lg bg-slate-800 border border-slate-600 text-slate-100 text-sm font-bold">重新整理</button>
+                        <button type="button" onclick="copyRestockAlert()" class="px-3 py-2 rounded-lg bg-yellow-600 text-black text-sm font-bold">複製補貨清單</button>
+                    </div>
+                </div>
+                <div class="flex gap-2 mt-2">
+                    <button type="button" id="ra-tab-need" onclick="setRestockAlertTab('need')" class="flex-1 py-2 rounded-lg text-sm font-bold bg-yellow-600 text-black">需補貨</button>
+                    <button type="button" id="ra-tab-hot" onclick="setRestockAlertTab('hot')" class="flex-1 py-2 rounded-lg text-sm font-bold bg-slate-800 text-slate-300 border border-slate-600">熱賣商品</button>
+                </div>
+                <div class="flex gap-2 mt-2">
+                    <select id="ra-cat" onchange="renderRestockAlert()" class="input-dark p-2 rounded text-sm flex-1 min-w-0"></select>
+                    <input id="ra-search" oninput="renderRestockAlert()" class="input-dark p-2 rounded text-sm flex-1 min-w-0" placeholder="搜尋品名">
+                </div>
+                <p class="text-xs text-slate-400 mt-2">銷量＝每日流水的配件出貨（含掛帳、贈品，不含退貨）。需補貨：缺貨、低於最低庫存、或照目前賣速 7 天內會賣完。建議補＝賣 14 天的量減掉現有庫存。</p>
+            </div>
+            <div class="flex text-[11px] text-slate-500 px-1 pb-1 border-b border-slate-800 shrink-0 gap-2">
+                <div class="flex-1 min-w-0">品項</div>
+                <div class="w-14 text-right shrink-0">銷量</div>
+                <div class="w-14 text-right shrink-0">庫存</div>
+                <div class="w-16 text-right shrink-0">可賣</div>
+                <div class="w-14 text-right shrink-0">建議補</div>
+            </div>
+            <div id="ra-list" class="flex-1 overflow-auto min-h-0 pb-4"></div>
+        </div>
+
         <div id="view-salary" class="hidden view-section flex-1 flex flex-col overflow-hidden books-page">
             <div class="books-toolbar shrink-0 mb-2">
                 <div class="books-toolbar-top">
@@ -610,7 +646,7 @@
         </div>
     </main>
 
-    <nav class="md:hidden fixed bottom-0 w-full h-16 bg-slate-950 border-t border-slate-800 flex z-50"><div onclick="switchView('pos')" id="m-nav-pos" class="mobile-nav-item active"><i class="fa-solid fa-cash-register"></i>收銀</div><div onclick="openReport()" id="m-nav-report" class="mobile-nav-item"><i class="fa-solid fa-file-invoice-dollar"></i>今日</div><div onclick="openPending()" id="m-nav-pending" class="mobile-nav-item"><i class="fa-solid fa-wallet"></i>未結</div><div onclick="openHistory()" id="m-nav-history" class="mobile-nav-item"><i class="fa-solid fa-chart-pie"></i>歷史</div><div onclick="switchView('restock')" id="m-nav-restock" class="mobile-nav-item"><i class="fa-solid fa-dolly"></i>進貨</div><div onclick="openBooks()" id="m-nav-books" class="mobile-nav-item" style="display:none"><i class="fa-solid fa-book"></i>記帳</div><div onclick="openSalary()" id="m-nav-salary" class="mobile-nav-item" style="display:none"><i class="fa-solid fa-sack-dollar"></i>薪資</div><div onclick="switchView('setting')" id="m-nav-setting" class="mobile-nav-item"><i class="fa-solid fa-gear"></i>設定</div></nav>
+    <nav class="md:hidden fixed bottom-0 w-full h-16 bg-slate-950 border-t border-slate-800 flex z-50"><div onclick="switchView('pos')" id="m-nav-pos" class="mobile-nav-item active"><i class="fa-solid fa-cash-register"></i>收銀</div><div onclick="openReport()" id="m-nav-report" class="mobile-nav-item"><i class="fa-solid fa-file-invoice-dollar"></i>今日</div><div onclick="openPending()" id="m-nav-pending" class="mobile-nav-item"><i class="fa-solid fa-wallet"></i>未結</div><div onclick="openHistory()" id="m-nav-history" class="mobile-nav-item"><i class="fa-solid fa-chart-pie"></i>歷史</div><div onclick="switchView('restock')" id="m-nav-restock" class="mobile-nav-item"><i class="fa-solid fa-dolly"></i>進貨</div><div onclick="openRestockAlert()" id="m-nav-restockalert" class="mobile-nav-item"><i class="fa-solid fa-bell"></i>補貨</div><div onclick="openBooks()" id="m-nav-books" class="mobile-nav-item" style="display:none"><i class="fa-solid fa-book"></i>記帳</div><div onclick="openSalary()" id="m-nav-salary" class="mobile-nav-item" style="display:none"><i class="fa-solid fa-sack-dollar"></i>薪資</div><div onclick="switchView('setting')" id="m-nav-setting" class="mobile-nav-item"><i class="fa-solid fa-gear"></i>設定</div></nav>
 
     <script>
         // 版本號：自動以日期產生（每次載入即更新）
@@ -1090,6 +1126,7 @@
                 else if(UI.tab === 'new') { const a = document.querySelector('#sub-cat-scroll .pill-btn.active'); filterItems('stocktype', a ? a.innerText : '自有'); }
                 else if(UI.tab === 'accessory') { const a = document.querySelector('#sub-cat-scroll .pill-btn.active'); if(a) { const t = a.innerText; if(t.includes('常用')) { renderFavSubNav(); renderFavAccessoryGrid(); } else if(t === '公司貨') renderCompanyAccessoryGrid(); else if(t === '調貨') renderDirectTransferGrid(); else filterItems(null, t); } }
                 renderReport(); 
+                loadRestockAlert(false, true);
             } catch(e) { 
                 console.error('Data Parse Error', e); 
                 document.getElementById('sync-status').innerHTML = '<span class="text-red-500">● 連線失敗</span>'; 
@@ -2464,6 +2501,135 @@
             return rows.join('\n');
         }
 
+        // 補貨通知：近 N 天配件銷量 × 目前庫存
+        const RA_SOON_DAYS = 7;
+        const RA_COVER_DAYS = 14;
+        function openRestockAlert() {
+            switchView('restockalert');
+            loadRestockAlert();
+        }
+        function setRestockAlertTab(tab) {
+            UI.raTab = tab === 'hot' ? 'hot' : 'need';
+            const on = 'flex-1 py-2 rounded-lg text-sm font-bold bg-yellow-600 text-black';
+            const off = 'flex-1 py-2 rounded-lg text-sm font-bold bg-slate-800 text-slate-300 border border-slate-600';
+            document.getElementById('ra-tab-need').className = UI.raTab === 'need' ? on : off;
+            document.getElementById('ra-tab-hot').className = UI.raTab === 'hot' ? on : off;
+            renderRestockAlert();
+        }
+        function raQtyOf(row) {
+            const m = String(row.itemName || row.name || '').match(/\sx(\d+)\s*$/);
+            return m ? Math.max(1, parseInt(m[1], 10)) : 1;
+        }
+        async function loadRestockAlert(force, quiet) {
+            const days = Number((document.getElementById('ra-days') || {}).value) || 30;
+            const fresh = UI.raSales && UI.raSales.days === days && Date.now() - UI.raSales.at < 10 * 60 * 1000;
+            const box = document.getElementById('ra-list');
+            if (!fresh || force) {
+                if (!quiet && box) box.innerHTML = '<div class="text-center mt-10"><span class="loader"></span></div>';
+                try {
+                    const end = new Date();
+                    const start = new Date(end.getTime() - (days - 1) * 86400000);
+                    const res = await API.getHistory(ymdTaipei(start), ymdTaipei(end));
+                    const rows = Array.isArray(res) ? res : (res.history || []);
+                    const startMs = new Date(ymdTaipei(start) + 'T00:00:00+08:00').getTime();
+                    const byId = new Map();
+                    const byName = new Map();
+                    rows.forEach(r => {
+                        if (String(r.type || '') !== 'accessory') return;
+                        if (r.status === 'Returned' || r.status === 'Deleted') return;
+                        const t = parseLedgerDate(r.time);
+                        if (!t || t.getTime() < startMs) return;
+                        const q = raQtyOf(r);
+                        const id = String(r.itemId || '');
+                        if (id) byId.set(id, (byId.get(id) || 0) + q);
+                        else {
+                            const n = stripLedgerName(String(r.itemName || '').replace(/\s*\(贈\)\s*/, '').replace(/\sx\d+\s*$/, '')).trim();
+                            if (n) byName.set(n, (byName.get(n) || 0) + q);
+                        }
+                    });
+                    UI.raSales = { days, at: Date.now(), byId, byName };
+                } catch (e) {
+                    console.error(e);
+                    if (!quiet && box) box.innerHTML = '<div class="text-center text-red-400 py-10">銷量載入失敗</div>';
+                    return;
+                }
+            }
+            if (!UI.raTab) UI.raTab = 'need';
+            renderRestockAlert();
+        }
+        function restockAlertRows() {
+            const s = UI.raSales;
+            if (!s) return [];
+            return DB.inv.filter(i => i.type === 'accessory' && !i.isHidden).map(i => {
+                const sold = (s.byId.get(String(i.id)) || 0) + (s.byName.get(String(i.name).trim()) || 0);
+                const stock = Math.max(0, Number(i.stock) || 0);
+                const min = Math.max(0, Number(i.minStock) || 0);
+                const daily = sold / s.days;
+                const daysLeft = daily > 0 ? stock / daily : Infinity;
+                let level = '';
+                if (sold > 0 && stock <= 0) level = 'out';
+                else if (min > 0 && stock <= min) level = 'min';
+                else if (sold > 0 && daysLeft <= RA_SOON_DAYS) level = 'soon';
+                const suggest = Math.max(0, Math.ceil(daily * RA_COVER_DAYS) - stock, min > 0 ? min + 1 - stock : 0);
+                return { item: i, sold, stock, min, daily, daysLeft, level, suggest };
+            });
+        }
+        function renderRestockAlert() {
+            const box = document.getElementById('ra-list');
+            const all = restockAlertRows();
+            const need = all.filter(r => r.level);
+            const badge = document.getElementById('restock-alert-badge');
+            if (badge) { badge.textContent = need.length > 99 ? '99+' : String(need.length); badge.classList.toggle('hidden', !need.length); }
+            if (!box || !UI.raSales) return;
+            const catSel = document.getElementById('ra-cat');
+            const prevCat = catSel.value;
+            const cats = getOrderedCategories();
+            catSel.innerHTML = '<option value="">全部分類</option>' + cats.map(c => `<option value="${booksEscape(c)}">${booksEscape(c)}</option>`).join('');
+            catSel.value = cats.includes(prevCat) ? prevCat : '';
+            const term = String(document.getElementById('ra-search').value || '').trim().toLowerCase();
+            const rank = { out: 0, min: 1, soon: 2 };
+            let list = UI.raTab === 'hot' ? all.filter(r => r.sold > 0) : need;
+            if (catSel.value) list = list.filter(r => r.item.category === catSel.value);
+            if (term) list = list.filter(r => String(r.item.name).toLowerCase().includes(term));
+            list.sort((a, b) => UI.raTab === 'hot'
+                ? (b.sold - a.sold || a.stock - b.stock)
+                : (rank[a.level] - rank[b.level] || b.sold - a.sold || a.stock - b.stock));
+            if (!list.length) {
+                box.innerHTML = `<div class="text-center text-slate-500 py-16 text-sm">${UI.raTab === 'hot' ? '這段期間沒有配件銷量' : '目前沒有需要補貨的品項'}</div>`;
+                return;
+            }
+            const tag = { out: '<span class="text-[10px] text-red-300 border border-red-700 px-1 rounded">缺貨</span>', min: '<span class="text-[10px] text-orange-300 border border-orange-700 px-1 rounded">低於最低</span>', soon: `<span class="text-[10px] text-yellow-300 border border-yellow-700 px-1 rounded">${RA_SOON_DAYS}天內賣完</span>` };
+            box.innerHTML = list.map(r => {
+                const left = r.daysLeft === Infinity ? '—' : (r.daysLeft < 1 ? '<1 天' : Math.floor(r.daysLeft) + ' 天');
+                const stockCls = r.stock <= 0 ? 'text-red-400' : (r.level ? 'text-orange-300' : 'text-slate-200');
+                return `<div class="flex items-center gap-2 py-2.5 px-1 border-b border-slate-800">
+                    <div class="flex-1 min-w-0">
+                        <div class="text-sm text-slate-100 truncate">${booksEscape(r.item.name)} ${r.level ? tag[r.level] : ''}</div>
+                        <div class="text-[11px] text-slate-500">${booksEscape(r.item.category)}${r.min ? '　最低 ' + r.min : ''}　日均 ${r.daily.toFixed(1)}</div>
+                    </div>
+                    <div class="w-14 text-right shrink-0 font-mono text-sm text-amber-300">${r.sold}</div>
+                    <div class="w-14 text-right shrink-0 font-mono text-sm ${stockCls}">${r.stock}</div>
+                    <div class="w-16 text-right shrink-0 text-xs text-slate-400">${left}</div>
+                    <div class="w-14 text-right shrink-0 font-mono text-sm ${r.suggest ? 'text-green-400' : 'text-slate-600'}">${r.suggest || '—'}</div>
+                </div>`;
+            }).join('');
+        }
+        async function copyRestockAlert() {
+            const s = UI.raSales;
+            if (!s) return;
+            const list = restockAlertRows().filter(r => r.level && r.suggest > 0);
+            if (!list.length) { Swal.fire({ icon: 'info', title: '目前沒有要補的品項', background: '#26221e', color: 'white' }); return; }
+            const groups = new Map();
+            list.forEach(r => { const k = r.item.category || '其他'; if (!groups.has(k)) groups.set(k, []); groups.get(k).push(r); });
+            const lines = [`【補貨清單】${ymdTaipei(new Date())}（近 ${s.days} 天銷量）`];
+            getOrderedCategories().concat([...groups.keys()]).filter((c, i, a) => groups.has(c) && a.indexOf(c) === i).forEach(c => {
+                lines.push('', `■ ${c}`);
+                groups.get(c).sort((a, b) => b.sold - a.sold).forEach(r => lines.push(`${r.item.name}　補 ${r.suggest}（庫存 ${r.stock}／賣 ${r.sold}）`));
+            });
+            const text = lines.join('\n');
+            const ok = await copyTextToClipboard(text);
+            Swal.fire({ icon: ok ? 'success' : 'info', title: ok ? `已複製 ${list.length} 項` : '請手動複製', text: ok ? '' : text, background: '#26221e', color: 'white' });
+        }
         function openSalary() {
             if (!(User && User.isAdmin)) {
                 Swal.fire({ icon: 'error', title: '僅管理員可查看薪資', background: '#26221e', color: 'white' });
