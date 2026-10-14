@@ -2267,6 +2267,7 @@
                         ${g.status === 'Pending' ? `<button onclick="event.stopPropagation(); settle('${g.orderId}', ${g.total})" class="text-[10px] bg-green-900 text-green-200 px-1.5 rounded border border-green-700 hover:bg-green-800">入帳</button>` : ''}
                         ${editablePending && g.payMethod === 'credit' ? `<button type="button" onclick="event.stopPropagation(); changePendingPayMethod('${oidEsc}', 'linepay')" class="text-[10px] bg-green-950 text-green-300 px-1.5 rounded border border-green-700 hover:bg-green-900 whitespace-nowrap">改LINE Pay</button>` : ''}
                         ${editablePending && g.payMethod === 'linepay' ? `<button type="button" onclick="event.stopPropagation(); changePendingPayMethod('${oidEsc}', 'credit')" class="text-[10px] bg-amber-950 text-amber-300 px-1.5 rounded border border-amber-700 hover:bg-amber-900 whitespace-nowrap">改掛帳</button>` : ''}
+                        ${editablePending ? `<button type="button" onclick="event.stopPropagation(); changePendingCustomer('${oidEsc}')" class="text-[10px] bg-slate-800 text-slate-200 px-1.5 rounded border border-slate-600 hover:bg-slate-700 whitespace-nowrap">改客人</button>` : ''}
                         ${opts.allowAmend ? `<button onclick="event.stopPropagation(); startAmendOrder('${oidEsc}')" class="text-[10px] bg-cyan-900 text-cyan-200 px-1.5 rounded border border-cyan-700 hover:bg-cyan-800">補 key</button>` : ''}
                         ${(User && User.isAdmin) ? `<button type="button" onclick="event.preventDefault(); event.stopPropagation(); window.openOrderSalaryPay && window.openOrderSalaryPay('${oidEsc}')" class="text-[10px] bg-amber-900 text-amber-200 px-1.5 rounded border border-amber-700 hover:bg-amber-800 relative z-10">薪資</button>` : ''}
                         <button onclick="event.stopPropagation(); confirmDeleteOrder('${g.orderId}')" class="text-[10px] bg-red-900 text-red-200 px-1.5 rounded border border-red-700 hover:bg-red-800">刪單</button>
@@ -5308,6 +5309,39 @@
                 await loadPending();
                 const applied = (res.creditApplied || []).length;
                 Swal.fire({ icon: 'success', title: `已改成${label}`, text: applied ? `已用儲值金結清 ${applied} 張` : '', toast: !applied, position: applied ? 'center' : 'top', timer: applied ? undefined : 1500, showConfirmButton: !!applied, background: '#26221e', color: 'white' });
+            } catch (e) {
+                Swal.fire({ icon: 'error', title: '更新失敗', text: e.message || '', background: '#26221e', color: 'white' });
+            }
+        }
+
+        async function changePendingCustomer(orderId) {
+            const meta = UI.pendingOrderMeta[String(orderId)] || {};
+            const oldName = String(meta.customer || '').trim();
+            const names = [...new Set((DB.pending || []).map(i => String(i.customer || '').trim()).filter(n => n && n !== oldName))].sort((a, b) => a.localeCompare(b, 'zh-TW'));
+            const { value } = await Swal.fire({
+                title: '改客人名稱',
+                html: `<div class="text-xs text-slate-400 text-left">${booksEscape(String(orderId))}　$${(Number(meta.total) || 0).toLocaleString()}　原本：${booksEscape(oldName || '（空白）')}</div>
+                    <input id="sw-cust" class="swal2-input" list="sw-cust-list" value="${booksEscape(oldName)}" placeholder="客人名稱">
+                    <datalist id="sw-cust-list">${names.map(n => `<option value="${booksEscape(n)}">`).join('')}</datalist>
+                    <div class="text-xs text-slate-400 text-left mt-2">整張單的品項都會改成新客人；掛帳會從原客人的帳本移到新客人，兩邊都會重算儲值金扣抵。</div>`,
+                background: '#26221e', color: 'white',
+                showCancelButton: true, confirmButtonText: '儲存', cancelButtonText: '取消',
+                didOpen: () => { const el = document.getElementById('sw-cust'); if (el) { el.focus(); el.select(); } },
+                preConfirm: () => {
+                    const v = String(document.getElementById('sw-cust').value || '').replace(/\s+/g, ' ').trim();
+                    if (!v) { Swal.showValidationMessage('請填客人名稱'); return false; }
+                    if (v.length > 50) { Swal.showValidationMessage('名稱太長'); return false; }
+                    return v;
+                }
+            });
+            if (!value || value === oldName) return;
+            Swal.fire({ title: '更新中...', allowOutsideClick: false, background: '#26221e', color: 'white', didOpen: () => Swal.showLoading() });
+            try {
+                const res = await API.handleTransaction({ action: 'change_customer', orderId, customer: value, person: User.name });
+                if (!res || res.status !== 'success') throw new Error((res && res.msg) || '請重試');
+                await loadPending();
+                const applied = (res.creditApplied || []).length;
+                Swal.fire({ icon: 'success', title: `已改成「${value}」`, text: applied ? `已用儲值金結清 ${applied} 張` : '', toast: !applied, position: applied ? 'center' : 'top', timer: applied ? undefined : 1500, showConfirmButton: !!applied, background: '#26221e', color: 'white' });
             } catch (e) {
                 Swal.fire({ icon: 'error', title: '更新失敗', text: e.message || '', background: '#26221e', color: 'white' });
             }
