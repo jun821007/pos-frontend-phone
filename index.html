@@ -501,7 +501,7 @@
                     <h2>薪資</h2>
                     <div class="books-toolbar-actions flex flex-wrap gap-2" id="salary-actions-unpaid">
                         <button type="button" onclick="addManualSalary()" class="px-3 py-2 rounded-lg bg-amber-900 border border-amber-700 text-amber-100 text-sm font-bold">＋手動新增</button>
-                        <button type="button" onclick="copyAllSalaryQueue()" class="px-3 py-2 rounded-lg bg-slate-800 border border-slate-600 text-slate-100 text-sm font-bold">複製全部</button>
+                        <button type="button" onclick="copyAllSalaryQueue()" class="px-3 py-2 rounded-lg bg-slate-800 border border-slate-600 text-slate-100 text-sm font-bold">複製要結</button>
                         <button type="button" onclick="payReadySalaryQueue()" class="px-3 py-2 rounded-lg bg-yellow-600 text-black text-sm font-bold">發放要結</button>
                         <button type="button" onclick="clearSalaryQueue()" class="px-3 py-2 rounded-lg bg-slate-800 border border-red-900 text-red-300 text-sm">清空</button>
                     </div>
@@ -3197,21 +3197,20 @@
             Swal.fire({ icon: ok ? 'success' : 'info', title: ok ? '已複製' : '請手動複製', text: ok ? '' : text, toast: true, position: 'top', timer: 1600, showConfirmButton: false, background: '#26221e' });
         }
         async function copyAllSalaryQueue() {
-            const list = refreshSalaryQueueStatuses(loadSalaryQueue()).filter((r) => !r.paid && (Number(r.amount) || 0) > 0);
+            const list = refreshSalaryQueueStatuses(loadSalaryQueue()).filter((r) => !r.paid && String(r.status) === 'Completed' && (Number(r.amount) || 0) > 0);
             if (!list.length) {
-                Swal.fire({ icon: 'info', title: '沒有可複製項目', background: '#26221e', color: 'white' });
+                Swal.fire({ icon: 'info', title: '沒有要結的項目', text: '未結的單入帳後才會變成要結', background: '#26221e', color: 'white' });
                 return;
             }
             const text = buildSalaryCopyText(list.map((r) => ({
                 orderId: r.orderId,
                 customer: r.customer,
-                label: r.label + (String(r.status) === 'Completed' ? '' : '（未結）'),
+                label: r.label,
                 amount: r.amount,
-                formula: r.formula,
-                pending: String(r.status) !== 'Completed'
+                formula: r.formula
             })));
             const ok = await copyTextToClipboard(text);
-            Swal.fire({ icon: ok ? 'success' : 'info', title: ok ? '已複製全部' : '請手動複製', text: ok ? '' : text, background: '#26221e', color: 'white' });
+            Swal.fire({ icon: ok ? 'success' : 'info', title: ok ? `已複製要結 ${list.length} 筆` : '請手動複製', text: ok ? '' : text, background: '#26221e', color: 'white' });
         }
         async function payReadySalaryQueue() {
             if (!(User && User.isAdmin)) return;
