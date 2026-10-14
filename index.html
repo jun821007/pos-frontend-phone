@@ -1820,7 +1820,12 @@
                 const { main, issue } = parseRepairLedgerParts(it.itemName || it.name || '');
                 return issue ? `${main} ${issue}` : main;
             }
-            return stripSettlementDealerNoise(it.itemName || it.name || '', it.dealerName || '') || '品項';
+            let dealer = it.dealerName || '';
+            if (!dealer && t === 'peer_phone') {
+                const m = stripLedgerName(it.itemName || it.name || '').match(/^同行\s+(\S+)\s+\S/);
+                if (m) dealer = m[1];
+            }
+            return stripSettlementDealerNoise(it.itemName || it.name || '', dealer) || '品項';
         }
         function buildSettlementCopyText(items) {
             const lines = [];
