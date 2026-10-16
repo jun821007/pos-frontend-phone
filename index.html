@@ -4920,7 +4920,7 @@
                     </div>
                     <div class="accordion-content${bucketOpen ? ' open' : ''} bg-slate-900/30">
                         ${hasCredit ? `<div class="px-3 pt-2 flex gap-2"><button type="button" onclick="openCustomerLedger(UI.pendingBucketNames['${bucketKey}'])" class="text-[11px] px-2.5 py-1 rounded-lg bg-slate-800 border border-cyan-700 text-cyan-300">帳本／收款／對帳單</button></div>` : ''}
-                        ${bucket.orders.map(g => renderOrderRow(g, { compact: true, selectable: true, idPrefix: 'group-pending', editablePending: true })).join('')}
+                        ${bucket.orders.map(g => renderOrderRow(g, { compact: true, selectable: true, idPrefix: 'group-pending', editablePending: true, allowAmend: true })).join('')}
                     </div>
                 </div>`;
             });
@@ -6142,14 +6142,18 @@
             updateAmendBanner();
         }
         function canAmendOrderGroup(g) {
-            const todayYmd = ymdTaipei(new Date());
             const sample = (g && g.items && g.items[0]) || g || {};
+            // 未結單可持續補 key；已結只允許補當日單
+            if (String(sample.status || g.status || '') === 'Pending') return true;
+            const todayYmd = ymdTaipei(new Date());
             const orderDay = ymdTaipei(parseLedgerDate(sample.time));
             return !!orderDay && orderDay === todayYmd;
         }
         function getOrderItemsForAmend(orderId) {
             const oid = String(orderId);
             const ok = (i) => String(i.orderId) === oid && i.status !== 'Returned' && i.status !== 'Deleted';
+            const fromPending = (DB.pending || []).filter(ok);
+            if (fromPending.length) return fromPending;
             const fromSales = (DB.sales || []).filter(ok);
             if (fromSales.length) return fromSales;
             return (DB.history || []).filter(ok);
@@ -6180,9 +6184,12 @@
             const sample = salesItems[0] || (g.items && g.items[0]) || {};
             const customer = String((g && g.customer) || sample.customer || '過路客').trim() || '過路客';
             const payMethod = String(sample.payMethod || (g && g.payMethod) || 'cash').trim() || 'cash';
+            const isPending = String(sample.status || '') === 'Pending'
+                || (DB.pending || []).some(i => String(i.orderId) === String(orderId) && i.status === 'Pending');
             const todayYmd = ymdTaipei(new Date());
             const orderDay = ymdTaipei(parseLedgerDate(sample.time || (g && g.time)));
-            if (orderDay && orderDay !== todayYmd) {
+            // 未結可持續補 key；已結只能補當日
+            if (!isPending && orderDay && orderDay !== todayYmd) {
                 Swal.fire({ icon: 'warning', title: '只能補當日單', text: '此單不是今天的帳', background: '#26221e', color: 'white' });
                 return;
             }
