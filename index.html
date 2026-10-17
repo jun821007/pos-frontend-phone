@@ -250,7 +250,12 @@
     <main class="flex-1 flex flex-col relative bg-slate-950 overflow-hidden w-full">
         <header class="h-14 min-h-[3.5rem] glass flex items-center justify-between px-4 border-b border-slate-800 shrink-0 z-10">
             <div class="flex items-center gap-2"><span class="font-bold text-slate-100 text-lg">POS</span><span id="user-badge" class="text-[10px] bg-slate-800 text-yellow-500 px-2 py-0.5 rounded-full border border-slate-700">未登入</span></div>
-            <div id="sync-status" class="text-xs text-slate-500 flex items-center gap-2"><span class="loader"></span> 載入中</div>
+            <div class="flex items-center gap-2 shrink-0">
+                <button type="button" onclick="softRefresh()" title="重新整理" class="md:hidden w-8 h-8 rounded-lg bg-slate-800/80 hover:bg-slate-700 text-slate-400 hover:text-blue-400 flex items-center justify-center transition" aria-label="重新整理">
+                    <i class="fa-solid fa-rotate-right text-sm"></i>
+                </button>
+                <div id="sync-status" class="text-xs text-slate-500 flex items-center gap-2"><span class="loader"></span> 載入中</div>
+            </div>
         </header>
         <div id="amend-header-bar" class="hidden shrink-0 px-3 py-1.5 bg-cyan-950/80 border-b border-cyan-800 flex items-center justify-between gap-2 text-xs text-cyan-200 z-20">
             <span id="amend-header-text" class="truncate min-w-0 font-semibold">補 key 中</span>
