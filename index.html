@@ -1579,34 +1579,62 @@
                 `${owner}：${myCost}-${tag.base}=利潤 ${myCost - tag.base}　該給 ${myCost}`
             ];
         }
-        // 複製寄賣總結只加件主那一行：售價、底、畫面上的利潤、該給。店裡的「我的」不加。
-        function consignOwnerLineAmounts(tag, sale, myCost, ship) {
+        function consignCopyNumber(n) {
+            const x = Number(n) || 0;
+            const rounded = Math.round(x * 100) / 100;
+            if (Math.abs(rounded - Math.round(rounded)) < 1e-9) return String(Math.round(rounded));
+            return String(rounded);
+        }
+        // 複製寄賣總結只加件主那一行。店裡的「我的」不加。記利潤的售價是件主減號左邊；不記用算式最前面的售價。運費不進總結。
+        function consignOwnerLineAmounts(tag, sale, myCost) {
             const owner = tag.owner || '件主';
             const base = Number(tag.base) || 0;
-            const sh = tag.noCount ? (Number(ship) || 0) : 0;
-            if (tag.noCount) return { owner, sale, base, profit: sale - base - sh, give: sale - sh };
-            return { owner, sale, base, profit: myCost - base, give: myCost };
+            const summarySale = tag.noCount ? (Number(sale) || 0) : (Number(myCost) || 0);
+            return { owner, sale: summarySale, base };
         }
-        function consignOwnerCopyTotals(rows) {
-            const order = [];
-            const byOwner = {};
-            (rows || []).forEach(row => {
-                const owner = row.owner || '件主';
-                if (!byOwner[owner]) {
-                    byOwner[owner] = { count: 0, sale: 0, base: 0, profit: 0, give: 0 };
-                    order.push(owner);
+        function formatConsignOwnerSummary(owner, rows) {
+            const bases = (rows || []).map(r => Number(r.base) || 0);
+            const sales = (rows || []).map(r => Number(r.sale) || 0);
+            const baseSum = bases.reduce((s, n) => s + n, 0);
+            const saleSum = sales.reduce((s, n) => s + n, 0);
+            return [
+                owner,
+                `本 ${bases.map(consignCopyNumber).join('+')}=${consignCopyNumber(baseSum)}`,
+                `售價 ${sales.map(consignCopyNumber).join('+')}=${consignCopyNumber(saleSum)}`,
+                `總利潤 ${consignCopyNumber(saleSum)}-${consignCopyNumber(baseSum)}=${consignCopyNumber(saleSum - baseSum)}`
+            ].join('\n');
+        }
+        function buildConsignCopyText(customer, normalized) {
+            let ownerShip = consignOwnerShipping(normalized);
+            const groups = [];
+            const groupIndex = {};
+            (normalized || []).forEach(it => {
+                if (!it || it.type !== 'new_phone') return;
+                const tag = parseConsignTag(it);
+                if (!tag) return;
+                const ship = tag.noCount ? ownerShip : 0;
+                if (tag.noCount) ownerShip = 0;
+                const sale = Number(it.salePrice) || 0;
+                const myCost = Number(it.cost) || 0;
+                const lines = consignFormulaLines(tag, sale, myCost, ship);
+                const block = [`${customer}　${stripLedgerName(it.itemName || it.name || '')}`].concat(lines).join('\n');
+                const amounts = consignOwnerLineAmounts(tag, sale, myCost);
+                const owner = amounts.owner;
+                if (groupIndex[owner] == null) {
+                    groupIndex[owner] = groups.length;
+                    groups.push({ owner, blocks: [], rows: [] });
                 }
-                const st = byOwner[owner];
-                st.count += 1;
-                st.sale += Number(row.sale) || 0;
-                st.base += Number(row.base) || 0;
-                st.profit += Number(row.profit) || 0;
-                st.give += Number(row.give) || 0;
+                const g = groups[groupIndex[owner]];
+                g.blocks.push(block);
+                g.rows.push(amounts);
             });
-            return order.filter(owner => byOwner[owner].count >= 2).map(owner => {
-                const st = byOwner[owner];
-                return [owner, `總金額 ${st.sale}`, `本 ${st.base}`, `互扣後利潤 ${st.profit}`, `實拿總金額 ${st.give}`].join('\n');
+            if (!groups.length) return '';
+            const parts = [];
+            groups.forEach(g => {
+                parts.push(g.blocks.join('\n\n'));
+                if (g.rows.length >= 2) parts.push(formatConsignOwnerSummary(g.owner, g.rows));
             });
+            return parts.join('\n\n');
         }
         async function addNewStockToCart(i) {
             const sid = String(i.id);
@@ -2084,21 +2112,8 @@
                 return;
             }
             if (kind === 'consign') {
-                let ownerShip = consignOwnerShipping(normalized);
-                const ownerRows = [];
-                const blocks = normalized.filter(it => it.type === 'new_phone' && parseConsignTag(it)).map(it => {
-                    const tag = parseConsignTag(it);
-                    const ship = tag.noCount ? ownerShip : 0;
-                    if (tag.noCount) ownerShip = 0;
-                    const sale = Number(it.salePrice) || 0;
-                    const myCost = Number(it.cost) || 0;
-                    const lines = consignFormulaLines(tag, sale, myCost, ship);
-                    ownerRows.push(consignOwnerLineAmounts(tag, sale, myCost, ship));
-                    return [`${customer}　${stripLedgerName(it.itemName || it.name || '')}`].concat(lines).join('\n');
-                });
-                if (!blocks.length) return;
-                const summaries = consignOwnerCopyTotals(ownerRows);
-                const text = summaries.length ? `${blocks.join('\n\n')}\n\n${summaries.join('\n\n')}` : blocks.join('\n\n');
+                const text = buildConsignCopyText(customer, normalized);
+                if (!text) return;
                 const ok = await copyTextToClipboard(text);
                 if (ok) Swal.fire({ icon:'success', title:'已複製寄賣算式', toast:true, position:'top', timer:1500, showConfirmButton:false, background:'#26221e', color:'white' });
                 else Swal.fire({ icon:'error', title:'複製失敗', text:'請手動複製', background:'#26221e', color:'white' });
