@@ -142,6 +142,12 @@
         .phone-row-name { font-size: 15px; font-weight: 700; color: #f3ebe3; line-height: 1.35; min-width: 0; word-break: break-word; }
         .phone-row-id { font-size: 11px; color: #a89f94; font-weight: 600; flex-shrink: 0; }
         .phone-row-spec { margin-top: 5px; display: flex; flex-wrap: wrap; gap: 6px; }
+        .phone-row.is-reserved { border-left-color: #fb923c; background: rgba(194, 65, 12, 0.16); }
+        .phone-row.is-reserved.is-selected { background: rgba(232, 160, 74, 0.22); border-left-color: #fb923c; }
+        .ns-status { margin-left: auto; font-size: 11px; font-weight: 800; padding: 2px 7px; border-radius: 999px; flex-shrink: 0; background: #3d3731; color: #a89f94; }
+        .ns-status.is-reserved { background: #c2410c; color: #fff7ed; }
+        .ns-status-btn { flex-shrink: 0; align-self: center; margin-left: 8px; min-height: 36px; padding: 6px 10px; border-radius: 999px; background: #3d3731; color: #f3ebe3; font-size: 12px; font-weight: 700; border: 1px solid #5c534a; }
+        .phone-row.is-reserved .ns-status-btn { background: #9a3412; color: #ffedd5; border-color: #fdba74; }
         .acc-check { display: none; position: absolute; top: 8px; left: 8px; color: #7a7168; font-size: 18px; z-index: 2; }
         #item-grid.is-multiselect .acc-check { display: block; }
         .acc-card.is-selected { box-shadow: inset 0 0 0 2px #e8a04a; background: rgba(232, 160, 74, 0.12); }
@@ -1465,16 +1471,19 @@
                 list.forEach(i => {
                     const sid = String(i.id);
                     const inCart = Cart.some(c => String(c.itemId) === sid);
+                    const stockStatus = String(i.stockStatus || '庫存中');
+                    const reserved = stockStatus === '客訂中';
                     let specs = '';
                     if (i.imei) specs += `<span class="spec-tag">序 ${salaryEsc(i.imei)}</span>`;
                     specs += `<span class="spec-tag">成本 $${(Number(i.cost) || 0).toLocaleString()}</span>`;
                     if (i.stockType === '寄賣' && i.owner) specs += `<span class="spec-tag">件主 ${salaryEsc(i.owner)}</span>`;
-                    grid.innerHTML += `<div onclick="triggerAddToCart('${salaryEsc(sid)}')" class="phone-row${inCart ? ' is-selected' : ''}" id="card-${salaryEsc(sid)}" data-id="${salaryEsc(sid)}">
+                    grid.innerHTML += `<div onclick="triggerAddToCart('${salaryEsc(sid)}')" class="phone-row${inCart ? ' is-selected' : ''}${reserved ? ' is-reserved' : ''}" id="card-${salaryEsc(sid)}" data-id="${salaryEsc(sid)}">
                         <div class="phone-row-check"><i class="fa-solid fa-circle-check"></i></div>
                         <div class="phone-row-main">
-                            <div class="phone-row-top"><span class="phone-row-id">#${salaryEsc(i.stock_id)}</span><div class="phone-row-name">${salaryEsc(i.name)}</div></div>
+                            <div class="phone-row-top"><span class="phone-row-id">#${salaryEsc(i.stock_id)}</span><div class="phone-row-name">${salaryEsc(i.name)}</div><span class="ns-status${reserved ? ' is-reserved' : ''}">${salaryEsc(stockStatus)}</span></div>
                             <div class="phone-row-spec">${specs}</div>
                         </div>
+                        <button type="button" class="ns-status-btn" onclick="event.stopPropagation(); changeNewStockStatus('${salaryEsc(sid)}')">切換</button>
                     </div>`;
                 });
                 return;
@@ -1703,6 +1712,36 @@
             });
             renderCart();
             filterItems('stocktype', i.stockType);
+        }
+        async function changeNewStockStatus(id) {
+            const item = DB.inv.find(x => String(x.id) === String(id) && x.type === 'new_stock');
+            if (!item) return;
+            const current = String(item.stockStatus || '庫存中');
+            const next = current === '客訂中' ? '庫存中' : '客訂中';
+            const r = await withPreservedItemGridScroll((swalOpts) => Swal.fire({
+                title: `改為${next}？`,
+                text: item.name || '',
+                icon: 'question',
+                showCancelButton: true,
+                confirmButtonText: '確認',
+                cancelButtonText: '取消',
+                background: '#26221e',
+                color: 'white',
+                ...swalOpts
+            }));
+            if (!r.isConfirmed) return;
+            try {
+                const res = await API.changePhoneStatus(item.id, current);
+                if (!res || res.status !== 'success') throw new Error((res && res.msg) || '更新失敗');
+                item.stockStatus = next;
+                const active = document.querySelector('#sub-cat-scroll .pill-btn.active');
+                const scrollTop = saveItemGridScroll();
+                filterItems('stocktype', active ? active.innerText : (item.stockType || '自有'));
+                restoreItemGridScroll(scrollTop);
+                Swal.fire({ title: '已更新', icon: 'success', timer: 800, showConfirmButton: false, background: '#26221e', color: 'white' });
+            } catch (e) {
+                Swal.fire({ icon: 'error', title: '更新失敗', text: e.message || '請重試', background: '#26221e', color: 'white' });
+            }
         }
         async function triggerAddToCart(id) {
             if (UI.multiSelect && UI.tab === 'phone') { togglePhoneSelect(id); return; }
