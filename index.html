@@ -146,8 +146,6 @@
         .phone-row.is-reserved.is-selected { background: rgba(232, 160, 74, 0.22); border-left-color: #fb923c; }
         .ns-status { margin-left: auto; font-size: 11px; font-weight: 800; padding: 2px 7px; border-radius: 999px; flex-shrink: 0; background: #3d3731; color: #a89f94; }
         .ns-status.is-reserved { background: #c2410c; color: #fff7ed; }
-        .ns-status-btn { flex-shrink: 0; align-self: center; margin-left: 8px; min-height: 36px; padding: 6px 10px; border-radius: 999px; background: #3d3731; color: #f3ebe3; font-size: 12px; font-weight: 700; border: 1px solid #5c534a; }
-        .phone-row.is-reserved .ns-status-btn { background: #9a3412; color: #ffedd5; border-color: #fdba74; }
         .acc-check { display: none; position: absolute; top: 8px; left: 8px; color: #7a7168; font-size: 18px; z-index: 2; }
         #item-grid.is-multiselect .acc-check { display: block; }
         .acc-card.is-selected { box-shadow: inset 0 0 0 2px #e8a04a; background: rgba(232, 160, 74, 0.12); }
@@ -288,7 +286,7 @@
                             <button onclick="toggleMultiSelectMode()" id="btn-multiselect" class="pill-btn border-yellow-500 text-yellow-400 shrink-0">☑ 多選</button>
                             <div id="multi-select-confirm" class="hidden items-center gap-2 flex">
                                 <span id="multi-count" class="text-xs text-slate-400 shrink-0">0</span>
-                                <button onclick="confirmMultiAdd()" class="bg-yellow-500 text-black font-bold px-3 py-1.5 rounded-xl text-xs shrink-0">加入</button>
+                                <button onclick="confirmMultiAdd()" id="btn-multi-add" class="bg-yellow-500 text-black font-bold px-3 py-1.5 rounded-xl text-xs shrink-0">加入</button>
                                 <button onclick="batchChangeSelectedPhoneStatus()" id="btn-batch-phone-status" class="bg-blue-600 text-white font-bold px-3 py-1.5 rounded-xl text-xs shrink-0">批次改狀態</button>
                                 <button onclick="cancelMultiSelect()" class="text-slate-400 text-xs shrink-0">取消</button>
                             </div>
@@ -1470,6 +1468,7 @@
             if (UI.tab === 'new') {
                 list.forEach(i => {
                     const sid = String(i.id);
+                    const selected = UI.selectedPhones.has(sid);
                     const inCart = Cart.some(c => String(c.itemId) === sid);
                     const stockStatus = String(i.stockStatus || '庫存中');
                     const reserved = stockStatus === '客訂中';
@@ -1477,13 +1476,12 @@
                     if (i.imei) specs += `<span class="spec-tag">序 ${salaryEsc(i.imei)}</span>`;
                     specs += `<span class="spec-tag">成本 $${(Number(i.cost) || 0).toLocaleString()}</span>`;
                     if (i.stockType === '寄賣' && i.owner) specs += `<span class="spec-tag">件主 ${salaryEsc(i.owner)}</span>`;
-                    grid.innerHTML += `<div onclick="triggerAddToCart('${salaryEsc(sid)}')" class="phone-row${inCart ? ' is-selected' : ''}${reserved ? ' is-reserved' : ''}" id="card-${salaryEsc(sid)}" data-id="${salaryEsc(sid)}">
+                    grid.innerHTML += `<div onclick="triggerAddToCart('${salaryEsc(sid)}')" class="phone-row${selected ? ' is-selected' : ''}${inCart ? ' in-cart' : ''}${reserved ? ' is-reserved' : ''}" id="card-${salaryEsc(sid)}" data-id="${salaryEsc(sid)}">
                         <div class="phone-row-check"><i class="fa-solid fa-circle-check"></i></div>
                         <div class="phone-row-main">
                             <div class="phone-row-top"><span class="phone-row-id">#${salaryEsc(i.stock_id)}</span><div class="phone-row-name">${salaryEsc(i.name)}</div><span class="ns-status${reserved ? ' is-reserved' : ''}">${salaryEsc(stockStatus)}</span></div>
                             <div class="phone-row-spec">${specs}</div>
                         </div>
-                        <button type="button" class="ns-status-btn" onclick="event.stopPropagation(); changeNewStockStatus('${salaryEsc(sid)}')">切換</button>
                     </div>`;
                 });
                 return;
@@ -1713,38 +1711,8 @@
             renderCart();
             filterItems('stocktype', i.stockType);
         }
-        async function changeNewStockStatus(id) {
-            const item = DB.inv.find(x => String(x.id) === String(id) && x.type === 'new_stock');
-            if (!item) return;
-            const current = String(item.stockStatus || '庫存中');
-            const next = current === '客訂中' ? '庫存中' : '客訂中';
-            const r = await withPreservedItemGridScroll((swalOpts) => Swal.fire({
-                title: `改為${next}？`,
-                text: item.name || '',
-                icon: 'question',
-                showCancelButton: true,
-                confirmButtonText: '確認',
-                cancelButtonText: '取消',
-                background: '#26221e',
-                color: 'white',
-                ...swalOpts
-            }));
-            if (!r.isConfirmed) return;
-            try {
-                const res = await API.changePhoneStatus(item.id, current);
-                if (!res || res.status !== 'success') throw new Error((res && res.msg) || '更新失敗');
-                item.stockStatus = next;
-                const active = document.querySelector('#sub-cat-scroll .pill-btn.active');
-                const scrollTop = saveItemGridScroll();
-                filterItems('stocktype', active ? active.innerText : (item.stockType || '自有'));
-                restoreItemGridScroll(scrollTop);
-                Swal.fire({ title: '已更新', icon: 'success', timer: 800, showConfirmButton: false, background: '#26221e', color: 'white' });
-            } catch (e) {
-                Swal.fire({ icon: 'error', title: '更新失敗', text: e.message || '請重試', background: '#26221e', color: 'white' });
-            }
-        }
         async function triggerAddToCart(id) {
-            if (UI.multiSelect && UI.tab === 'phone') { togglePhoneSelect(id); return; }
+            if (UI.multiSelect && (UI.tab === 'phone' || UI.tab === 'new')) { togglePhoneSelect(id); return; }
             if (UI.multiSelect && UI.tab === 'accessory') { toggleAccSelect('a:' + String(id)); return; }
             const i = DB.inv.find(x => String(x.id) === String(id));
             if(!i) { Swal.fire({icon:'error', title:'找不到商品', text:`ID: ${id}`, background:'#26221e', color:'white'}); return; }
@@ -7609,17 +7577,20 @@
             const confirm = document.getElementById('multi-select-confirm');
             const btn = document.getElementById('btn-multiselect');
             const batch = document.getElementById('btn-batch-phone-status');
+            const addBtn = document.getElementById('btn-multi-add');
             if (!bar) return;
-            if (UI.tab !== 'phone' && UI.tab !== 'accessory') { bar.classList.add('hidden'); return; }
+            const phoneLike = UI.tab === 'phone' || UI.tab === 'new';
+            if (!phoneLike && UI.tab !== 'accessory') { bar.classList.add('hidden'); return; }
             bar.classList.remove('hidden');
-            if (batch) batch.classList.toggle('hidden', UI.tab !== 'phone');
+            if (batch) batch.classList.toggle('hidden', !phoneLike);
+            if (addBtn) addBtn.classList.toggle('hidden', UI.tab === 'new');
             if (UI.multiSelect) {
                 if (btn) { btn.classList.add('active'); }
                 if (confirm) confirm.classList.remove('hidden');
                 const cnt = document.getElementById('multi-count');
                 if (cnt) {
-                    const n = UI.tab === 'phone' ? UI.selectedPhones.size : UI.selectedAcc.size;
-                    cnt.textContent = n + (UI.tab === 'phone' ? ' 台' : ' 件');
+                    const n = phoneLike ? UI.selectedPhones.size : UI.selectedAcc.size;
+                    cnt.textContent = n + (phoneLike ? ' 台' : ' 件');
                 }
             } else {
                 if (btn) btn.classList.remove('active');
@@ -7633,7 +7604,7 @@
                 UI.selectedAcc = new Set();
             }
             const grid = document.getElementById('item-grid');
-            if (grid && (UI.tab === 'phone' || UI.tab === 'accessory')) grid.classList.toggle('is-multiselect', UI.multiSelect);
+            if (grid && (UI.tab === 'phone' || UI.tab === 'new' || UI.tab === 'accessory')) grid.classList.toggle('is-multiselect', UI.multiSelect);
             refreshPhoneSelection();
             refreshAccSelection();
             renderMultiSelectBar();
@@ -7676,6 +7647,7 @@
             });
         }
         async function confirmMultiAdd() {
+            if (UI.tab === 'new') return;
             if (UI.tab === 'accessory') return confirmMultiAcc();
             return confirmMultiPhone();
         }
@@ -7797,12 +7769,16 @@
             renderCart();
             cancelMultiSelect();
         }
+        function phoneBatchStatus(p) {
+            if (p && p.type === 'new_stock') return String(p.stockStatus || '庫存中');
+            return String((p && p.status_label) || '');
+        }
         async function batchChangeSelectedPhoneStatus() {
             if (UI.selectedPhones.size === 0) return;
             const phones = Array.from(UI.selectedPhones).map(id => DB.inv.find(x => String(x.id) === String(id))).filter(Boolean);
             if (phones.length === 0) return;
-            const baseStatus = String(phones[0].status_label || '');
-            const mixedStatus = phones.some(p => String(p.status_label || '') !== baseStatus);
+            const baseStatus = phoneBatchStatus(phones[0]);
+            const mixedStatus = phones.some(p => phoneBatchStatus(p) !== baseStatus);
             if (mixedStatus) {
                 Swal.fire({ icon:'warning', title:'只能同狀態批次變更', text:'請先只選同一種原始狀態的手機', background:'#26221e', color:'white' });
                 return;
@@ -7821,9 +7797,11 @@
             if (!ok.isConfirmed) return;
             try {
                 for (const p of phones) {
-                    const res = await API.changePhoneStatus(p.id, p.status_label);
+                    const current = phoneBatchStatus(p);
+                    const res = await API.changePhoneStatus(p.id, current);
                     if (!res || res.status !== 'success') throw new Error(res?.msg || '更新失敗');
-                    p.status_label = nextStatus;
+                    if (p.type === 'new_stock') p.stockStatus = nextStatus;
+                    else p.status_label = nextStatus;
                 }
                 Swal.fire({ icon:'success', title:'批次更新完成', toast:true, position:'top', timer:1200, showConfirmButton:false, background:'#26221e', color:'white' });
                 const active = document.querySelector('.pill-btn.active');
