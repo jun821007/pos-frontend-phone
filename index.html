@@ -2272,14 +2272,14 @@
                 }
                 const needPrice = parseNeedsPriceName(it.itemName);
                 if (needPrice) dName = booksEscape(needPrice.name) + ` <span class="text-[10px] text-slate-500">成本 ${needPrice.cost.toLocaleString()}</span>`;
-                if(!needPrice && it.salePrice === 0 && it.cost > 0 && !dName.includes('(贈)') && !(it.type === 'phone' && dName.includes(' + ')) && !it.isMultiPhoneExtra) { dName += ' <span class="text-red-400 text-[10px] border border-red-400 px-1 rounded">贈</span>'; }
+                if(!needPrice && !isDefectLedger(it) && it.salePrice === 0 && it.cost > 0 && !dName.includes('(贈)') && !(it.type === 'phone' && dName.includes(' + ')) && !it.isMultiPhoneExtra) { dName += ' <span class="text-red-400 text-[10px] border border-red-400 px-1 rounded">贈</span>'; }
                 let itemKey = `RET_${it.orderId}_${it.itemId}`;
                 ItemRegistry[itemKey] = { ...it, customer: g.customer };
                 let safeCost = Number(it.cost) || 0;
                 const iidEsc = String(it.itemId || '').replace(/\\/g, '\\\\').replace(/'/g, "\\'");
                 const isIncludedLine = it.type === 'phone' && Number(it.salePrice) === 0 && (it.itemName || '').includes(' + ');
                 const saleNum = Number(it.salePrice) || 0;
-                const isPendingGift = !needPrice && !isIncludedLine && saleNum === 0 && safeCost > 0;
+                const isPendingGift = !isDefectLedger(it) && !needPrice && !isIncludedLine && saleNum === 0 && safeCost > 0;
                 const needPriceTag = '<span class="text-[10px] font-bold text-orange-300 border border-orange-500 bg-orange-950/50 px-1.5 py-0.5 rounded">待填價</span>';
                 const priceHtml = isIncludedLine
                     ? '<span class="text-slate-500 text-[10px]">含於上筆</span>'
@@ -2290,7 +2290,7 @@
                     : editablePending
                         ? `<button type="button" onclick="event.stopPropagation(); editPendingItemAmount('${oidEsc}', '${iidEsc}', ${saleNum}, ${safeCost})" class="text-yellow-500 hover:text-yellow-300 underline decoration-dotted decoration-yellow-600/50" title="點擊修改金額">${isPendingGift ? '<span class="text-red-400">贈</span>' : '$' + saleNum.toLocaleString()}</button>`
                         : (isPendingGift ? '<span class="text-red-400">贈</span>' : `$${saleNum.toLocaleString()}`);
-                const giftBtnHtml = editablePending && !isIncludedLine && !needPrice
+                const giftBtnHtml = editablePending && !isIncludedLine && !needPrice && !isDefectLedger(it)
                     ? `<button type="button" onclick="event.stopPropagation(); togglePendingItemGift('${oidEsc}', '${iidEsc}', ${isPendingGift}, ${saleNum}, ${safeCost})" class="text-xs border px-1 rounded shrink-0 ${isPendingGift ? 'text-red-400 border-red-400' : 'text-slate-500 border-slate-600'}" title="${isPendingGift ? '改為收費' : '改為贈品'}">贈</button>`
                     : '';
                 const priceColHtml = isIncludedLine
@@ -6930,6 +6930,14 @@
             }
         }
 
+        const DEFECT_REWORK_CATEGORIES = ['原廠拆機電池', '加工好電池', 'A+ 聚信成品電池', '排線', '電芯'];
+        function normDefectCategory(value) {
+            return String(value || '').replace(/[\uFF01-\uFF5E]/g, ch => String.fromCharCode(ch.charCodeAt(0) - 0xFEE0)).replace(/\u3000/g, ' ').trim();
+        }
+        function isDefectReworkCategory(category) {
+            const name = normDefectCategory(category);
+            return DEFECT_REWORK_CATEGORIES.some(item => normDefectCategory(item) === name);
+        }
         function defectPartChoices() {
             return (DB.inv || []).filter(i => {
                 if (!i || i.type !== 'accessory') return false;
@@ -6952,7 +6960,7 @@
             box.innerHTML = shown.map(i => {
                 const id = booksEscape(String(i.id));
                 return `<label class="flex items-center gap-2 px-2 py-1.5 border-b border-slate-800 text-left">
-                    <input type="checkbox" class="df-part accent-rose-500" data-id="${id}" data-cost="${Number(i.cost) || 0}">
+                    <input type="checkbox" class="df-part accent-rose-500" data-id="${id}" data-cost="${Number(i.cost) || 0}" data-cat="${booksEscape(i.category)}">
                     <span class="flex-1 min-w-0 text-xs text-slate-200 truncate">${booksEscape(i.category)} ${booksEscape(i.name)} <span class="text-slate-500">庫存 ${i.stock}　成本 ${Number(i.cost) || 0}</span></span>
                     <input type="number" min="1" value="1" class="df-qty w-14 bg-slate-900 border border-slate-700 rounded px-1 py-1 text-xs text-white" data-id="${id}">
                 </label>`;
@@ -6971,6 +6979,15 @@
                 loss += (Number(cb.getAttribute('data-cost')) || 0) * qty;
             });
             el.textContent = '虧損 $' + loss.toLocaleString() + '　售價 $0';
+            const wrap = document.getElementById('df-rework-wrap');
+            const show = [...document.querySelectorAll('.df-part:checked')].some(cb => isDefectReworkCategory(cb.getAttribute('data-cat')));
+            if (wrap) {
+                wrap.classList.toggle('hidden', !show);
+                if (!show) {
+                    const box = document.getElementById('df-rework');
+                    if (box) box.checked = false;
+                }
+            }
         }
         async function modalDefect() {
             if (!defectPartChoices().length) {
@@ -6982,13 +6999,14 @@
                 title: '瑕疵',
                 width: 640,
                 html: `<div class="text-left text-xs text-slate-400 mb-2">扣自己的料件，成本計入虧損。日期固定今天 ${today}，不會留機。</div>
-                    <input id="df-customer" class="swal2-input" placeholder="客戶（必填）">
+                    <input id="df-customer" class="swal2-input" placeholder="客戶（選填）">
                     <input id="df-phone" class="swal2-input" placeholder="電話（選填）" type="tel" inputmode="tel">
                     <input id="df-model" class="swal2-input" placeholder="型號／品名">
                     <input id="df-imei" class="swal2-input" placeholder="序號（型號或序號至少填一個）">
                     <textarea id="df-note" class="swal2-textarea" placeholder="備註（選填）" rows="2"></textarea>
                     <input id="df-part-q" class="swal2-input" placeholder="搜尋自有庫存料件">
                     <div id="df-parts" class="max-h-52 overflow-auto border border-slate-700 rounded-lg bg-slate-950/40"></div>
+                    <label id="df-rework-wrap" class="hidden flex items-center gap-2 mt-3 text-left text-sm text-rose-200"><input id="df-rework" type="checkbox" class="accent-rose-500">復修（勾了才進 in-stock 復修查詢，預設不勾）</label>
                     <div id="df-loss" class="text-sm text-rose-300 mt-2 text-left">虧損 $0　售價 $0</div>`,
                 background: '#26221e',
                 color: 'white',
@@ -7004,7 +7022,6 @@
                     const customer = document.getElementById('df-customer').value.trim();
                     const modelName = document.getElementById('df-model').value.trim();
                     const imei = document.getElementById('df-imei').value.trim();
-                    if (!customer) { Swal.showValidationMessage('請填客戶'); return false; }
                     if (!modelName && !imei) { Swal.showValidationMessage('請填型號或序號'); return false; }
                     const parts = [];
                     document.querySelectorAll('.df-part:checked').forEach(cb => {
@@ -7014,6 +7031,9 @@
                         parts.push({ itemId: id, quantity });
                     });
                     if (!parts.length) { Swal.showValidationMessage('請勾選要扣的自有庫存'); return false; }
+                    const reworkWrap = document.getElementById('df-rework-wrap');
+                    const reworkBox = document.getElementById('df-rework');
+                    const rework = !!(reworkBox && reworkBox.checked && reworkWrap && !reworkWrap.classList.contains('hidden'));
                     return {
                         customer,
                         customerPhone: normalizeTaiwanPhone(document.getElementById('df-phone').value),
@@ -7021,6 +7041,7 @@
                         imei,
                         note: document.getElementById('df-note').value.trim(),
                         parts,
+                        rework,
                         person: (User && User.name) || ''
                     };
                 }
@@ -7039,7 +7060,7 @@
                 Swal.fire({
                     icon: 'success',
                     title: '瑕疵已入帳',
-                    html: `對帳編號 ${booksEscape(res.defectId)}<br>客戶 ${booksEscape(res.customer)}<br>虧損 $${Number(res.loss || 0).toLocaleString()}　售價 $0`,
+                    html: `對帳編號 ${booksEscape(res.defectId)}<br>客戶 ${booksEscape(res.customer || '未填')}<br>虧損 $${Number(res.loss || 0).toLocaleString()}　售價 $0<br>${res.rework ? '已進復修查詢' : '未進復修查詢'}`,
                     background: '#26221e',
                     color: 'white'
                 });
