@@ -1506,6 +1506,9 @@
                     let specs = '';
                     if (i.battery) specs += `<span class="spec-tag"><i class="fa-solid fa-battery-half mr-1"></i>${i.battery}%</span>`;
                     if (i.ios) specs += `<span class="spec-tag">iOS ${i.ios}</span>`;
+                    const soldCost = soldCostOf(i);
+                    specs += `<span class="spec-tag">成本 $${soldCost.toLocaleString()}</span>`;
+                    if (Number.isFinite(Number(i.purchaseCost)) && Number(i.purchaseCost) !== soldCost) specs += `<span class="spec-tag">收購 $${Number(i.purchaseCost).toLocaleString()}</span>`;
                     grid.innerHTML += `<div onclick="triggerAddToCart('${sid}')" class="phone-row${selected ? ' is-selected' : ''}${inCart ? ' in-cart' : ''}" id="card-${sid}" data-id="${sid}">
                         <div class="phone-row-check"><i class="fa-solid fa-circle-check"></i></div>
                         <div class="phone-row-main">
@@ -1724,6 +1727,16 @@
             const activeNewCat = document.querySelector('#sub-cat-scroll .pill-btn.active');
             filterItems('stocktype', activeNewCat ? activeNewCat.innerText : i.stockType);
         }
+        function soldCostOf(i) {
+            if (!i) return 0;
+            if (i.type !== 'phone') return Number(i.cost) || 0;
+            const purchase = Number(i.purchaseCost);
+            const effective = Number(i.effectiveCost);
+            if (i.hasBatteryReplace || i.hasOtherReplace) return Number.isFinite(effective) ? effective : (Number(i.cost) || 0);
+            if (i.usedCostFallback && Number.isFinite(effective)) return effective;
+            if (i.hasBatteryReplace === false && i.hasOtherReplace === false && Number.isFinite(purchase)) return purchase;
+            return Number(i.cost) || 0;
+        }
         async function triggerAddToCart(id) {
             if (UI.multiSelect && (UI.tab === 'phone' || UI.tab === 'new')) { togglePhoneSelect(id); return; }
             if (UI.multiSelect && UI.tab === 'accessory') { toggleAccSelect('a:' + String(id)); return; }
@@ -1735,14 +1748,21 @@
             if (i.type === 'phone') {
                 const { value } = await withPreservedItemGridScroll((swalOpts) => Swal.fire({
                     title: i.name,
-                    html: `<input id="sw-p" type="number" class="swal2-input" placeholder="單價" value="${defPrice}">`,
+                    html: `<input id="sw-p" type="number" class="swal2-input" placeholder="單價" value="${defPrice}"><div class="flex items-center justify-center mt-2"><button type="button" id="sw-cost-btn" class="px-3 py-2 rounded bg-emerald-900/50 text-emerald-400 border border-emerald-700 text-sm">本</button></div>`,
                     background: '#26221e', color: 'white',
                     ...swalOpts,
+                    didOpen: () => {
+                        const costBtn = document.getElementById('sw-cost-btn');
+                        if (costBtn) costBtn.onclick = () => {
+                            const el = document.getElementById('sw-p');
+                            if (el) { el.value = String(soldCostOf(i)); el.focus(); }
+                        };
+                    },
                     preConfirm: () => document.getElementById('sw-p').value
                 }));
                 if(!value) return;
                 p = parseInt(value); q = 1;
-                Cart.push({ ...i, price: p, quantity: 1, itemId: i.id, originalPrice: p, isGift: false }); renderCart(); return;
+                Cart.push({ ...i, cost: soldCostOf(i), price: p, quantity: 1, itemId: i.id, originalPrice: p, isGift: false }); renderCart(); return;
             } else if (i.type === 'accessory' || i.price === 0) {
                 const { value } = await withPreservedItemGridScroll((swalOpts) => Swal.fire({
                     title: i.name,
@@ -8001,7 +8021,8 @@
             if (phones.length === 0) return;
             const rowsHTML = phones.map((p, idx) => {
                 const def = (Number(p.price) > 0 ? p.price : (Number(p.defaultPrice) > 0 ? p.defaultPrice : ''));
-                const costHint = Number(p.cost) > 0 ? `<span class="text-slate-500 text-[10px] ml-1">本 ${Number(p.cost).toLocaleString()}</span>` : '';
+                const phoneSold = soldCostOf(p);
+                const costHint = phoneSold > 0 ? `<span class="text-slate-500 text-[10px] ml-1">本 ${phoneSold.toLocaleString()}</span>` : '';
                 return `<div class="flex items-center gap-2 py-1.5 border-b border-slate-700 text-left">
                     <div class="flex-1 min-w-0 text-sm text-slate-300 truncate">${p.name} <span class="text-slate-500 text-xs">#${p.stock_id}</span>${costHint}</div>
                     <input id="multi-price-${idx}" type="number" class="swal2-input !my-0 !w-24 !text-sm" placeholder="售價" value="${def}">
@@ -8043,7 +8064,7 @@
                     type: 'phone',
                     name: p.name,
                     price: prices[idx],
-                    cost: Number(p.cost) || 0,
+                    cost: soldCostOf(p),
                     quantity: 1,
                     itemId: p.id,
                     originalPrice: prices[idx],
