@@ -755,6 +755,12 @@
             const res = await fetch(`${API_BASE_URL}/repair-record/peer`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
             return await res.json();
           },
+          createDefect: async (data) => {
+            const res = await fetch(`${API_BASE_URL}/defect`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data || {}) });
+            const body = await res.json().catch(() => ({}));
+            if (!res.ok && (!body || body.status !== 'error')) return { status: 'error', msg: (body && (body.msg || body.message)) || '瑕疵寫入失敗' };
+            return body;
+          },
           repairBackfill: async () => {
             const res = await fetch(`${API_BASE_URL}/admin/repair-backfill`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' });
             return await res.json();
@@ -1954,7 +1960,11 @@
             const cost = Number(it.cost) || 0;
             return it.type === 'accessory' && sale === 0 && cost > 0;
         }
+        function isDefectLedger(it) {
+            return !!(it && (it.type === 'defect' || it.isDefect === true));
+        }
         function isGiftDeduction(it) {
+            if (isDefectLedger(it)) return false;
             const sale = Number(it.salePrice) || 0;
             const cost = Number(it.cost) || 0;
             if (cost <= 0) return false;
@@ -2160,6 +2170,7 @@
             if (type === 'new_phone') return { key: 'new', label: '(\u65b0)', order: 2 };
             if (type === 'accessory') return { key: 'acc', label: '(\u914d)', order: 3 };
             if (type === 'repair') return { key: 'repair', label: '(\u7dad)', order: 4 };
+            if (type === 'defect') return { key: 'defect', label: '(\u7455)', order: 4.5 };
             if (type === 'wrap') return { key: 'wrap', label: '(\u5305)', order: 5 };
             if (type === 'software' || type === 'software_phone') return { key: 'soft', label: '(\u8edf)', order: 6 };
             if (type === 'shipping') return { key: 'ship', label: '(\u904b)', order: 7 };
@@ -2242,11 +2253,12 @@
                 else if(it.type === 'phone' || it.type === 'peer_phone') prefix = '(\u4e8c)';
                 else if(it.type === 'accessory') prefix = '(\u914d)';
                 else if(it.type === 'repair') prefix = '(\u7dad)';
+                else if(it.type === 'defect') prefix = '(\u7455)';
                 else if(it.type === 'wrap') prefix = '(\u5305)';
                 else if(it.type === 'software' || it.type === 'software_phone') prefix = '(\u8edf)';
                 else if(it.type === 'direct_transfer') prefix = '(\u8abf)';
                 else if(it.type === 'shipping') prefix = '(\u904b)';
-                if(prefix) { const cM={'(\u4e8c)':'text-red-400','(\u914d)':'text-green-400','(\u65b0)':'text-yellow-400','(\u7dad)':'text-purple-400','(\u8edf)':'text-cyan-400','(\u904b)':'text-blue-400'}; const cls=cM[prefix]||'text-slate-400'; if(!dName.includes(prefix)) dName='<span class="'+cls+'">'+prefix+'</span> '+dName; }
+                if(prefix) { const cM={'(\u4e8c)':'text-red-400','(\u914d)':'text-green-400','(\u65b0)':'text-yellow-400','(\u7dad)':'text-purple-400','(\u7455)':'text-rose-300','(\u8edf)':'text-cyan-400','(\u904b)':'text-blue-400'}; const cls=cM[prefix]||'text-slate-400'; if(!dName.includes(prefix)) dName='<span class="'+cls+'">'+prefix+'</span> '+dName; }
                 if (it.type === 'repair') {
                     const repairMain = formatRepairDisplayHtml(stripLedgerName(it.itemName || ''));
                     dName = '<span class="text-purple-400">(\u7dad)</span> ' + repairMain;
@@ -2337,7 +2349,7 @@
                     </div>
                     </div>
                     <div class="min-w-[4rem] text-right text-xs flex flex-col items-end gap-1 shrink-0">
-                        <div class="flex items-center gap-1">${statusHtml}${payBadge}</div>
+                        <div class="flex items-center gap-1">${statusHtml}${(g.items || []).some(it => isDefectLedger(it)) ? '<span class="text-[10px] font-bold text-rose-200 border border-rose-500 bg-rose-950/40 px-1.5 py-0.5 rounded">瑕疵</span>' : ''}${payBadge}</div>
                         ${g.status === 'Pending' ? `<button onclick="event.stopPropagation(); settle('${g.orderId}', ${g.total})" class="text-[10px] bg-green-900 text-green-200 px-1.5 rounded border border-green-700 hover:bg-green-800">入帳</button>` : ''}
                         ${editablePending && g.payMethod === 'credit' ? `<button type="button" onclick="event.stopPropagation(); changePendingPayMethod('${oidEsc}', 'linepay')" class="text-[10px] bg-green-950 text-green-300 px-1.5 rounded border border-green-700 hover:bg-green-900 whitespace-nowrap">改LINE Pay</button>` : ''}
                         ${editablePending && g.payMethod === 'linepay' ? `<button type="button" onclick="event.stopPropagation(); changePendingPayMethod('${oidEsc}', 'credit')" class="text-[10px] bg-amber-950 text-amber-300 px-1.5 rounded border border-amber-700 hover:bg-amber-900 whitespace-nowrap">改掛帳</button>` : ''}
@@ -2471,7 +2483,7 @@
             { key: 'ship', label: '運費', types: ['shipping'] },
             { key: 'card', label: '網卡', types: ['esim'] }
         ];
-        const SALARY_KIND_SKIP_TYPES = new Set(['salary', 'expense', 'profit_share', 'fund', 'cash', 'withdraw']);
+        const SALARY_KIND_SKIP_TYPES = new Set(['salary', 'expense', 'profit_share', 'fund', 'cash', 'withdraw', 'defect']);
 
         function salaryLedgerRows() {
             return (DB.sales || []).concat(DB.history || []).concat(DB.pending || []);
@@ -3529,6 +3541,7 @@
         function booksCategoryOf(it) {
             const t = it.type;
             if (t === 'shipping') return null; // 運費不計毛利
+            if (t === 'defect') return null;
             if (isConsignNoCountItem(it)) return null;
             if (t === 'phone' || t === 'peer_phone') return 'used';
             if (t === 'new_phone') return 'new';
@@ -3650,6 +3663,29 @@
                 if (BlackList.orders.includes(i.orderId)) return;
                 if (BlackList.items.includes(i.orderId + '_' + i.itemId)) return;
                 if (i.status === 'Returned' || i.status === 'Deleted') return;
+                if (isDefectLedger(i)) {
+                    const when = parseLedgerDate(i.time);
+                    if (!when || when < rangeStart || when > rangeEnd) return;
+                    if (i.status && i.status !== 'Completed') return;
+                    const amt = Math.abs(Number(i.cost) || 0);
+                    expense['虧損'] = (expense['虧損'] || 0) + amt;
+                    expenseDetails.push({
+                        date: formatBooksYmd(when),
+                        ts: when.getTime(),
+                        seq,
+                        orderId: i.orderId || '',
+                        kind: '支出',
+                        subject: '虧損',
+                        name: i.itemName || i.name || '瑕疵',
+                        sale: 0,
+                        cost: amt,
+                        amount: amt,
+                        memo: false,
+                        customer: i.customer || '',
+                        person: i.person || ''
+                    });
+                    return;
+                }
                 if (isBooksManualExpense(i)) {
                     const when = parseLedgerDate(i.time);
                     if (!when || when < rangeStart || when > rangeEnd) return;
@@ -4755,7 +4791,7 @@
                             if(i.type!=='wrap') stats.pot += iProfit;
                         }
                     }
-                    if (sale===0 && cost>0 && !isMultiExtra && !isOwnerBorneShipping(i)) stats.gift += cost;
+                    if (sale===0 && cost>0 && !isMultiExtra && !isOwnerBorneShipping(i) && !isDefectLedger(i)) stats.gift += cost;
                 }
             });
             const filteredExpense = expenseRows.filter(i => matchesLedgerFilter(i, tokens));
@@ -5085,7 +5121,7 @@
                     if (ledgerCountsCompletedCash(i, histRange.rangeStart, histRange.rangeEnd) && !isMultiExtra) stats.cash += sale;
                     if (ledgerCountsCompletedProfit(i, histRange.rangeStart, histRange.rangeEnd) && !isMultiExtra) stats.profit += iHistProfit;
                     else if (ledgerCountsPendingPot(i, histRange.rangeStart, histRange.rangeEnd) && !isMultiExtra) { stats.pending += sale; if(i.type!=='wrap') stats.pot += iHistProfit; }
-                    if (sale===0 && cost>0 && !isMultiExtra && !ownerShip) stats.gift += cost;
+                    if (sale===0 && cost>0 && !isMultiExtra && !ownerShip && !isDefectLedger(i)) stats.gift += cost;
                 }
             });
             document.getElementById('h-cash').innerText = stats.cash.toLocaleString();
@@ -6047,6 +6083,7 @@
             setItemGridMode('grid');
             document.getElementById('item-grid').innerHTML = `
                 <div onclick="modalRepair()" class="glass p-6 rounded-xl border-l-4 border-yellow-500 flex flex-col items-center justify-center gap-2"><i class="fa-solid fa-screwdriver-wrench text-4xl text-yellow-500"></i><span class="font-bold">維修登記</span></div>
+                <div onclick="modalDefect()" class="glass p-6 rounded-xl border-l-4 border-rose-500 flex flex-col items-center justify-center gap-2"><i class="fa-solid fa-triangle-exclamation text-4xl text-rose-400"></i><span class="font-bold">瑕疵</span><span class="text-[11px] text-slate-400">扣自己的料，成本進虧損</span></div>
                 <div onclick="modalPeerRepair()" class="glass p-6 rounded-xl border-l-4 border-cyan-500 flex flex-col items-center justify-center gap-2"><i class="fa-solid fa-clipboard-list text-4xl text-cyan-400"></i><span class="font-bold">同事維修紀錄</span><span class="text-[11px] text-slate-400">只存紀錄，不算毛利</span></div>
                 <div onclick="modalWrap()" class="glass p-6 rounded-xl border-l-4 border-purple-500 flex flex-col items-center justify-center gap-2"><i class="fa-solid fa-wand-magic-sparkles text-4xl text-purple-500"></i><span class="font-bold">包膜服務</span></div>
                 <div onclick="modalNewPhone()" class="glass p-6 rounded-xl border-l-4 border-green-500 flex flex-col items-center justify-center gap-2"><i class="fa-solid fa-mobile-screen text-4xl text-green-500"></i><span class="font-bold">新機</span></div>
@@ -6890,6 +6927,124 @@
                     applyFormCustomerToCheckout(v[3]);
                     renderCart(); 
                 }
+            }
+        }
+
+        function defectPartChoices() {
+            return (DB.inv || []).filter(i => {
+                if (!i || i.type !== 'accessory') return false;
+                if (!(Number(i.stock) > 0)) return false;
+                const blob = `${i.group || ''} ${i.category || ''} ${i.name || ''}`;
+                if (/寄賣|同事/.test(blob)) return false;
+                return true;
+            }).sort((a, b) => String(a.category || '').localeCompare(String(b.category || ''), 'zh-TW') || String(a.name || '').localeCompare(String(b.name || ''), 'zh-TW'));
+        }
+        function renderDefectPartList() {
+            const box = document.getElementById('df-parts');
+            const q = String((document.getElementById('df-part-q') || {}).value || '').trim().toLowerCase();
+            if (!box) return;
+            const all = defectPartChoices().filter(i => !q || `${i.category} ${i.name} ${i.id}`.toLowerCase().includes(q));
+            const shown = all.slice(0, 40);
+            if (!shown.length) {
+                box.innerHTML = '<div class="text-xs text-slate-500 px-2 py-3">沒有符合的自有庫存</div>';
+                return;
+            }
+            box.innerHTML = shown.map(i => {
+                const id = booksEscape(String(i.id));
+                return `<label class="flex items-center gap-2 px-2 py-1.5 border-b border-slate-800 text-left">
+                    <input type="checkbox" class="df-part accent-rose-500" data-id="${id}" data-cost="${Number(i.cost) || 0}">
+                    <span class="flex-1 min-w-0 text-xs text-slate-200 truncate">${booksEscape(i.category)} ${booksEscape(i.name)} <span class="text-slate-500">庫存 ${i.stock}　成本 ${Number(i.cost) || 0}</span></span>
+                    <input type="number" min="1" value="1" class="df-qty w-14 bg-slate-900 border border-slate-700 rounded px-1 py-1 text-xs text-white" data-id="${id}">
+                </label>`;
+            }).join('') + (all.length > shown.length ? `<div class="text-[11px] text-slate-500 px-2 py-1">還有 ${all.length - shown.length} 筆，請再縮小搜尋</div>` : '');
+            box.querySelectorAll('.df-part,.df-qty').forEach(el => el.addEventListener('input', updateDefectLossPreview));
+            box.querySelectorAll('.df-part').forEach(el => el.addEventListener('change', updateDefectLossPreview));
+        }
+        function updateDefectLossPreview() {
+            const el = document.getElementById('df-loss');
+            if (!el) return;
+            let loss = 0;
+            document.querySelectorAll('.df-part:checked').forEach(cb => {
+                const id = cb.getAttribute('data-id');
+                const qtyEl = document.querySelector(`.df-qty[data-id="${CSS.escape(id)}"]`);
+                const qty = Math.max(1, Math.round(Number(qtyEl && qtyEl.value) || 1));
+                loss += (Number(cb.getAttribute('data-cost')) || 0) * qty;
+            });
+            el.textContent = '虧損 $' + loss.toLocaleString() + '　售價 $0';
+        }
+        async function modalDefect() {
+            if (!defectPartChoices().length) {
+                Swal.fire({ icon: 'warning', title: '沒有可扣的自有庫存', background: '#26221e', color: 'white' });
+                return;
+            }
+            const today = ymdTaipei(new Date()).replace(/-/g, '/');
+            const { value } = await Swal.fire({
+                title: '瑕疵',
+                width: 640,
+                html: `<div class="text-left text-xs text-slate-400 mb-2">扣自己的料件，成本計入虧損。日期固定今天 ${today}，不會留機。</div>
+                    <input id="df-customer" class="swal2-input" placeholder="客戶（必填）">
+                    <input id="df-phone" class="swal2-input" placeholder="電話（選填）" type="tel" inputmode="tel">
+                    <input id="df-model" class="swal2-input" placeholder="型號／品名">
+                    <input id="df-imei" class="swal2-input" placeholder="序號（型號或序號至少填一個）">
+                    <textarea id="df-note" class="swal2-textarea" placeholder="備註（選填）" rows="2"></textarea>
+                    <input id="df-part-q" class="swal2-input" placeholder="搜尋自有庫存料件">
+                    <div id="df-parts" class="max-h-52 overflow-auto border border-slate-700 rounded-lg bg-slate-950/40"></div>
+                    <div id="df-loss" class="text-sm text-rose-300 mt-2 text-left">虧損 $0　售價 $0</div>`,
+                background: '#26221e',
+                color: 'white',
+                showCancelButton: true,
+                confirmButtonText: '完成扣料',
+                cancelButtonText: '取消',
+                didOpen: () => {
+                    renderDefectPartList();
+                    const q = document.getElementById('df-part-q');
+                    if (q) q.addEventListener('input', renderDefectPartList);
+                },
+                preConfirm: () => {
+                    const customer = document.getElementById('df-customer').value.trim();
+                    const modelName = document.getElementById('df-model').value.trim();
+                    const imei = document.getElementById('df-imei').value.trim();
+                    if (!customer) { Swal.showValidationMessage('請填客戶'); return false; }
+                    if (!modelName && !imei) { Swal.showValidationMessage('請填型號或序號'); return false; }
+                    const parts = [];
+                    document.querySelectorAll('.df-part:checked').forEach(cb => {
+                        const id = cb.getAttribute('data-id');
+                        const qtyEl = document.querySelector(`.df-qty[data-id="${CSS.escape(id)}"]`);
+                        const quantity = Math.max(1, Math.round(Number(qtyEl && qtyEl.value) || 1));
+                        parts.push({ itemId: id, quantity });
+                    });
+                    if (!parts.length) { Swal.showValidationMessage('請勾選要扣的自有庫存'); return false; }
+                    return {
+                        customer,
+                        customerPhone: normalizeTaiwanPhone(document.getElementById('df-phone').value),
+                        modelName,
+                        imei,
+                        note: document.getElementById('df-note').value.trim(),
+                        parts,
+                        person: (User && User.name) || ''
+                    };
+                }
+            });
+            if (!value) return;
+            Swal.fire({ title: '寫入中...', allowOutsideClick: false, background: '#26221e', color: 'white', didOpen: () => Swal.showLoading() });
+            try {
+                const res = await API.createDefect(value);
+                if (!res || res.status !== 'success') throw new Error((res && res.msg) || '寫入失敗');
+                await fetchData();
+                try {
+                    const fd = await API.getTodaySalesOnly();
+                    if (fd && fd.status !== 'error') DB.sales = fd.todaySales || [];
+                    if (typeof renderReport === 'function') renderReport();
+                } catch (e) { console.warn(e); }
+                Swal.fire({
+                    icon: 'success',
+                    title: '瑕疵已入帳',
+                    html: `對帳編號 ${booksEscape(res.defectId)}<br>客戶 ${booksEscape(res.customer)}<br>虧損 $${Number(res.loss || 0).toLocaleString()}　售價 $0`,
+                    background: '#26221e',
+                    color: 'white'
+                });
+            } catch (e) {
+                Swal.fire({ icon: 'error', title: '瑕疵沒有完成', text: e.message || '請重試', background: '#26221e', color: 'white' });
             }
         }
 
