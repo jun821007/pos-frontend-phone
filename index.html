@@ -284,7 +284,6 @@
                         <div id="sub-cat-scroll" class="flex gap-2 overflow-x-auto no-scrollbar py-1 flex-1"></div>
                         <div id="multi-select-bar" class="hidden items-center gap-2 shrink-0 flex">
                             <button onclick="toggleMultiSelectMode()" id="btn-multiselect" class="pill-btn border-yellow-500 text-yellow-400 shrink-0">☑ 多選</button>
-                            <button onclick="openPhoneKit()" id="btn-phone-kit" class="hidden bg-emerald-700 text-white font-bold px-3 py-1.5 rounded-xl text-xs shrink-0">基本配件組</button>
                             <div id="multi-select-confirm" class="hidden items-center gap-2 flex">
                                 <span id="multi-count" class="text-xs text-slate-400 shrink-0">0</span>
                                 <button onclick="confirmMultiAdd()" id="btn-multi-add" class="bg-yellow-500 text-black font-bold px-3 py-1.5 rounded-xl text-xs shrink-0">加入</button>
@@ -1370,7 +1369,6 @@
                 }
                 UI.categoryOrder = categoryOrder;
                 UI.favAccessoryIds = favAccessoryIds;
-                UI.phoneAccKit = res.phoneAccKit || null;
                 UI.posPrefsLoaded = true;
                 cachePosPrefsLocally();
                 console.log('[pos-prefs] loaded', { categoryOrder: UI.categoryOrder.length, favs: UI.favAccessoryIds.length });
@@ -1441,7 +1439,7 @@
         function switchMainTab(t) {
             if (UI.tab !== t) cancelMultiSelect();
             UI.tab = t; document.querySelectorAll('.main-tab').forEach(e => e.classList.remove('active')); document.getElementById('tab-'+t).classList.add('active'); const sub = document.getElementById('sub-cat-scroll'); sub.innerHTML = '';
-            if (t === 'phone') { ['庫存中','客訂中','寄賣中'].forEach(s => sub.appendChild(createPill(s, () => filterItems('status', s)))); if(sub.firstChild) sub.firstChild.click(); renderMultiSelectBar(); } else if (t === 'new') { hideFavSubNav(); ['自有','客訂中','寄賣'].forEach(s => sub.appendChild(createPill(s, () => filterItems('stocktype', s)))); if(sub.firstChild) sub.firstChild.click(); renderMultiSelectBar(); } else if (t === 'accessory') { hideFavSubNav(); const favBtn = document.createElement('div'); favBtn.className = 'pill-btn border-amber-500 text-amber-400 shrink-0'; favBtn.innerHTML = '⭐ 常用'; favBtn.setAttribute('title','常用品'); favBtn.onclick = () => openFavAccessoryView(); sub.appendChild(favBtn); const btn = document.createElement('div'); btn.className = 'pill-btn border-blue-500 text-blue-400'; btn.innerHTML = '🏢 公司貨'; btn.onclick = () => { hideFavSubNav(); document.querySelectorAll('#sub-cat-scroll .pill-btn').forEach(b=>b.classList.remove('active')); btn.classList.add('active'); renderCompanyAccessoryGrid(); }; sub.appendChild(btn); const transferBtn = document.createElement('div'); transferBtn.className = 'pill-btn border-purple-500 text-purple-400'; transferBtn.innerHTML = '🚚 調貨'; transferBtn.onclick = () => { hideFavSubNav(); document.querySelectorAll('#sub-cat-scroll .pill-btn').forEach(b=>b.classList.remove('active')); transferBtn.classList.add('active'); renderDirectTransferGrid(); }; sub.appendChild(transferBtn); const cats = getOrderedCategories(); cats.forEach(c => sub.appendChild(createPill(c, () => filterItems('cat', c)))); if(sub.firstChild) sub.firstChild.click(); renderMultiSelectBar(); } else { hideFavSubNav(); renderServiceGrid(); renderMultiSelectBar(); }
+            if (t === 'phone') { ['庫存中','客訂中','寄賣中'].forEach(s => sub.appendChild(createPill(s, () => filterItems('status', s)))); if(sub.firstChild) sub.firstChild.click(); renderMultiSelectBar(); } else if (t === 'new') { hideFavSubNav(); ['自有','客訂中','寄賣'].forEach(s => sub.appendChild(createPill(s, () => filterItems('stocktype', s)))); if(sub.firstChild) sub.firstChild.click(); renderMultiSelectBar(); } else if (t === 'accessory') { hideFavSubNav(); const favBtn = document.createElement('div'); favBtn.className = 'pill-btn border-amber-500 text-amber-400 shrink-0'; favBtn.innerHTML = '⭐ 常用'; favBtn.setAttribute('title','常用品'); favBtn.onclick = () => openFavAccessoryView(); sub.appendChild(favBtn); const kitBtn = document.createElement('div'); kitBtn.className = 'pill-btn border-emerald-500 text-emerald-300 shrink-0'; kitBtn.innerText = '基本配件組'; kitBtn.onclick = (ev) => { ev.stopPropagation(); openPhoneKit(); }; sub.appendChild(kitBtn); const btn = document.createElement('div'); btn.className = 'pill-btn border-blue-500 text-blue-400'; btn.innerHTML = '🏢 公司貨'; btn.onclick = () => { hideFavSubNav(); document.querySelectorAll('#sub-cat-scroll .pill-btn').forEach(b=>b.classList.remove('active')); btn.classList.add('active'); renderCompanyAccessoryGrid(); }; sub.appendChild(btn); const transferBtn = document.createElement('div'); transferBtn.className = 'pill-btn border-purple-500 text-purple-400'; transferBtn.innerHTML = '🚚 調貨'; transferBtn.onclick = () => { hideFavSubNav(); document.querySelectorAll('#sub-cat-scroll .pill-btn').forEach(b=>b.classList.remove('active')); transferBtn.classList.add('active'); renderDirectTransferGrid(); }; sub.appendChild(transferBtn); const cats = getOrderedCategories(); cats.forEach(c => sub.appendChild(createPill(c, () => filterItems('cat', c)))); if(sub.firstChild) sub.firstChild.click(); renderMultiSelectBar(); } else { hideFavSubNav(); renderServiceGrid(); renderMultiSelectBar(); }
         }
         function createPill(t, f) { const d = document.createElement('div'); d.className = 'pill-btn'; d.innerText = t; d.onclick = () => { document.querySelectorAll('#sub-cat-scroll .pill-btn').forEach(b=>b.classList.remove('active')); d.classList.add('active'); f(); }; return d; }
         
@@ -7792,9 +7790,7 @@
             if (batch) batch.classList.toggle('hidden', !phoneLike);
             if (addBtn) addBtn.classList.remove('hidden');
             const copySerial = document.getElementById('btn-copy-new-serial');
-            const kitBtn = document.getElementById('btn-phone-kit');
             if (copySerial) copySerial.classList.toggle('hidden', UI.tab !== 'new');
-            if (kitBtn) kitBtn.classList.toggle('hidden', UI.tab !== 'phone');
             if (UI.multiSelect) {
                 if (btn) { btn.classList.add('active'); }
                 if (confirm) confirm.classList.remove('hidden');
@@ -7956,96 +7952,48 @@
             const ok = await copyTextToClipboard(text);
             Swal.fire({ icon: ok ? 'success' : 'info', title: ok ? '已複製序號' : '請手動複製', text: ok ? '' : text, background: '#26221e', color: 'white' });
         }
-        function currentPhoneKit() {
-            return Object.assign(PhoneKit.defaultPhoneKit(), UI.phoneAccKit || {});
-        }
-        async function editPhoneKit() {
-            const kit = currentPhoneKit();
-            const lines = (kit.models || []).map(row => [row.key, row.glass, row.shell].join('|')).join('\n');
-            const r = await Swal.fire({
-                title: '基本配件組對照',
-                html: `<div class="text-left text-xs text-slate-400 mb-2">只套在二手機。對不到型號時，用下面的分類／品名關鍵字自動找。一行一組：型號|玻璃貼|空壓殼（品名可空白）。</div>
-                    <input id="kit-glass-cat" class="swal2-input" placeholder="玻璃分類含" value="${booksEscape(kit.glassCategory)}">
-                    <input id="kit-glass-name" class="swal2-input" placeholder="玻璃品名含" value="${booksEscape(kit.glassName)}">
-                    <input id="kit-case-cat" class="swal2-input" placeholder="殼分類含" value="${booksEscape(kit.caseCategory)}">
-                    <input id="kit-case-name" class="swal2-input" placeholder="殼品名含，可空白" value="${booksEscape(kit.caseName)}">
-                    <input id="kit-cl" class="swal2-input" placeholder="C to L 品名或編號" value="${booksEscape(kit.cableCL)}">
-                    <input id="kit-cc" class="swal2-input" placeholder="C to C 品名或編號" value="${booksEscape(kit.cableCC)}">
-                    <textarea id="kit-models" class="swal2-textarea" rows="5" placeholder="13|13亮面|13空壓">${booksEscape(lines)}</textarea>`,
-                background: '#26221e', color: 'white', showCancelButton: true, confirmButtonText: '儲存',
-                preConfirm: () => {
-                    const models = [];
-                    for (const line of document.getElementById('kit-models').value.split('\n')) {
-                        const s = line.trim();
-                        if (!s) continue;
-                        const parts = s.split('|').map(x => x.trim());
-                        if (!parts[0]) { Swal.showValidationMessage('對照要有型號：' + s); return false; }
-                        models.push({ key: parts[0], glass: parts[1] || '', shell: parts[2] || '' });
-                    }
-                    return {
-                        glassCategory: document.getElementById('kit-glass-cat').value.trim(),
-                        glassName: document.getElementById('kit-glass-name').value.trim(),
-                        caseCategory: document.getElementById('kit-case-cat').value.trim(),
-                        caseName: document.getElementById('kit-case-name').value.trim(),
-                        cableCL: document.getElementById('kit-cl').value.trim(),
-                        cableCC: document.getElementById('kit-cc').value.trim(),
-                        models
-                    };
+        function openPhoneKit() {
+            const phones = [];
+            Cart.forEach(item => {
+                if (item.type !== 'phone') return;
+                const inv = DB.inv.find(x => String(x.id) === String(item.itemId || item.id));
+                const qty = Math.max(1, Number(item.quantity) || 1);
+                for (let n = 0; n < qty; n++) {
+                    phones.push({
+                        type: 'phone',
+                        modelName: (inv && inv.modelName) || item.modelName || item.name,
+                        name: (inv && inv.name) || item.name,
+                        stock_id: (inv && inv.stock_id) || item.stock_id
+                    });
                 }
             });
-            if (!r.isConfirmed) return false;
-            const res = await API.savePosPrefs({ phoneAccKit: r.value });
-            if (!res || res.status !== 'success') throw new Error((res && res.msg) || '儲存失敗');
-            UI.phoneAccKit = res.phoneAccKit || r.value;
-            return true;
-        }
-        async function openPhoneKit() {
-            if (UI.tab !== 'phone') return;
-            let phones = selectedInventory(['phone']);
-            if (!phones.length) phones = Cart.filter(item => item.type === 'phone').map(item => DB.inv.find(x => String(x.id) === String(item.itemId || item.id))).filter(Boolean);
             if (!phones.length) {
-                const options = DB.inv.filter(i => i.type === 'phone').slice(0, 80);
-                const opts = options.map(p => `<option value="${booksEscape(String(p.id))}">#${booksEscape(p.stock_id)} ${booksEscape(p.name)}</option>`).join('');
-                const pick = await Swal.fire({
-                    title: '選一台二手機',
-                    html: `<select id="kit-phone" class="swal2-select">${opts || '<option value="">沒有二手機</option>'}</select>`,
-                    background: '#26221e', color: 'white', showCancelButton: true, showDenyButton: true, confirmButtonText: '套用', denyButtonText: '設定對照',
-                    preConfirm: () => document.getElementById('kit-phone').value
-                });
-                if (pick.isDenied) { await editPhoneKit().catch(e => Swal.fire({ icon: 'error', title: '儲存失敗', text: e.message || '', background: '#26221e', color: 'white' })); return; }
-                if (!pick.isConfirmed || !pick.value) return;
-                const found = DB.inv.find(x => String(x.id) === String(pick.value) && x.type === 'phone');
-                if (!found) return;
-                phones = [found];
+                Swal.fire({ icon: 'info', title: '請先加入二手機', background: '#26221e', color: 'white' });
+                return;
             }
             const acc = DB.inv.filter(i => i.type === 'accessory' && !i.isHidden);
-            const plans = phones.map(phone => ({ phone, plan: PhoneKit.resolvePhoneKit(phone, acc, currentPhoneKit()) }));
-            const warnings = plans.flatMap(row => row.plan.warnings);
-            const preview = plans.map(row => {
-                const names = row.plan.items.map(item => item.name).join('、') || '沒有可加入的配件';
-                return `<div class="text-left text-sm mb-1"><b>${booksEscape(row.phone.name)}</b>　${row.plan.kind === 'cc' ? 'C to C' : row.plan.kind === 'cl' ? 'C to L' : '無線'}<div class="text-xs text-slate-400">${booksEscape(names)}</div></div>`;
-            }).join('');
-            const warnHtml = warnings.length ? `<div class="text-left text-xs text-orange-300 mt-2">${warnings.map(booksEscape).join('<br>')}</div>` : '';
-            const ok = await Swal.fire({
-                title: '基本配件組',
-                html: preview + warnHtml,
-                background: '#26221e', color: 'white',
-                showCancelButton: true, showDenyButton: true, confirmButtonText: '加入購物車', denyButtonText: '設定對照', cancelButtonText: '取消'
+            const cartQty = {};
+            Cart.forEach(line => {
+                if (line.type !== 'accessory') return;
+                const id = String(line.itemId || line.id);
+                cartQty[id] = (cartQty[id] || 0) + (Number(line.quantity) || 0);
             });
-            if (ok.isDenied) { await editPhoneKit().catch(e => Swal.fire({ icon: 'error', title: '儲存失敗', text: e.message || '', background: '#26221e', color: 'white' })); return; }
-            if (!ok.isConfirmed) return;
-            plans.forEach(row => row.plan.items.forEach(item => {
-                const stock = Number(item.stock) || 0;
-                if (stock <= 0) return;
+            const plan = PhoneKit.buildPhoneKitAdds(phones, acc, cartQty);
+            plan.adds.forEach(add => {
+                const item = add.item;
                 const price = Number(item.defaultPrice) > 0 ? Number(item.defaultPrice) : (Number(item.price) || 0);
                 const existing = Cart.find(line => String(line.itemId) === String(item.id) && line.type === 'accessory' && !line.isGift);
-                if (existing) {
-                    if ((Number(existing.quantity) || 0) < stock) existing.quantity = (Number(existing.quantity) || 0) + 1;
-                    return;
-                }
-                Cart.push({ ...item, price, quantity: 1, itemId: item.id, originalPrice: price, isGift: false });
-            }));
-            renderCart();
+                if (existing) existing.quantity = (Number(existing.quantity) || 0) + add.qty;
+                else Cart.push({ ...item, price, cost: Number(item.cost) || 0, quantity: add.qty, itemId: item.id, originalPrice: price, isGift: false });
+            });
+            if (plan.adds.length) renderCart();
+            const added = plan.adds.map(add => add.item.name + ' ×' + add.qty).join('、');
+            Swal.fire({
+                icon: plan.warnings.length ? 'warning' : 'success',
+                title: plan.adds.length ? '已加入基本配件組' : '沒有可加入的配件',
+                text: [added, plan.warnings.join('\n')].filter(Boolean).join('\n'),
+                background: '#26221e', color: 'white'
+            });
         }
         async function confirmMultiAcc() {
             if (UI.selectedAcc.size === 0) return;
