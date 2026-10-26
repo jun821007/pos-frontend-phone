@@ -284,9 +284,11 @@
                         <div id="sub-cat-scroll" class="flex gap-2 overflow-x-auto no-scrollbar py-1 flex-1"></div>
                         <div id="multi-select-bar" class="hidden items-center gap-2 shrink-0 flex">
                             <button onclick="toggleMultiSelectMode()" id="btn-multiselect" class="pill-btn border-yellow-500 text-yellow-400 shrink-0">☑ 多選</button>
+                            <button onclick="openPhoneKit()" id="btn-phone-kit" class="hidden bg-emerald-700 text-white font-bold px-3 py-1.5 rounded-xl text-xs shrink-0">基本配件組</button>
                             <div id="multi-select-confirm" class="hidden items-center gap-2 flex">
                                 <span id="multi-count" class="text-xs text-slate-400 shrink-0">0</span>
                                 <button onclick="confirmMultiAdd()" id="btn-multi-add" class="bg-yellow-500 text-black font-bold px-3 py-1.5 rounded-xl text-xs shrink-0">加入</button>
+                                <button onclick="copySelectedNewSerials()" id="btn-copy-new-serial" class="hidden bg-slate-700 text-white font-bold px-3 py-1.5 rounded-xl text-xs shrink-0">複製序號</button>
                                 <button onclick="batchChangeSelectedPhoneStatus()" id="btn-batch-phone-status" class="bg-blue-600 text-white font-bold px-3 py-1.5 rounded-xl text-xs shrink-0">批次改狀態</button>
                                 <button onclick="cancelMultiSelect()" class="text-slate-400 text-xs shrink-0">取消</button>
                             </div>
@@ -657,6 +659,7 @@
 
     <nav class="md:hidden fixed bottom-0 w-full h-16 bg-slate-950 border-t border-slate-800 flex z-50"><div onclick="switchView('pos')" id="m-nav-pos" class="mobile-nav-item active"><i class="fa-solid fa-cash-register"></i>收銀</div><div onclick="openReport()" id="m-nav-report" class="mobile-nav-item"><i class="fa-solid fa-file-invoice-dollar"></i>今日</div><div onclick="openPending()" id="m-nav-pending" class="mobile-nav-item"><i class="fa-solid fa-wallet"></i>未結</div><div onclick="openHistory()" id="m-nav-history" class="mobile-nav-item"><i class="fa-solid fa-chart-pie"></i>歷史</div><div onclick="switchView('restock')" id="m-nav-restock" class="mobile-nav-item"><i class="fa-solid fa-dolly"></i>進貨</div><div onclick="openRestockAlert()" id="m-nav-restockalert" class="mobile-nav-item"><i class="fa-solid fa-bell"></i>補貨</div><div onclick="openBooks()" id="m-nav-books" class="mobile-nav-item" style="display:none"><i class="fa-solid fa-book"></i>記帳</div><div onclick="openSalary()" id="m-nav-salary" class="mobile-nav-item" style="display:none"><i class="fa-solid fa-sack-dollar"></i>薪資</div><div onclick="switchView('setting')" id="m-nav-setting" class="mobile-nav-item"><i class="fa-solid fa-gear"></i>設定</div></nav>
 
+    <script src="phone-kit.js"></script>
     <script>
         // 版本號：自動以日期產生（每次載入即更新）
         const POS_VERSION = 'v' + new Date().toISOString().slice(0,10).replace(/-/g,'.');
@@ -1367,6 +1370,7 @@
                 }
                 UI.categoryOrder = categoryOrder;
                 UI.favAccessoryIds = favAccessoryIds;
+                UI.phoneAccKit = res.phoneAccKit || null;
                 UI.posPrefsLoaded = true;
                 cachePosPrefsLocally();
                 console.log('[pos-prefs] loaded', { categoryOrder: UI.categoryOrder.length, favs: UI.favAccessoryIds.length });
@@ -7786,7 +7790,11 @@
             if (!phoneLike && UI.tab !== 'accessory') { bar.classList.add('hidden'); return; }
             bar.classList.remove('hidden');
             if (batch) batch.classList.toggle('hidden', !phoneLike);
-            if (addBtn) addBtn.classList.toggle('hidden', UI.tab === 'new');
+            if (addBtn) addBtn.classList.remove('hidden');
+            const copySerial = document.getElementById('btn-copy-new-serial');
+            const kitBtn = document.getElementById('btn-phone-kit');
+            if (copySerial) copySerial.classList.toggle('hidden', UI.tab !== 'new');
+            if (kitBtn) kitBtn.classList.toggle('hidden', UI.tab !== 'phone');
             if (UI.multiSelect) {
                 if (btn) { btn.classList.add('active'); }
                 if (confirm) confirm.classList.remove('hidden');
@@ -7850,9 +7858,194 @@
             });
         }
         async function confirmMultiAdd() {
-            if (UI.tab === 'new') return;
+            if (UI.tab === 'new') return confirmMultiNew();
             if (UI.tab === 'accessory') return confirmMultiAcc();
             return confirmMultiPhone();
+        }
+        function selectedInventory(types) {
+            return Array.from(UI.selectedPhones).map(id => DB.inv.find(x => String(x.id) === String(id))).filter(p => p && (!types || types.includes(p.type)));
+        }
+        function pushNewPhoneCart(phone, sale, noCount, myCost) {
+            const sid = String(phone.id);
+            if (Cart.some(c => String(c.itemId) === sid)) return false;
+            const base = Number(phone.cost) || 0;
+            const isConsign = phone.stockType === '寄賣';
+            const owner = String(phone.owner || '').trim() || '件主';
+            let name = '新機 ' + phone.name;
+            let cost = base;
+            const extra = {};
+            if (isConsign) {
+                name += noCount ? ` [寄賣不記:${owner} 底${base}]` : ` [寄賣:${owner} 底${base}]`;
+                if (noCount) { cost = sale; extra.profit = 0; }
+                else cost = myCost;
+            }
+            Cart.push({
+                type: 'new_phone', name, dealerName: isConsign ? owner : (phone.sourceChannel || '自有'),
+                cost, price: sale, imei: phone.imei || '', quantity: 1,
+                itemId: sid, originalPrice: sale, isGift: false, ...extra
+            });
+            return true;
+        }
+        async function confirmMultiNew() {
+            const phones = selectedInventory(['new_stock']);
+            if (!phones.length) return;
+            const own = phones.filter(p => p.stockType !== '寄賣');
+            const consign = phones.filter(p => p.stockType === '寄賣');
+            const rowHtml = (p, idx, prefix) => {
+                const base = Number(p.cost) || 0;
+                return `<div class="flex items-center gap-2 py-1.5 border-b border-slate-700 text-left">
+                    <div class="flex-1 min-w-0 text-sm text-slate-300 truncate">${booksEscape(p.name)} <span class="text-slate-500 text-xs">#${booksEscape(p.stock_id)}</span> <span class="text-slate-500 text-[10px]">本 ${base.toLocaleString()}</span></div>
+                    ${prefix === 'c' ? `<input id="multi-new-cost-${idx}" type="number" class="swal2-input !my-0 !w-20 !text-sm" value="${base}">` : ''}
+                    <input id="multi-new-${prefix}-${idx}" type="number" class="swal2-input !my-0 !w-24 !text-sm" placeholder="售價">
+                </div>`;
+            };
+            const html = `
+                ${own.length ? `<div class="text-left text-xs text-amber-300 mb-1">自有 ${own.length} 台</div><div class="max-h-36 overflow-y-auto">${own.map((p, i) => rowHtml(p, i, 'o')).join('')}</div>` : ''}
+                ${consign.length ? `<div class="text-left text-xs text-orange-300 mt-2 mb-1">寄賣 ${consign.length} 台</div>
+                    <div class="flex justify-center gap-4 text-sm mb-1">
+                        <label><input type="radio" name="multi-ns-mode" value="count" checked> 記利潤</label>
+                        <label><input type="radio" name="multi-ns-mode" value="nocount"> 不記</label>
+                    </div>
+                    <div class="max-h-36 overflow-y-auto">${consign.map((p, i) => rowHtml(p, i, 'c')).join('')}</div>` : ''}`;
+            const { value } = await Swal.fire({
+                title: `新機 ${phones.length} 台`,
+                html, background: '#26221e', color: 'white',
+                showCancelButton: true, confirmButtonText: '加入購物車', cancelButtonText: '取消',
+                preConfirm: () => {
+                    const readSale = (id) => Number(document.getElementById(id)?.value) || 0;
+                    const ownSales = own.map((_, i) => readSale('multi-new-o-' + i));
+                    const consignSales = consign.map((_, i) => readSale('multi-new-c-' + i));
+                    if (ownSales.some(n => n <= 0) || consignSales.some(n => n <= 0)) {
+                        Swal.showValidationMessage('每台請填售價');
+                        return false;
+                    }
+                    const noCount = consign.length > 0 && (document.querySelector('input[name="multi-ns-mode"]:checked') || {}).value === 'nocount';
+                    const costs = consign.map((p, i) => {
+                        const base = Number(p.cost) || 0;
+                        const my = Number(document.getElementById('multi-new-cost-' + i)?.value);
+                        return Number.isFinite(my) && my > 0 ? my : base;
+                    });
+                    if (!noCount && consign.some((p, i) => costs[i] < (Number(p.cost) || 0))) {
+                        Swal.showValidationMessage('我的成本不能低於件主成本');
+                        return false;
+                    }
+                    return { ownSales, consignSales, noCount, costs };
+                }
+            });
+            if (!value) return;
+            let added = 0;
+            own.forEach((p, i) => { if (pushNewPhoneCart(p, value.ownSales[i], false, Number(p.cost) || 0)) added++; });
+            consign.forEach((p, i) => { if (pushNewPhoneCart(p, value.consignSales[i], value.noCount, value.costs[i])) added++; });
+            renderCart();
+            cancelMultiSelect();
+            if (added < phones.length) Swal.fire({ icon: 'info', title: '已在購物車的沒有重複加入', toast: true, position: 'top', timer: 1600, showConfirmButton: false, background: '#26221e', color: 'white' });
+        }
+        async function copySelectedNewSerials() {
+            const phones = selectedInventory(['new_stock']);
+            if (!phones.length) {
+                Swal.fire({ icon: 'info', title: '請先勾選新機', background: '#26221e', color: 'white' });
+                return;
+            }
+            const built = PhoneKit.newPhoneSerialBlocks(phones);
+            if (built.missing.length) {
+                const go = await Swal.fire({ icon: 'warning', title: '有機器沒有序號', text: built.missing.join('、'), showCancelButton: true, confirmButtonText: '仍複製其他', cancelButtonText: '取消', background: '#26221e', color: 'white' });
+                if (!go.isConfirmed) return;
+            }
+            const text = PhoneKit.newPhoneSerialBlocks(phones.filter(p => String(p.imei || '').trim())).text;
+            if (!text.trim()) return;
+            const ok = await copyTextToClipboard(text);
+            Swal.fire({ icon: ok ? 'success' : 'info', title: ok ? '已複製序號' : '請手動複製', text: ok ? '' : text, background: '#26221e', color: 'white' });
+        }
+        function currentPhoneKit() {
+            return Object.assign(PhoneKit.defaultPhoneKit(), UI.phoneAccKit || {});
+        }
+        async function editPhoneKit() {
+            const kit = currentPhoneKit();
+            const lines = (kit.models || []).map(row => [row.key, row.glass, row.shell].join('|')).join('\n');
+            const r = await Swal.fire({
+                title: '基本配件組對照',
+                html: `<div class="text-left text-xs text-slate-400 mb-2">只套在二手機。對不到型號時，用下面的分類／品名關鍵字自動找。一行一組：型號|玻璃貼|空壓殼（品名可空白）。</div>
+                    <input id="kit-glass-cat" class="swal2-input" placeholder="玻璃分類含" value="${booksEscape(kit.glassCategory)}">
+                    <input id="kit-glass-name" class="swal2-input" placeholder="玻璃品名含" value="${booksEscape(kit.glassName)}">
+                    <input id="kit-case-cat" class="swal2-input" placeholder="殼分類含" value="${booksEscape(kit.caseCategory)}">
+                    <input id="kit-case-name" class="swal2-input" placeholder="殼品名含，可空白" value="${booksEscape(kit.caseName)}">
+                    <input id="kit-cl" class="swal2-input" placeholder="C to L 品名或編號" value="${booksEscape(kit.cableCL)}">
+                    <input id="kit-cc" class="swal2-input" placeholder="C to C 品名或編號" value="${booksEscape(kit.cableCC)}">
+                    <textarea id="kit-models" class="swal2-textarea" rows="5" placeholder="13|13亮面|13空壓">${booksEscape(lines)}</textarea>`,
+                background: '#26221e', color: 'white', showCancelButton: true, confirmButtonText: '儲存',
+                preConfirm: () => {
+                    const models = [];
+                    for (const line of document.getElementById('kit-models').value.split('\n')) {
+                        const s = line.trim();
+                        if (!s) continue;
+                        const parts = s.split('|').map(x => x.trim());
+                        if (!parts[0]) { Swal.showValidationMessage('對照要有型號：' + s); return false; }
+                        models.push({ key: parts[0], glass: parts[1] || '', shell: parts[2] || '' });
+                    }
+                    return {
+                        glassCategory: document.getElementById('kit-glass-cat').value.trim(),
+                        glassName: document.getElementById('kit-glass-name').value.trim(),
+                        caseCategory: document.getElementById('kit-case-cat').value.trim(),
+                        caseName: document.getElementById('kit-case-name').value.trim(),
+                        cableCL: document.getElementById('kit-cl').value.trim(),
+                        cableCC: document.getElementById('kit-cc').value.trim(),
+                        models
+                    };
+                }
+            });
+            if (!r.isConfirmed) return false;
+            const res = await API.savePosPrefs({ phoneAccKit: r.value });
+            if (!res || res.status !== 'success') throw new Error((res && res.msg) || '儲存失敗');
+            UI.phoneAccKit = res.phoneAccKit || r.value;
+            return true;
+        }
+        async function openPhoneKit() {
+            if (UI.tab !== 'phone') return;
+            let phones = selectedInventory(['phone']);
+            if (!phones.length) phones = Cart.filter(item => item.type === 'phone').map(item => DB.inv.find(x => String(x.id) === String(item.itemId || item.id))).filter(Boolean);
+            if (!phones.length) {
+                const options = DB.inv.filter(i => i.type === 'phone').slice(0, 80);
+                const opts = options.map(p => `<option value="${booksEscape(String(p.id))}">#${booksEscape(p.stock_id)} ${booksEscape(p.name)}</option>`).join('');
+                const pick = await Swal.fire({
+                    title: '選一台二手機',
+                    html: `<select id="kit-phone" class="swal2-select">${opts || '<option value="">沒有二手機</option>'}</select>`,
+                    background: '#26221e', color: 'white', showCancelButton: true, showDenyButton: true, confirmButtonText: '套用', denyButtonText: '設定對照',
+                    preConfirm: () => document.getElementById('kit-phone').value
+                });
+                if (pick.isDenied) { await editPhoneKit().catch(e => Swal.fire({ icon: 'error', title: '儲存失敗', text: e.message || '', background: '#26221e', color: 'white' })); return; }
+                if (!pick.isConfirmed || !pick.value) return;
+                const found = DB.inv.find(x => String(x.id) === String(pick.value) && x.type === 'phone');
+                if (!found) return;
+                phones = [found];
+            }
+            const acc = DB.inv.filter(i => i.type === 'accessory' && !i.isHidden);
+            const plans = phones.map(phone => ({ phone, plan: PhoneKit.resolvePhoneKit(phone, acc, currentPhoneKit()) }));
+            const warnings = plans.flatMap(row => row.plan.warnings);
+            const preview = plans.map(row => {
+                const names = row.plan.items.map(item => item.name).join('、') || '沒有可加入的配件';
+                return `<div class="text-left text-sm mb-1"><b>${booksEscape(row.phone.name)}</b>　${row.plan.kind === 'cc' ? 'C to C' : row.plan.kind === 'cl' ? 'C to L' : '無線'}<div class="text-xs text-slate-400">${booksEscape(names)}</div></div>`;
+            }).join('');
+            const warnHtml = warnings.length ? `<div class="text-left text-xs text-orange-300 mt-2">${warnings.map(booksEscape).join('<br>')}</div>` : '';
+            const ok = await Swal.fire({
+                title: '基本配件組',
+                html: preview + warnHtml,
+                background: '#26221e', color: 'white',
+                showCancelButton: true, showDenyButton: true, confirmButtonText: '加入購物車', denyButtonText: '設定對照', cancelButtonText: '取消'
+            });
+            if (ok.isDenied) { await editPhoneKit().catch(e => Swal.fire({ icon: 'error', title: '儲存失敗', text: e.message || '', background: '#26221e', color: 'white' })); return; }
+            if (!ok.isConfirmed) return;
+            plans.forEach(row => row.plan.items.forEach(item => {
+                const stock = Number(item.stock) || 0;
+                if (stock <= 0) return;
+                const price = Number(item.defaultPrice) > 0 ? Number(item.defaultPrice) : (Number(item.price) || 0);
+                const existing = Cart.find(line => String(line.itemId) === String(item.id) && line.type === 'accessory' && !line.isGift);
+                if (existing) {
+                    if ((Number(existing.quantity) || 0) < stock) existing.quantity = (Number(existing.quantity) || 0) + 1;
+                    return;
+                }
+                Cart.push({ ...item, price, quantity: 1, itemId: item.id, originalPrice: price, isGift: false });
+            }));
+            renderCart();
         }
         async function confirmMultiAcc() {
             if (UI.selectedAcc.size === 0) return;
