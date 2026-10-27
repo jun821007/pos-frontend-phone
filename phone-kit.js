@@ -35,38 +35,6 @@
     };
   }
 
-  function modelFit(profile, blob) {
-    if (!profile.series) return 0;
-    const text = compact(blob);
-    const tokens = [];
-    const re = /(\d{1,2})(pro|plus|mini|e)?/g;
-    let match;
-    while ((match = re.exec(text))) {
-      const series = Number(match[1]);
-      if (series >= 4 && series <= 30) tokens.push({ series, variant: match[2] || '' });
-    }
-    const hits = tokens.filter((token) => token.series === profile.series);
-    if (!hits.length) return 0;
-    if (profile.variant) {
-      if (hits.some((token) => token.variant === profile.variant)) return 3;
-      if (hits.some((token) => !token.variant)) return 1;
-      return 0;
-    }
-    return hits.some((token) => !token.variant) ? 2 : 0;
-  }
-
-  function isGlass(item) {
-    const cat = String(item.category || '');
-    const name = String(item.name || '');
-    return (cat.includes('玻') || name.includes('玻')) && name.includes('亮面');
-  }
-
-  function isCase(item) {
-    const cat = String(item.category || '');
-    const name = String(item.name || '');
-    return cat.includes('空壓') || name.includes('空壓');
-  }
-
   function cableScore(item, kind) {
     const name = String(item.name || '');
     const folded = compact(name);
@@ -95,43 +63,105 @@
     return { item: top.item, out: top.stock <= 0, many: same.length > 1 };
   }
 
-  function resolvePhoneKit(phone, accessories) {
+  function parseKeyword(key) {
+    const raw = compact(key);
+    if (!raw) return null;
+    if (raw.includes('duo')) return { type: 'duo', raw };
+    const model = raw.match(/^(\d{1,2})(pro|plus|mini|e)?$/);
+    if (model && Number(model[1]) >= 4 && Number(model[1]) <= 30) {
+      return { type: 'model', series: Number(model[1]), variant: model[2] || '', raw };
+    }
+    return { type: 'text', raw };
+  }
+
+  function keywordMatches(phone, keyword) {
     const model = String((phone && (phone.modelName || phone.name)) || '');
-    const profile = phoneProfile(model);
+    const folded = compact(model);
+    if (keyword.type === 'duo') return folded.includes('duo');
+    if (folded.includes('duo')) return false;
+    if (keyword.type === 'model') {
+      const profile = phoneProfile(model);
+      if (profile.series !== keyword.series) return false;
+      if (keyword.variant) return profile.variant === keyword.variant;
+      return !profile.variant;
+    }
+    return folded.includes(keyword.raw);
+  }
+
+  function findKitRow(phone, map) {
+    let best = null;
+    ((map && map.rows) || []).forEach((row) => {
+      const keyword = parseKeyword(row && row.key);
+      if (!keyword || !keywordMatches(phone, keyword)) return;
+      const score = keyword.raw.length + (keyword.type === 'duo' ? 20 : 0);
+      if (!best || score > best.score) best = { row, score };
+    });
+    return best ? best.row : null;
+  }
+
+  function findAccessory(accessories, id) {
+    const wanted = String(id || '').trim();
+    if (!wanted) return null;
+    return (accessories || []).find((item) => item && String(item.id) === wanted) || null;
+  }
+
+  function takeMapped(accessories, id, label, who, warnings) {
+    if (!String(id || '').trim()) {
+      warnings.push(who + ' 沒有設定' + label);
+      return null;
+    }
+    const item = findAccessory(accessories, id);
+    if (!item) {
+      warnings.push(who + ' 的' + label + '已不在庫存');
+      return null;
+    }
+    if ((Number(item.stock) || 0) <= 0) {
+      warnings.push(item.name + ' 無庫存');
+      return null;
+    }
+    return item;
+  }
+
+  function resolvePhoneKit(phone, accessories, map) {
+    const model = String((phone && (phone.modelName || phone.name)) || '');
     const kind = cableKindForModel(model);
     const warnings = [];
     const who = model || (phone && phone.stock_id) || '這台';
-    if (!kind) warnings.push(who + ' 認不出充電線規格');
-    const glass = pickBest(accessories, (item) => (isGlass(item) ? modelFit(profile, item.name + (item.category || '')) : 0));
-    const shell = pickBest(accessories, (item) => (isCase(item) ? modelFit(profile, item.name + (item.category || '')) : 0));
-    const cable = kind ? pickBest(accessories, (item) => cableScore(item, kind)) : null;
-    const slots = [
-      { label: '亮面玻璃貼', found: glass },
-      { label: '空壓殼', found: shell },
-      { label: kind === 'cc' ? 'C to C' : 'C to L', found: cable }
-    ];
+    const cfg = map || {};
     const items = [];
-    slots.forEach((slot) => {
-      if (!slot.found || !slot.found.item) {
-        if (slot.label === 'C to L' || slot.label === 'C to C') {
-          if (kind) warnings.push(who + ' 找不到' + slot.label);
-        } else warnings.push(who + ' 找不到' + slot.label);
-        return;
+    const row = findKitRow(phone, cfg);
+    if (!row) warnings.push(who + ' 缺對照，沒有加入玻璃貼與空壓殼');
+    else {
+      const glass = takeMapped(accessories, row.glassId, '亮面玻璃貼', who, warnings);
+      const shell = takeMapped(accessories, row.caseId, '空壓殼', who, warnings);
+      if (glass) items.push(glass);
+      if (shell) items.push(shell);
+    }
+    if (!kind) warnings.push(who + ' 認不出充電線規格');
+    else {
+      const cableId = kind === 'cc' ? cfg.cableCCId : cfg.cableCLId;
+      if (String(cableId || '').trim()) {
+        const cable = takeMapped(accessories, cableId, kind === 'cc' ? 'C to C' : 'C to L', who, warnings);
+        if (cable) items.push(cable);
+      } else {
+        const cable = pickBest(accessories, (item) => cableScore(item, kind));
+        if (!cable || !cable.item) warnings.push(who + ' 找不到' + (kind === 'cc' ? 'C to C' : 'C to L'));
+        else if (cable.out) warnings.push(cable.item.name + ' 無庫存');
+        else items.push(cable.item);
       }
-      if (slot.found.out) warnings.push(slot.found.item.name + ' 無庫存');
-      else {
-        items.push(slot.found.item);
-        if (slot.found.many) warnings.push(slot.label + ' 對到多項，先帶「' + slot.found.item.name + '」');
-      }
-    });
+    }
+    if (String(cfg.chargerId || '').trim()) {
+      const charger = takeMapped(accessories, cfg.chargerId, '快充頭', who, warnings);
+      if (charger) items.push(charger);
+    }
     return { kind, warnings, items };
   }
 
-  function buildPhoneKitAdds(phones, accessories, cartQty) {
+  function buildPhoneKitAdds(phones, accessories, cartQty, map) {
     const warnings = [];
     const want = new Map();
     (phones || []).forEach((phone) => {
-      const plan = resolvePhoneKit(phone, accessories);
+      const plan = resolvePhoneKit(phone, accessories, map);
       warnings.push(...plan.warnings);
       plan.items.forEach((item) => {
         const id = String(item.id);
@@ -163,5 +193,5 @@
     return { text: blocks.join('\n'), missing };
   }
 
-  return { compact, cableKindForModel, resolvePhoneKit, buildPhoneKitAdds, newPhoneSerialBlocks };
+  return { compact, cableKindForModel, parseKeyword, findKitRow, resolvePhoneKit, buildPhoneKitAdds, newPhoneSerialBlocks };
 });

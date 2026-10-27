@@ -577,10 +577,11 @@
                 <span class="text-sm text-slate-500">點擊重整</span>
             </div>
             
-            <div class="grid grid-cols-3 gap-2 shrink-0">
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-2 shrink-0">
                 <button type="button" id="set-tab-company" onclick="switchSettingTab('company')" class="set-tab py-2.5 rounded-lg border text-sm font-bold transition"><i class="fa-solid fa-box mr-1"></i>公司配件</button>
                 <button type="button" id="set-tab-add" onclick="switchSettingTab('add')" class="set-tab py-2.5 rounded-lg border text-sm font-bold transition"><i class="fa-solid fa-plus mr-1"></i>新增配件</button>
                 <button type="button" id="set-tab-sort" onclick="switchSettingTab('sort')" class="set-tab py-2.5 rounded-lg border text-sm font-bold transition"><i class="fa-solid fa-list-ol mr-1"></i>分類排序</button>
+                <button type="button" id="set-tab-kit" onclick="switchSettingTab('kit')" class="set-tab py-2.5 rounded-lg border text-sm font-bold transition"><i class="fa-solid fa-mobile-screen mr-1"></i>配件組對照</button>
             </div>
 
             <div id="set-panel-company" class="set-panel glass rounded-xl border-l-4 border-blue-500 p-4 space-y-3 shrink-0">
@@ -628,6 +629,31 @@
                     上傳本機分類／常用到雲端
                 </button>
                 <p class="text-[11px] text-slate-500">若其他裝置沒跟上，用「已排好／有星號」的那台按這個</p>
+            </div>
+
+            <div id="set-panel-kit" class="set-panel hidden glass rounded-xl border-l-4 border-emerald-500 p-4 space-y-3 shrink-0">
+                <h3 class="font-bold text-lg text-emerald-300">基本配件組對照</h3>
+                <p class="text-[11px] text-slate-500">玻璃貼、空壓殼只吃這裡的指定品項。沒設定的型號不會猜別的型號。線材沒指定時，14 與更早用 C to L，15、16、Duo 及之後用 C to C。</p>
+                <label class="text-xs text-slate-400">快充頭（可空白）</label>
+                <select id="kit-map-charger" class="input-dark p-2 rounded text-sm w-full"></select>
+                <label class="text-xs text-slate-400">C to L 線（可空白，空白則依品名自動找）</label>
+                <select id="kit-map-cl" class="input-dark p-2 rounded text-sm w-full"></select>
+                <label class="text-xs text-slate-400">C to C 線（可空白，空白則依品名自動找）</label>
+                <select id="kit-map-cc" class="input-dark p-2 rounded text-sm w-full"></select>
+                <button type="button" onclick="savePhoneKitCables()" class="w-full py-2 rounded-lg bg-emerald-800 text-white text-sm font-bold">儲存線材</button>
+                <div class="border-t border-slate-700 pt-3 space-y-2">
+                    <label class="text-xs text-slate-400">型號關鍵字（13、13Pro、14、15、16、Duo）</label>
+                    <input id="kit-map-key" class="input-dark p-2 rounded text-sm w-full" placeholder="例如 13Pro">
+                    <label class="text-xs text-slate-400">亮面玻璃貼</label>
+                    <select id="kit-map-glass" class="input-dark p-2 rounded text-sm w-full"></select>
+                    <label class="text-xs text-slate-400">空壓殼</label>
+                    <select id="kit-map-case" class="input-dark p-2 rounded text-sm w-full"></select>
+                    <div class="flex gap-2">
+                        <button type="button" id="kit-map-save-row" onclick="savePhoneKitRow()" class="flex-1 py-2 rounded-lg bg-emerald-600 text-white text-sm font-bold">新增</button>
+                        <button type="button" id="kit-map-cancel" onclick="cancelPhoneKitRow()" class="hidden px-3 py-2 rounded-lg bg-slate-700 text-slate-200 text-sm">取消</button>
+                    </div>
+                </div>
+                <div id="kit-map-list" class="space-y-2"></div>
             </div>
             
             <!-- 版本與登出 -->
@@ -925,7 +951,7 @@
         let ItemRegistry = {};
         let OrderRegistry = {};
         let User = { name: '', isAdmin: false };
-        let UI = { tab: 'phone', sub: '', rsMode: 'inventory', rsCat: 'all', multiSelect: false, selectedPhones: new Set(), selectedAcc: new Set(), selectedPendingOrders: new Set(), pendingOrderMeta: {}, pendingOrdersByCustomer: {}, allPendingOrderIds: [], pendingTab: 'unpaid', statsCollapsed: { report: true, history: true }, categoryOrder: null, favAccessoryIds: null, favSubCat: '', posPrefsLoaded: false, booksMode: 'month', lastBooksReport: null, lastFundData: null, booksContinuous: false, booksLooping: false, lastBooksEntryYmd: null, lastBooksVendor: '', lastBooksFoodNote: '飲料', booksSessionCount: 0, amendTarget: null, salaryTab: 'unpaid', salaryPaidRows: [] };
+        let UI = { tab: 'phone', sub: '', rsMode: 'inventory', rsCat: 'all', multiSelect: false, selectedPhones: new Set(), selectedAcc: new Set(), selectedPendingOrders: new Set(), pendingOrderMeta: {}, pendingOrdersByCustomer: {}, allPendingOrderIds: [], pendingTab: 'unpaid', statsCollapsed: { report: true, history: true }, categoryOrder: null, favAccessoryIds: null, phoneAccKitMap: null, kitMapEdit: -1, favSubCat: '', posPrefsLoaded: false, booksMode: 'month', lastBooksReport: null, lastFundData: null, booksContinuous: false, booksLooping: false, lastBooksEntryYmd: null, lastBooksVendor: '', lastBooksFoodNote: '飲料', booksSessionCount: 0, amendTarget: null, salaryTab: 'unpaid', salaryPaidRows: [] };
         let cartFooterTranslateY = 0;
         const CART_FOOTER_DRAG_MAX_UP = 360;
         const CART_FOOTER_DRAG_MAX_DOWN = 0;
@@ -1225,7 +1251,7 @@
         }
         function switchSettingTab(tab) {
             UI.settingTab = tab;
-            ['company', 'add', 'sort'].forEach(t => {
+            ['company', 'add', 'sort', 'kit'].forEach(t => {
                 const on = t === tab;
                 const panel = document.getElementById('set-panel-' + t);
                 const btn = document.getElementById('set-tab-' + t);
@@ -1234,6 +1260,7 @@
             });
             if (tab === 'company') renderCompanyTemplateList();
             if (tab === 'add') renderNewAccCategoryOptions();
+            if (tab === 'kit') renderPhoneKitMap();
         }
         // 分類 → 大分類（取該分類最多列使用的 B 欄）；大分類依收銀分類順序排列
         function accCategoryGroups() {
@@ -1369,6 +1396,10 @@
                 }
                 UI.categoryOrder = categoryOrder;
                 UI.favAccessoryIds = favAccessoryIds;
+                UI.phoneAccKitMap = res.phoneAccKitMap || null;
+                if (UI.phoneAccKitMap) {
+                    try { localStorage.setItem('pos_phone_acc_kit_map', JSON.stringify(UI.phoneAccKitMap)); } catch (err) {}
+                }
                 UI.posPrefsLoaded = true;
                 cachePosPrefsLocally();
                 console.log('[pos-prefs] loaded', { categoryOrder: UI.categoryOrder.length, favs: UI.favAccessoryIds.length });
@@ -1383,6 +1414,10 @@
                     const rawFav = localStorage.getItem('pos_fav_accessories');
                     UI.favAccessoryIds = rawFav ? JSON.parse(rawFav) : [];
                 } catch (err) { UI.favAccessoryIds = []; }
+                try {
+                    const rawKit = localStorage.getItem('pos_phone_acc_kit_map');
+                    UI.phoneAccKitMap = rawKit ? JSON.parse(rawKit) : null;
+                } catch (err) { UI.phoneAccKitMap = null; }
                 UI.posPrefsLoaded = false;
             }
         }
@@ -7952,6 +7987,135 @@
             const ok = await copyTextToClipboard(text);
             Swal.fire({ icon: ok ? 'success' : 'info', title: ok ? '已複製序號' : '請手動複製', text: ok ? '' : text, background: '#26221e', color: 'white' });
         }
+        function emptyPhoneKitMap() {
+            return { rows: [], chargerId: '', cableCLId: '', cableCCId: '' };
+        }
+        function currentPhoneKitMap() {
+            const map = UI.phoneAccKitMap;
+            if (!map || typeof map !== 'object') return emptyPhoneKitMap();
+            return {
+                rows: Array.isArray(map.rows) ? map.rows.map(row => ({ key: String(row.key || ''), glassId: String(row.glassId || ''), caseId: String(row.caseId || '') })) : [],
+                chargerId: String(map.chargerId || ''),
+                cableCLId: String(map.cableCLId || ''),
+                cableCCId: String(map.cableCCId || '')
+            };
+        }
+        function kitAccessoryChoices() {
+            return DB.inv.filter(item => item.type === 'accessory' && !item.isHidden)
+                .slice()
+                .sort((a, b) => String(a.name || '').localeCompare(String(b.name || ''), 'zh-Hant'));
+        }
+        function fillKitSelect(select, selectedId) {
+            if (!select) return;
+            const options = ['<option value="">（不指定）</option>'];
+            kitAccessoryChoices().forEach(item => {
+                const id = String(item.id);
+                options.push(`<option value="${booksEscape(id)}"${id === String(selectedId || '') ? ' selected' : ''}>${booksEscape(item.name)}（庫存 ${Number(item.stock) || 0}）</option>`);
+            });
+            if (selectedId && !kitAccessoryChoices().some(item => String(item.id) === String(selectedId))) {
+                options.push(`<option value="${booksEscape(String(selectedId))}" selected>已下架 ${booksEscape(String(selectedId))}</option>`);
+            }
+            select.innerHTML = options.join('');
+        }
+        function kitItemName(id) {
+            if (!id) return '未選';
+            const item = DB.inv.find(row => String(row.id) === String(id));
+            return item ? item.name : ('已下架 ' + id);
+        }
+        function renderPhoneKitMap() {
+            const map = currentPhoneKitMap();
+            fillKitSelect(document.getElementById('kit-map-charger'), map.chargerId);
+            fillKitSelect(document.getElementById('kit-map-cl'), map.cableCLId);
+            fillKitSelect(document.getElementById('kit-map-cc'), map.cableCCId);
+            const editing = UI.kitMapEdit >= 0 ? map.rows[UI.kitMapEdit] : null;
+            fillKitSelect(document.getElementById('kit-map-glass'), editing ? editing.glassId : '');
+            fillKitSelect(document.getElementById('kit-map-case'), editing ? editing.caseId : '');
+            const keyInput = document.getElementById('kit-map-key');
+            if (keyInput && document.activeElement !== keyInput) keyInput.value = editing ? editing.key : '';
+            const saveBtn = document.getElementById('kit-map-save-row');
+            const cancelBtn = document.getElementById('kit-map-cancel');
+            if (saveBtn) saveBtn.textContent = editing ? '儲存修改' : '新增';
+            if (cancelBtn) cancelBtn.classList.toggle('hidden', !editing);
+            const list = document.getElementById('kit-map-list');
+            if (!list) return;
+            if (!map.rows.length) {
+                list.innerHTML = '<div class="text-sm text-slate-500">還沒有型號對照。未設定的二手機不會自動加玻璃貼或空壓殼。</div>';
+                return;
+            }
+            list.innerHTML = map.rows.map((row, index) => `<div class="flex items-start gap-2 p-2 rounded-lg bg-slate-900/60">
+                <div class="flex-1 min-w-0 text-sm">
+                    <div class="font-bold text-emerald-200">${booksEscape(row.key)}</div>
+                    <div class="text-xs text-slate-400">貼：${booksEscape(kitItemName(row.glassId))}</div>
+                    <div class="text-xs text-slate-400">殼：${booksEscape(kitItemName(row.caseId))}</div>
+                </div>
+                <button type="button" onclick="editPhoneKitRow(${index})" class="text-xs text-sky-300 px-2 py-1">編輯</button>
+                <button type="button" onclick="deletePhoneKitRow(${index})" class="text-xs text-red-300 px-2 py-1">刪除</button>
+            </div>`).join('');
+        }
+        async function persistPhoneKitMap(map) {
+            const res = await API.savePosPrefs({ phoneAccKitMap: map });
+            if (!res || res.status === 'error') throw new Error((res && res.msg) || '儲存失敗');
+            UI.phoneAccKitMap = res.phoneAccKitMap || map;
+            try { localStorage.setItem('pos_phone_acc_kit_map', JSON.stringify(UI.phoneAccKitMap)); } catch (err) {}
+            renderPhoneKitMap();
+        }
+        async function savePhoneKitCables() {
+            const map = currentPhoneKitMap();
+            map.chargerId = document.getElementById('kit-map-charger').value;
+            map.cableCLId = document.getElementById('kit-map-cl').value;
+            map.cableCCId = document.getElementById('kit-map-cc').value;
+            try {
+                await persistPhoneKitMap(map);
+                Swal.fire({ icon: 'success', title: '線材已儲存', toast: true, position: 'top', timer: 1200, showConfirmButton: false, background: '#26221e', color: 'white' });
+            } catch (e) {
+                Swal.fire({ icon: 'error', title: '儲存失敗', text: e.message || '', background: '#26221e', color: 'white' });
+            }
+        }
+        function editPhoneKitRow(index) {
+            UI.kitMapEdit = index;
+            renderPhoneKitMap();
+        }
+        function cancelPhoneKitRow() {
+            UI.kitMapEdit = -1;
+            renderPhoneKitMap();
+        }
+        async function savePhoneKitRow() {
+            const key = document.getElementById('kit-map-key').value.trim();
+            if (!key) {
+                Swal.fire({ icon: 'warning', title: '請填型號關鍵字', background: '#26221e', color: 'white' });
+                return;
+            }
+            const glassId = document.getElementById('kit-map-glass').value;
+            const caseId = document.getElementById('kit-map-case').value;
+            if (!glassId && !caseId) {
+                Swal.fire({ icon: 'warning', title: '請選玻璃貼或空壓殼', background: '#26221e', color: 'white' });
+                return;
+            }
+            const map = currentPhoneKitMap();
+            const norm = key.replace(/[\s\u3000]+/g, '').toLowerCase();
+            const dup = map.rows.findIndex((row, index) => index !== UI.kitMapEdit && String(row.key || '').replace(/[\s\u3000]+/g, '').toLowerCase() === norm);
+            if (dup >= 0) {
+                Swal.fire({ icon: 'warning', title: '這個型號已經有對照', background: '#26221e', color: 'white' });
+                return;
+            }
+            const next = { key, glassId, caseId };
+            if (UI.kitMapEdit >= 0 && map.rows[UI.kitMapEdit]) map.rows[UI.kitMapEdit] = next;
+            else map.rows.push(next);
+            UI.kitMapEdit = -1;
+            try { await persistPhoneKitMap(map); }
+            catch (e) { Swal.fire({ icon: 'error', title: '儲存失敗', text: e.message || '', background: '#26221e', color: 'white' }); }
+        }
+        async function deletePhoneKitRow(index) {
+            const map = currentPhoneKitMap();
+            const row = map.rows[index];
+            if (!row) return;
+            const go = await Swal.fire({ icon: 'warning', title: '刪除 ' + row.key + '？', showCancelButton: true, confirmButtonText: '刪除', cancelButtonText: '取消', background: '#26221e', color: 'white' });
+            if (!go.isConfirmed) return;
+            map.rows.splice(index, 1);
+            if (UI.kitMapEdit === index) UI.kitMapEdit = -1;
+            try { await persistPhoneKitMap(map); }
+            catch (e) { Swal.fire({ icon: 'error', title: '儲存失敗', text: e.message || '', background: '#26221e', color: 'white' }); }
+        }
         function openPhoneKit() {
             const phones = [];
             Cart.forEach(item => {
@@ -7978,7 +8142,7 @@
                 const id = String(line.itemId || line.id);
                 cartQty[id] = (cartQty[id] || 0) + (Number(line.quantity) || 0);
             });
-            const plan = PhoneKit.buildPhoneKitAdds(phones, acc, cartQty);
+            const plan = PhoneKit.buildPhoneKitAdds(phones, acc, cartQty, UI.phoneAccKitMap || { rows: [] });
             plan.adds.forEach(add => {
                 const item = add.item;
                 const price = Number(item.defaultPrice) > 0 ? Number(item.defaultPrice) : (Number(item.price) || 0);
