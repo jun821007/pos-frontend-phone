@@ -850,6 +850,15 @@
             const res = await fetch(`${API_BASE_URL}/company-template/${encodeURIComponent(name)}`, { method: 'DELETE' });
             return await res.json();
           },
+          accessoryRenamePreview: async (id, newName) => {
+            const q = `id=${encodeURIComponent(id || '')}&newName=${encodeURIComponent(newName || '')}`;
+            const res = await fetch(`${API_BASE_URL}/admin/accessory-rename?${q}`);
+            return await res.json();
+          },
+          renameAccessory: async (data) => {
+            const res = await fetch(`${API_BASE_URL}/admin/accessory-rename`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data || {}) });
+            return await res.json();
+          },
           updateAccessoryPrice: async (data) => {
             const res = await fetch(`${API_BASE_URL}/accessory-price`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data || {}) });
             return await res.json();
@@ -2829,6 +2838,21 @@
             const L = [];
             const c = r.counts || {};
             L.push(`【庫存健檢】近 ${r.days} 天　品項 ${c.items}　流水 ${c.logs}`);
+            L.push('');
+            const rc = r.reconcile;
+            if (!rc || !rc.ok) {
+                L.push(`〇、對帳：無法對帳（${(rc && rc.msg) || '後端沒有回傳對帳結果'}）`);
+            } else {
+                const diffs = rc.stockDiffs || [];
+                if (!diffs.length) L.push(`〇、對帳：H 欄與 Supabase 一致（${rc.items} 項）`);
+                else {
+                    L.push(`〇、對帳：H 欄與 Supabase 不一致 ${diffs.length} 項（共 ${rc.items} 項）`);
+                    diffs.forEach(x => L.push(`  ${x.id} ${x.category}／${x.name}　H ${x.sheet}　Supabase ${x.supabase == null ? '沒有這個編號' : x.supabase}${x.diff == null ? '' : `　差 ${x.diff > 0 ? '+' : ''}${x.diff}`}`));
+                }
+                (rc.onlySupabase || []).forEach(x => L.push(`  Supabase 有、試算表沒有：${x.id} ${x.category}／${x.name}　Supabase ${x.supabase}`));
+                L.push(`  起點後對不到品項的流水：${rc.unmatchedCount || 0} 筆`);
+                (rc.unmatchedLogs || []).forEach(x => L.push(`  ${x.created_at ? new Date(x.created_at).toLocaleString('zh-TW', { timeZone: 'Asia/Taipei', hour12: false }) : ''} ${x.category}／${x.item_name}　${x.transaction_type} ${x.quantity}　${x.source || ''}　${x.remark || ''}`));
+            }
             L.push('');
             if (r.ackHidden) L.push(`（已確認隱藏：第一項 ${r.ackHidden.missing} 張、第二項 ${r.ackHidden.orphans} 種）`, '');
             L.push(`一、結帳有賣但沒扣庫存：${c.missingDeductions} 張單`);
@@ -6563,7 +6587,74 @@
         function createRsPill(t, v) { const d = document.createElement('div'); d.className = 'pill-btn rs-pill'; d.innerText = t; if(UI.rsCat === v) d.classList.add('active'); d.onclick = () => { UI.rsCat = v; document.querySelectorAll('.rs-pill').forEach(b=>b.classList.remove('active')); d.classList.add('active'); renderRsPartsPills(); renderRestockGrid(); }; return d; }
         function renderRestockGrid() { if(UI.rsMode === 'expense') return; const term = document.getElementById('rs-search').value.toLowerCase(); const grid = document.getElementById('rs-grid'); grid.innerHTML = ''; let list = DB.inv.filter(i => { if (i.type !== 'accessory') return false; if (term) return i.name.toLowerCase().includes(term); if (UI.rsCat === 'hidden_parts') return i.isHidden && (!UI.rsPartsCat || i.category === UI.rsPartsCat); if (UI.rsCat === 'all') return !i.isHidden; return i.category === UI.rsCat; }); if(list.length === 0) { grid.innerHTML = '<div class="col-span-full text-center text-slate-500 mt-4">無符合商品</div>'; return; } list.forEach(i => { let border = i.isHidden ? 'border-pink-500' : 'border-blue-500'; grid.innerHTML += `<div class="glass p-3 rounded-xl border-l-4 ${border} relative group active:scale-95 transition"><div onclick="addRsItem('${i.id}')" class="cursor-pointer pb-7"><div class="flex justify-between text-xs text-slate-500"><span>${i.category}</span><span>庫: ${i.stock}</span></div><div class="font-bold text-sm text-slate-200 line-clamp-2 my-1">${i.name}</div><div class="text-right text-xs text-slate-400">成本 $${i.cost}${i.pendingCost ? `<span class="text-amber-300">（${accPendingLabel(i)}）</span>` : ''}</div></div><button onclick="event.stopPropagation(); editAccessoryById('${i.id}')" class="absolute bottom-2 left-2 text-xs px-2 py-1 rounded-lg bg-[#3d3731] text-amber-200 hover:text-white"><i class="fa-solid fa-pen-to-square mr-1"></i>售價 $${Number(i.defaultPrice) || 0}</button></div>`; }); }
         function editAccessoryById(id) { const i = DB.inv.find(x => x.id == id); if (i) editAccessory(i.id, i.name, Number(i.cost) || 0, Number(i.defaultPrice) || 0); }
-        async function editAccessory(id, n, c, p) { const { value: v } = await Swal.fire({ title: '編輯商品', html: `<div class="text-xs text-slate-400 mb-2">${n}</div><label class="text-xs text-slate-500 block text-left">成本</label><input id="sw-edit-c" class="swal2-input" type="number" value="${c}"><label class="text-xs text-slate-500 block text-left mt-2">建議售價</label><input id="sw-edit-p" class="swal2-input" type="number" value="${p}">`, background: '#26221e', color: 'white', showCancelButton: true, confirmButtonText: '儲存', cancelButtonText: '取消', preConfirm: () => { const c = document.getElementById('sw-edit-c').value, p = document.getElementById('sw-edit-p').value; if (c === '' || isNaN(Number(c)) || Number(c) < 0 || p === '' || isNaN(Number(p)) || Number(p) < 0) { Swal.showValidationMessage('成本、建議售價請填 0 以上的數字'); return false; } return [Math.round(Number(c)), Math.round(Number(p))]; } }); if (!v) return; Swal.fire({ title: '儲存中...', allowOutsideClick: false, background: '#26221e', color: 'white', didOpen: () => Swal.showLoading() }); try { const res = await API.updateAccessoryPrice({ id, cost: v[0], defaultPrice: v[1] }); if (!res || res.status !== 'success') throw new Error((res && res.msg) || '請重試'); DB.inv.filter(x => x.type === 'accessory' && x.category === res.category && x.name === res.name).forEach(item => { item.cost = v[0]; item.defaultPrice = v[1]; }); renderRestockGrid(); const warn = res.supabase === false ? '（試算表已存，Supabase 沒寫到，之後按一次「Supabase 同步」）' : ''; Swal.fire({ icon: warn ? 'warning' : 'success', title: '已儲存', text: warn, toast: !warn, position: warn ? 'center' : 'top', timer: warn ? undefined : 1500, showConfirmButton: !!warn, background: '#26221e', color: 'white' }); } catch (e) { Swal.fire({ icon: 'error', title: '儲存失敗', text: e.message || '', background: '#26221e', color: 'white' }); } }
+        async function editAccessory(id, n, c, p) { const editRes = await Swal.fire({ title: '編輯商品', showDenyButton: !!(User && User.isAdmin), denyButtonText: '修改品名', html: `<div class="text-xs text-slate-400 mb-2">${n}</div><label class="text-xs text-slate-500 block text-left">成本</label><input id="sw-edit-c" class="swal2-input" type="number" value="${c}"><label class="text-xs text-slate-500 block text-left mt-2">建議售價</label><input id="sw-edit-p" class="swal2-input" type="number" value="${p}">`, background: '#26221e', color: 'white', showCancelButton: true, confirmButtonText: '儲存', cancelButtonText: '取消', preConfirm: () => { const c = document.getElementById('sw-edit-c').value, p = document.getElementById('sw-edit-p').value; if (c === '' || isNaN(Number(c)) || Number(c) < 0 || p === '' || isNaN(Number(p)) || Number(p) < 0) { Swal.showValidationMessage('成本、建議售價請填 0 以上的數字'); return false; } return [Math.round(Number(c)), Math.round(Number(p))]; } }); if (editRes.isDenied) return renameAccessory(id); const v = editRes.value; if (!v) return; Swal.fire({ title: '儲存中...', allowOutsideClick: false, background: '#26221e', color: 'white', didOpen: () => Swal.showLoading() }); try { const res = await API.updateAccessoryPrice({ id, cost: v[0], defaultPrice: v[1] }); if (!res || res.status !== 'success') throw new Error((res && res.msg) || '請重試'); DB.inv.filter(x => x.type === 'accessory' && x.category === res.category && x.name === res.name).forEach(item => { item.cost = v[0]; item.defaultPrice = v[1]; }); renderRestockGrid(); const warn = res.supabase === false ? '（試算表已存，Supabase 沒寫到，之後按一次「Supabase 同步」）' : ''; Swal.fire({ icon: warn ? 'warning' : 'success', title: '已儲存', text: warn, toast: !warn, position: warn ? 'center' : 'top', timer: warn ? undefined : 1500, showConfirmButton: !!warn, background: '#26221e', color: 'white' }); } catch (e) { Swal.fire({ icon: 'error', title: '儲存失敗', text: e.message || '', background: '#26221e', color: 'white' }); } }
+        async function renameAccessory(id) {
+            if (!(User && User.isAdmin)) {
+                Swal.fire({ icon: 'error', title: '僅管理員可修改品名', background: '#26221e', color: 'white' });
+                return;
+            }
+            Swal.fire({ title: '讀取中...', allowOutsideClick: false, background: '#26221e', color: 'white', didOpen: () => Swal.showLoading() });
+            let cur;
+            try {
+                cur = await API.accessoryRenamePreview(id, '');
+                if (!cur || cur.status !== 'success') throw new Error((cur && cur.msg) || '讀取失敗');
+            } catch (e) {
+                Swal.fire({ icon: 'error', title: '無法修改品名', text: e.message || '', background: '#26221e', color: 'white' });
+                return;
+            }
+            const info = `<div class="text-left text-sm text-slate-300 space-y-1 mb-2"><div>編號：<span class="font-mono text-amber-200">${booksEscape(cur.id)}</span></div><div>分類：${booksEscape(cur.category)}</div><div>目前品名：<span class="text-white font-bold">${booksEscape(cur.name)}</span></div><div>庫存：${Number(cur.stock) || 0}</div></div>`;
+            const { value: newName } = await Swal.fire({
+                title: '修改品名',
+                html: info + '<input id="sw-rename-name" class="swal2-input" placeholder="新品名">',
+                background: '#26221e', color: 'white',
+                showCancelButton: true, confirmButtonText: '下一步', cancelButtonText: '取消',
+                didOpen: () => { const el = document.getElementById('sw-rename-name'); if (el) { el.value = cur.name; el.focus(); el.select(); } },
+                preConfirm: async () => {
+                    const name = String(document.getElementById('sw-rename-name').value || '').trim();
+                    if (!name) { Swal.showValidationMessage('請輸入新品名'); return false; }
+                    if (name === cur.name) { Swal.showValidationMessage('新品名和目前相同'); return false; }
+                    try {
+                        const p = await API.accessoryRenamePreview(id, name);
+                        if (!p || p.status !== 'success') { Swal.showValidationMessage((p && p.msg) || '無法使用這個品名'); return false; }
+                        UI.renamePreview = p;
+                        return name;
+                    } catch (e) {
+                        Swal.showValidationMessage(e.message || '檢查失敗');
+                        return false;
+                    }
+                }
+            });
+            if (!newName) return;
+            const p = UI.renamePreview || cur;
+            const ok = await Swal.fire({
+                title: '確認修改品名？',
+                html: `<div class="text-left text-sm text-slate-200 space-y-1"><div>${booksEscape(p.id)}　${booksEscape(p.name)}</div><div>→ <span class="font-bold text-amber-200">${booksEscape(newName)}</span></div><div class="mt-2">庫存清單品名會改，<span class="font-bold text-amber-300">進出庫流水帳 ${Number(p.logRows) || 0} 筆會一起改</span>，Supabase 同編號流水 ${Number(p.supabaseLogs) || 0} 筆一起改。</div><div class="text-xs text-slate-400">每日流水、記帳的舊銷售紀錄不會改。改完庫存數字若和改前不同，會全部還原。</div></div>`,
+                showCancelButton: true, confirmButtonText: '確認修改', cancelButtonText: '取消',
+                background: '#26221e', color: 'white'
+            });
+            if (!ok.isConfirmed) return;
+            Swal.fire({ title: '修改中...', allowOutsideClick: false, background: '#26221e', color: 'white', didOpen: () => Swal.showLoading() });
+            try {
+                const res = await API.renameAccessory({ id, newName, person: User.name });
+                if (!res || res.status !== 'success') throw new Error((res && res.msg) || '修改失敗');
+                DB.inv.filter(x => x.type === 'accessory' && String(x.id) === String(res.id)).forEach(item => { item.name = res.newName; });
+                renderRestockGrid();
+                const lines = [
+                    `${res.id}　${res.oldName} → ${res.newName}`,
+                    `流水帳改了 ${res.logRows} 筆、Supabase 流水 ${res.supabaseLogs} 筆`,
+                    `庫存 ${res.stock}（和改前相同）`
+                ];
+                if (res.kitMapChanged) lines.push(`配件組對照改了 ${res.kitMapChanged} 處`);
+                if (!res.recorded) lines.push('品名修改紀錄沒寫到，請手動補記');
+                Swal.fire({
+                    icon: res.recorded ? 'success' : 'warning', title: '已修改品名',
+                    html: `<pre class="text-left text-[12px] leading-5 text-slate-200 whitespace-pre-wrap">${booksEscape(lines.join('\n'))}</pre>`,
+                    background: '#26221e', color: 'white'
+                });
+            } catch (e) {
+                Swal.fire({ icon: 'error', title: '修改品名失敗', text: e.message || '', background: '#26221e', color: 'white' });
+            }
+        }
         function accPendingLabel(i) {
             if (!i || !i.pendingCost) return '';
             const left = Math.max(0, (Number(i.stock) || 0) - (Number(i.pendingThreshold) || 0));
