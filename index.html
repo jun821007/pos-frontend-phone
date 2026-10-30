@@ -4322,8 +4322,9 @@
             try {
                 const r = await API.handleRestock({ items, person: User.name, orderId: oid, vendorName: vendorName || undefined, entryDate: entryDate || undefined });
                 if (r.status === 'error') {
-                    Swal.fire({ icon: 'error', title: '入帳失敗', text: r.msg || '請重試', background: '#26221e', color: 'white' });
-                    return false;
+                    const msg = r.msg || '請重試';
+                    if (!quiet) Swal.fire({ icon: 'error', title: '入帳失敗', text: msg, background: '#26221e', color: 'white' });
+                    return { ok: false, msg };
                 }
                 if (entryDate && /^\d{4}-\d{2}-\d{2}$/.test(entryDate)) {
                     UI.lastBooksEntryYmd = entryDate;
@@ -4341,8 +4342,9 @@
                 }
                 return true;
             } catch (err) {
-                Swal.fire({ icon: 'error', title: '入帳失敗', text: (err && err.message) || '請重試', background: '#26221e', color: 'white' });
-                return false;
+                const msg = (err && err.message) || '請重試';
+                if (!quiet) Swal.fire({ icon: 'error', title: '入帳失敗', text: msg, background: '#26221e', color: 'white' });
+                return { ok: false, msg };
             }
         }
         function booksPeriodStartYmd() {
@@ -4560,10 +4562,15 @@
                 const vals = step.values || [];
                 const batch = vals.length > 1;
                 let done = 0;
+                let failMsg = '';
                 if (batch) Swal.fire({ title: `入帳中 0/${vals.length}`, background: '#26221e', color: 'white', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
                 for (const v of vals) {
                     const { items, vendor } = buildBooksEntryItems(kind, v);
-                    if (!(await submitBooksLedger(items, vendor, v.d, { quiet: batch || !!UI.booksContinuous }))) break;
+                    const posted = await submitBooksLedger(items, vendor, v.d, { quiet: batch || !!UI.booksContinuous });
+                    if (posted !== true) {
+                        failMsg = (posted && posted.msg) || '';
+                        break;
+                    }
                     done++;
                     if (batch) Swal.update({ title: `入帳中 ${done}/${vals.length}` });
                 }
@@ -4572,7 +4579,7 @@
                     await fetchData();
                     await loadBooksReport({ silent: true });
                     if (ok) Swal.fire({ icon: 'success', title: `已入帳 ${done} 筆`, toast: true, position: 'top', timer: 1600, showConfirmButton: false, background: '#26221e' });
-                    else Swal.fire({ icon: 'warning', title: `只入帳了 ${done}／${vals.length} 筆`, text: `第 ${done + 1} 筆起沒寫入，請重新新增`, background: '#26221e', color: 'white' });
+                    else Swal.fire({ icon: 'warning', title: `只入帳了 ${done}／${vals.length} 筆`, text: `${failMsg ? failMsg + ' ' : ''}第 ${done + 1} 筆起沒寫入。已成功的不用再 key。`, background: '#26221e', color: 'white' });
                 }
                 if (!ok) {
                     if (!UI.booksContinuous || !UI.booksLooping) return;
