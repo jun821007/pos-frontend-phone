@@ -3755,6 +3755,9 @@
                         ts: when.getTime(),
                         seq,
                         orderId: i.orderId || '',
+                        itemId: i.itemId || '',
+                        type: i.type || 'defect',
+                        payMethod: i.payMethod || '',
                         kind: '支出',
                         subject: '虧損',
                         name: i.itemName || i.name || '瑕疵',
@@ -3780,10 +3783,13 @@
                         ts: when.getTime(),
                         seq,
                         orderId: i.orderId || '',
+                        itemId: i.itemId || '',
+                        type: i.type || '',
+                        payMethod: i.payMethod || '',
                         kind: memo ? '備查' : '支出',
                         subject: subj,
                         name: i.itemName || i.name || '',
-                        sale: '',
+                        sale: 0,
                         cost: amt,
                         amount: amt,
                         memo,
@@ -3829,6 +3835,9 @@
                             ts: (when || new Date(0)).getTime(),
                             seq: g.seq,
                             orderId: g.orderId,
+                            itemId: it.itemId || '',
+                            type: it.type || '',
+                            payMethod: it.payMethod || '',
                             kind: '備查',
                             subject: '寄賣代售',
                             name: `${g.customer || '過路客'}　${stripLedgerName(it.itemName || it.name || '')}（${tag.owner} ${formula}）`,
@@ -3852,6 +3861,25 @@
                         catNames[cat].push(stripLedgerName(it.itemName || it.name || '') || '-');
                         if (cat === 'new') newItemsForName.push(it);
                     }
+                    const lineProfit = isGiftDeduction(it) ? -(Number(it.cost) || 0) : calcCopyProfit(it);
+                    incomeDetails.push({
+                        date: formatBooksYmd(booksCountedWhen(it) || parseLedgerDate(g.time)),
+                        checkoutDate: formatBooksYmd(parseLedgerDate(g.time)),
+                        ts: ((booksCountedWhen(it) || parseLedgerDate(g.time)) || new Date(0)).getTime(),
+                        seq: g.seq,
+                        orderId: g.orderId,
+                        itemId: it.itemId || '',
+                        type: it.type || '',
+                        payMethod: it.payMethod || '',
+                        kind: '收入',
+                        subject: (BOOKS_PROFIT_KEYS.find(x => x.key === cat) || { label: '其他' }).label + '純毛利',
+                        name: stripLedgerName(it.itemName || it.name || '') || cat,
+                        sale,
+                        cost,
+                        amount: lineProfit,
+                        customer: g.customer || '',
+                        person: g.person || ''
+                    });
                 });
                 catProfit.used -= giftAlloc.used || 0;
                 catProfit.new -= giftAlloc.new || 0;
@@ -3863,30 +3891,9 @@
                 const checkoutAt = parseLedgerDate(g.time);
                 const checkoutYmd = formatBooksYmd(checkoutAt);
                 const countedYmd = formatBooksYmd(countedAt);
-                BOOKS_PROFIT_KEYS.forEach(({ key, label }) => {
-                    profit[key] += catProfit[key];
-                    if (Math.abs(catProfit[key]) < 0.005 && catNames[key].length === 0) return;
-                    const detailName = key === 'new'
-                        ? booksNewPhoneDetailName(g, newItemsForName)
-                        : (catNames[key].join('、') || label);
-                    incomeDetails.push({
-                        date: countedYmd,
-                        checkoutDate: checkoutYmd,
-                        ts: (countedAt || new Date(0)).getTime(),
-                        seq: g.seq,
-                        orderId: g.orderId,
-                        kind: '收入',
-                        subject: label + '純毛利',
-                        name: detailName,
-                        sale: catSale[key],
-                        cost: catCost[key],
-                        amount: catProfit[key],
-                        customer: g.customer || '',
-                        person: g.person || ''
-                    });
-                });
+                BOOKS_PROFIT_KEYS.forEach(({ key }) => { profit[key] += catProfit[key]; });
             });
-            const incomeRows = incomeDetails.filter(r => Math.abs(Number(r.amount)) >= 0.005);
+            const incomeRows = incomeDetails.filter(r => r.itemId || Math.abs(Number(r.amount)) >= 0.005);
             const profitTotal = BOOKS_PROFIT_KEYS.reduce((s, x) => s + (Number(profit[x.key]) || 0), 0);
             const expenseTotal = BOOKS_EXPENSE_KEYS.reduce((s, k) => s + (Number(expense[k]) || 0), 0);
             const partsMemo = BOOKS_MEMO_KEYS.reduce((s, k) => s + (Number(expense[k]) || 0), 0);
@@ -4039,7 +4046,8 @@
                     return `<article class="books-card">
                         <div class="books-card-top"><span>${booksEscape(r.date)}　${booksEscape(subj)}</span></div>
                         <div class="books-card-name">${booksEscape(r.name || r.subject)}</div>
-                        <div class="books-card-amt ${amtClass}">${isOut ? '−' : '+'}${money(amt)}</div>
+                        <div class="books-card-amt ${amtClass}">${r.itemId ? `<button type="button" class="underline decoration-dotted" onclick="editBooksLine('${booksLineKey(r)}')">${isOut ? '−' : '+'}${money(amt)}</button>` : (isOut ? '−' : '+') + money(amt)}</div>
+                        ${booksLineOps(r) ? `<div class="mt-1">${booksLineOps(r)}</div>` : ''}
                         ${bits.length ? `<div class="books-card-meta">${booksEscape(bits.join('　'))}</div>` : ''}
                     </article>`;
                 }).join('')
@@ -4070,11 +4078,11 @@
                     <td>${booksEscape(r.orderId)}</td>
                     <td>${booksEscape(r.name)}${who ? `<div class="text-[11px] text-amber-200/80">${booksEscape(who)}</div>` : ''}</td>
                     <td>${booksEscape(r.memo ? r.subject + '（備查）' : r.subject)}</td>
-                    <td class="num">${moneyCell(r.sale)}</td>
+                    <td class="num">${r.itemId ? `<button type="button" class="underline decoration-dotted" onclick="editBooksLine('${booksLineKey(r)}')">${moneyCell(r.sale)}</button>` : moneyCell(r.sale)}</td>
                     <td class="num">${moneyCell(r.cost)}</td>
-                    <td class="num inc">${r.income === '' ? '' : money(r.income)}</td>
-                    <td class="num ${r.memo ? 'mute' : 'exp'}">${r.outgo === '' ? '' : money(r.outgo)}</td>
-                    <td>${booksEscape(r.person)}</td>
+                    <td class="num inc">${r.income === '' ? '' : (r.itemId ? `<button type="button" class="underline decoration-dotted" onclick="editBooksLine('${booksLineKey(r)}')">${money(r.income)}</button>` : money(r.income))}</td>
+                    <td class="num ${r.memo ? 'mute' : 'exp'}">${r.outgo === '' ? '' : (r.itemId ? `<button type="button" class="underline decoration-dotted" onclick="editBooksLine('${booksLineKey(r)}')">${money(r.outgo)}</button>` : money(r.outgo))}</td>
+                    <td>${booksEscape(r.person)}${booksLineOps(r)}</td>
                 </tr>`;
                 }).join('')
                 : `<tr><td colspan="9" class="mute">${emptyText}</td></tr>`;
@@ -4127,7 +4135,7 @@
                         <table class="books-sheet" id="books-det-table">
                             <thead><tr>
                                 <th>入帳日</th><th>單號</th><th>摘要</th><th>科目</th>
-                                <th class="num">售價</th><th class="num">成本</th><th class="num">收入</th><th class="num">支出</th><th>經手人</th>
+                                <th class="num">售價</th><th class="num">成本</th><th class="num">收入</th><th class="num">支出</th><th>經手人／操作</th>
                             </tr></thead>
                             <tbody>${detBody}</tbody>
                             <tfoot><tr class="tot">
@@ -4143,6 +4151,104 @@
         function setBooksDetFilter(val) {
             UI.booksDetFilter = val || '';
             if (UI.lastBooksReport) renderBooksReport(UI.lastBooksReport);
+        }
+        function booksLineKey(r) {
+            return encodeURIComponent(String(r.orderId || '') + '\t' + String(r.itemId || ''));
+        }
+        function booksLineOps(r) {
+            if (!(User && User.isAdmin) || !r || !r.itemId) return '';
+            const key = booksLineKey(r);
+            return `<span class="inline-flex gap-2 ml-2"><button type="button" class="text-amber-300 text-[11px]" onclick="editBooksLine('${key}')">修改</button><button type="button" class="text-red-300 text-[11px]" onclick="deleteBooksLine('${key}')">刪除</button></span>`;
+        }
+        function booksFindLine(key) {
+            const report = UI.lastBooksReport;
+            if (!report) return null;
+            const rows = [].concat(report.incomeDetails || [], report.expenseDetails || []);
+            return rows.find(r => booksLineKey(r) === key) || null;
+        }
+        async function editBooksLine(key) {
+            if (!(User && User.isAdmin)) return;
+            const row = booksFindLine(key);
+            if (!row) return;
+            const nameLocked = ['accessory', 'repair', 'phone', 'new_phone', 'peer_phone', 'software_phone', 'direct_transfer'].includes(row.type);
+            const editName = String(row.name || '').replace(/\s*\(贈\)\s*/g, ' ').replace(/\s+x\d+\s*$/, '').replace(/\s+/g, ' ').trim();
+            const sale = Number(row.sale) || 0;
+            const cost = Number(row.cost) || 0;
+            const { value: edited, isConfirmed } = await Swal.fire({
+                title: '修改這一筆',
+                html: `<div class="text-left text-sm">
+                    <div class="text-[11px] text-slate-500 mb-2">數量不可改，只改售價、成本、摘要。配件出庫的庫存數量維持原出庫。</div>
+                    <label class="text-xs text-slate-500 block mb-1">摘要${nameLocked ? '（跟庫存連動，不能改）' : ''}</label>
+                    <input id="bk-name" class="swal2-input !my-0 !w-full" value="${booksEscape(editName)}" ${nameLocked ? 'disabled style="opacity:.5"' : ''}>
+                    <label class="text-xs text-slate-500 block mb-1 mt-3">售價</label>
+                    <input id="bk-sale" type="number" min="0" class="swal2-input !my-0 !w-full" value="${sale}">
+                    <label class="text-xs text-slate-500 block mb-1 mt-3">成本</label>
+                    <input id="bk-cost" type="number" min="0" class="swal2-input !my-0 !w-full" value="${cost}">
+                    <div class="text-xs text-slate-500 mt-3">利潤 <span id="bk-profit"></span></div>
+                </div>`,
+                background: '#26221e', color: 'white', showCancelButton: true, confirmButtonText: '儲存',
+                didOpen: () => {
+                    const refresh = () => {
+                        const p = (Number(document.getElementById('bk-sale').value) || 0) - (Number(document.getElementById('bk-cost').value) || 0);
+                        const el = document.getElementById('bk-profit');
+                        el.textContent = p.toLocaleString();
+                        el.className = p >= 0 ? 'text-green-400' : 'text-red-400';
+                    };
+                    document.getElementById('bk-sale').addEventListener('input', refresh);
+                    document.getElementById('bk-cost').addEventListener('input', refresh);
+                    refresh();
+                },
+                preConfirm: () => {
+                    const saleVal = Number(document.getElementById('bk-sale').value);
+                    const costVal = Number(document.getElementById('bk-cost').value);
+                    if (!Number.isFinite(saleVal) || saleVal < 0 || !Number.isFinite(costVal) || costVal < 0) {
+                        Swal.showValidationMessage('售價、成本要是 0 以上的數字');
+                        return false;
+                    }
+                    const nm = nameLocked ? '' : String(document.getElementById('bk-name').value || '').replace(/\s+/g, ' ').trim();
+                    if (!nameLocked && !nm) { Swal.showValidationMessage('摘要不能空白'); return false; }
+                    return { sale: Math.round(saleVal), cost: Math.round(costVal), name: nm };
+                }
+            });
+            if (!isConfirmed || !edited) return;
+            Swal.fire({ title: '更新中...', allowOutsideClick: false, background: '#26221e', color: 'white', didOpen: () => Swal.showLoading() });
+            try {
+                const res = await API.handleTransaction({
+                    action: 'books_update_line', orderId: row.orderId, itemId: row.itemId,
+                    salePrice: edited.sale, cost: edited.cost, name: edited.name || undefined, person: User.name
+                });
+                if (!res || res.status !== 'success') throw new Error((res && res.msg) || '請重試');
+                await loadBooksReport({ silent: true });
+                Swal.fire({ icon: 'success', title: '已更新', text: '利潤 ' + Number(res.profit || 0).toLocaleString(), toast: true, position: 'top', timer: 1400, showConfirmButton: false, background: '#26221e', color: 'white' });
+            } catch (e) {
+                Swal.fire({ icon: 'error', title: '沒有改成', text: e.message || '', background: '#26221e', color: 'white' });
+            }
+        }
+        async function deleteBooksLine(key) {
+            if (!(User && User.isAdmin)) return;
+            const row = booksFindLine(key);
+            if (!row) return;
+            const { value: password } = await Swal.fire({
+                title: '刪除這一筆',
+                html: `<div class="text-left text-sm">${booksEscape(row.name || row.subject)}<div class="text-[11px] text-slate-400 mt-2">不會刪整張單。配件出貨會回補庫存。調貨不回補。數量欄不會另外改。</div></div>`,
+                input: 'password', inputPlaceholder: '管理員密碼', showCancelButton: true, confirmButtonText: '刪除',
+                background: '#26221e', color: 'white'
+            });
+            if (!password) return;
+            if (password !== 'Apple168168') {
+                Swal.fire({ icon: 'error', title: '密碼錯誤', background: '#26221e', color: 'white' });
+                return;
+            }
+            Swal.fire({ title: '刪除中...', allowOutsideClick: false, background: '#26221e', color: 'white', didOpen: () => Swal.showLoading() });
+            try {
+                const res = await API.handleTransaction({ action: 'books_delete_line', orderId: row.orderId, itemId: row.itemId, person: User.name });
+                if (!res || res.status !== 'success') throw new Error((res && res.msg) || '請重試');
+                await loadBooksReport({ silent: true });
+                const stockText = res.stock === 'restore' ? '已回補庫存' : (res.stock === 'undo-in' ? '已沖回進貨' : (res.stock === 'none' ? '這類不回補庫存' : ''));
+                Swal.fire({ icon: 'success', title: '已標成刪除', text: stockText, background: '#26221e', color: 'white' });
+            } catch (e) {
+                Swal.fire({ icon: 'error', title: '沒有刪成', text: e.message || '', background: '#26221e', color: 'white' });
+            }
         }
         async function submitBooksLedger(items, vendorName, entryDate, opts) {
             if (!(User && User.isAdmin)) {
