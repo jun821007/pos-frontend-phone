@@ -3756,6 +3756,7 @@
                         seq,
                         orderId: i.orderId || '',
                         itemId: i.itemId || '',
+                        sheetRow: i.sheetRow || '',
                         type: i.type || 'defect',
                         payMethod: i.payMethod || '',
                         kind: '支出',
@@ -3784,6 +3785,7 @@
                         seq,
                         orderId: i.orderId || '',
                         itemId: i.itemId || '',
+                        sheetRow: i.sheetRow || '',
                         type: i.type || '',
                         payMethod: i.payMethod || '',
                         kind: memo ? '備查' : '支出',
@@ -4153,12 +4155,13 @@
             if (UI.lastBooksReport) renderBooksReport(UI.lastBooksReport);
         }
         function booksLineKey(r) {
-            return encodeURIComponent(String(r.orderId || '') + '\t' + String(r.itemId || ''));
+            return encodeURIComponent(String(r.orderId || '') + '\t' + String(r.itemId || '') + '\t' + String(r.sheetRow || ''));
         }
         function booksLineEditable(r) {
-            if (!(User && User.isAdmin) || !r || !r.itemId) return false;
+            if (!(User && User.isAdmin) || !r) return false;
             if (r.kind === '收入' || r.subject === '寄賣代售') return false;
-            return r.kind === '支出' || r.kind === '備查';
+            if (r.kind !== '支出' && r.kind !== '備查') return false;
+            return !!(r.itemId || r.sheetRow);
         }
         function booksLineOps(r) {
             if (!booksLineEditable(r)) return '';
@@ -4202,8 +4205,8 @@
             Swal.fire({ title: '更新中...', allowOutsideClick: false, background: '#26221e', color: 'white', didOpen: () => Swal.showLoading() });
             try {
                 const res = await API.handleTransaction({
-                    action: 'books_update_line', orderId: row.orderId, itemId: row.itemId,
-                    cost: edited.cost, name: edited.name, person: User.name
+                    action: 'books_update_line', orderId: row.orderId, itemId: row.itemId || '',
+                    sheetRow: row.sheetRow || undefined, cost: edited.cost, name: edited.name, person: User.name
                 });
                 if (!res || res.status !== 'success') throw new Error((res && res.msg) || '請重試');
                 await loadBooksReport({ silent: true });
@@ -4228,7 +4231,7 @@
             }
             Swal.fire({ title: '刪除中...', allowOutsideClick: false, background: '#26221e', color: 'white', didOpen: () => Swal.showLoading() });
             try {
-                const res = await API.handleTransaction({ action: 'books_delete_line', orderId: row.orderId, itemId: row.itemId, person: User.name });
+                const res = await API.handleTransaction({ action: 'books_delete_line', orderId: row.orderId, itemId: row.itemId || '', sheetRow: row.sheetRow || undefined, person: User.name });
                 if (!res || res.status !== 'success') throw new Error((res && res.msg) || '請重試');
                 await loadBooksReport({ silent: true });
                 const stockText = res.stock === 'restore' ? '已回補庫存' : (res.stock === 'undo-in' ? '已沖回進貨' : (res.stock === 'none' ? '這類不回補庫存' : ''));
