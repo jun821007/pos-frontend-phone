@@ -2000,10 +2000,51 @@
             return `${lines.join('\n')}\n總金額\n${sumParts.join('+')}=${total}`;
         }
         function parseRepairLedgerParts(name) {
-            const raw = stripLedgerName(name || '');
+            const raw = stripLedgerName(name || '').replace(/[／/]/g, '｜');
             const sep = raw.indexOf('｜');
             if (sep === -1) return { main: raw, issue: '' };
             return { main: raw.slice(0, sep).trim(), issue: raw.slice(sep + 1).trim() };
+        }
+        function salaryRepairFact(it) {
+            const reason = String((it && (it.reason || it.description)) || '').trim();
+            const modelName = String((it && it.modelName) || '').trim();
+            const raw = String((it && (it.itemName || it.name)) || '');
+            const parts = parseRepairLedgerParts(raw);
+            let work = reason || parts.issue;
+            let model = modelName;
+            if (!model) {
+                const main = parts.main.replace(/^維修[:：]\s*/, '').trim();
+                if (main && main !== '維修') model = main;
+            }
+            if (!model && !work) {
+                const plain = stripLedgerName(raw);
+                const pair = plain.split('　');
+                if (pair.length >= 2) {
+                    model = pair[0].trim();
+                    work = pair.slice(1).join('　').trim();
+                }
+            }
+            if (work && model && work === model) work = '';
+            return { model, work };
+        }
+        function salaryOrderItems(orderId) {
+            const g = getOrderGroupForSalary(orderId);
+            if (g && g.items && g.items.length) return g.items;
+            const oid = String(orderId || '');
+            if (!oid) return [];
+            return (UI.salaryMonthRows || []).filter((i) => String(i.orderId) === oid && i.status !== 'Returned' && i.status !== 'Deleted');
+        }
+        function salaryRepairFacts(orderId, fallbackDetail) {
+            const fromOrder = salaryOrderItems(orderId)
+                .filter((it) => String(it.type || '') === 'repair')
+                .map(salaryRepairFact)
+                .filter((f) => f.model || f.work);
+            if (fromOrder.length) return fromOrder;
+            const detail = String(fallbackDetail || '').trim();
+            if (!detail || detail === '維修') return [];
+            const chunks = detail.split('、').map((s) => s.trim()).filter(Boolean);
+            const parsed = chunks.map((chunk) => salaryRepairFact({ name: chunk })).filter((f) => f.model || f.work);
+            return parsed.length ? parsed : [];
         }
         function formatRepairCopyLabel(it) {
             const { main, issue } = parseRepairLedgerParts(it.itemName || it.name || '');
@@ -2632,6 +2673,24 @@
             });
             return out;
         }
+        function isSalaryRepairCopy(line) {
+            const label = String((line && line.label) || '').replace(/（已發）$/, '');
+            return !!(line && (line.kind === 'repair' || label === '維修'));
+        }
+        function salaryCopyBlock(line, index) {
+            const amt = '$' + (Number(line.amount) || 0).toLocaleString();
+            if (!isSalaryRepairCopy(line)) {
+                let text = (index + 1) + '. ' + (line.orderId || '') + '　' + (line.customer || '') + '　' + (line.label || '') + '　' + amt;
+                if (line.formula) text += '\n   ' + line.formula;
+                return text;
+            }
+            const paidMark = String(line.label || '').includes('已發') ? '（已發）' : '';
+            const facts = salaryRepairFacts(line.orderId, line.detail);
+            const rows = ['維修　' + (line.customer || '') + '　' + amt + paidMark];
+            facts.forEach((f) => rows.push([f.model, f.work].filter(Boolean).join('　')));
+            if (line.orderId) rows.push(String(line.orderId));
+            return rows.join('\n');
+        }
         function buildSalaryCopyText(lines) {
             const ymd = ymdTaipei(new Date()).replace(/-/g, '/');
             const rows = [];
@@ -2639,8 +2698,7 @@
             let total = 0;
             let pendingTotal = 0;
             (lines || []).forEach((line, idx) => {
-                rows.push((idx + 1) + '. ' + line.orderId + '　' + (line.customer || '') + '　' + line.label + '　$' + (Number(line.amount || 0).toLocaleString()));
-                if (line.formula) rows.push('   ' + line.formula);
+                rows.push(salaryCopyBlock(line, idx));
                 if (line.pending) pendingTotal += Number(line.amount) || 0;
                 else total += Number(line.amount) || 0;
             });
@@ -3105,6 +3163,7 @@
             try {
                 const res = await API.getHistory(startYmd, endYmd);
                 const rows = Array.isArray(res) ? res : (res.history || []);
+                UI.salaryMonthRows = rows;
                 const paid = rows.filter((i) => {
                     if (String(i.type || '') !== 'salary') return false;
                     if (i.status === 'Returned' || i.status === 'Deleted') return false;
@@ -3158,8 +3217,10 @@
                 orderId: meta.orderId || row.orderId || '',
                 customer: meta.customer || '',
                 label: meta.kindLabel + '（已發）',
+                kind: meta.kindLabel === '維修' ? 'repair' : '',
                 amount: Math.abs(Number(row.cost) || 0),
-                formula: meta.name
+                formula: meta.kindLabel === '維修' ? '' : meta.name,
+                detail: ''
             }]);
             const ok = await copyTextToClipboard(text);
             Swal.fire({ icon: ok ? 'success' : 'info', title: ok ? '已複製' : '請手動複製', text: ok ? '' : text, toast: true, position: 'top', timer: 1600, showConfirmButton: false, background: '#26221e' });
@@ -3176,8 +3237,10 @@
                     orderId: meta.orderId || row.orderId || '',
                     customer: meta.customer || '',
                     label: meta.kindLabel + '（已發）',
+                    kind: meta.kindLabel === '維修' ? 'repair' : '',
                     amount: Math.abs(Number(row.cost) || 0),
-                    formula: meta.name
+                    formula: meta.kindLabel === '維修' ? '' : meta.name,
+                    detail: ''
                 };
             });
             const text = buildSalaryCopyText(lines);
@@ -3238,6 +3301,10 @@
         }
         function salaryDetailText(g, kind) {
             const types = salaryTypesForKind(kind);
+            if (kind === 'repair') {
+                const facts = (g.items || []).filter((it) => String(it.type || '') === 'repair').map(salaryRepairFact).filter((f) => f.model || f.work);
+                if (facts.length) return facts.map((f) => [f.model, f.work].filter(Boolean).join('　')).join('、');
+            }
             const names = (g.items || [])
                 .filter((it) => types.includes(it.type))
                 .map((it) => String(it.itemName || it.name || '').replace(/^\([^)]*\)\s*/, '').trim())
@@ -3352,8 +3419,10 @@
                 orderId: row.orderId,
                 customer: row.customer,
                 label: row.label,
+                kind: row.kind,
                 amount: row.amount,
-                formula: row.formula
+                formula: row.formula,
+                detail: row.detail
             }]);
             const ok = await copyTextToClipboard(text);
             Swal.fire({ icon: ok ? 'success' : 'info', title: ok ? '已複製' : '請手動複製', text: ok ? '' : text, toast: true, position: 'top', timer: 1600, showConfirmButton: false, background: '#26221e' });
@@ -3368,8 +3437,10 @@
                 orderId: r.orderId,
                 customer: r.customer,
                 label: r.label,
+                kind: r.kind,
                 amount: r.amount,
-                formula: r.formula
+                formula: r.formula,
+                detail: r.detail
             })));
             const ok = await copyTextToClipboard(text);
             Swal.fire({ icon: ok ? 'success' : 'info', title: ok ? `已複製要結 ${list.length} 筆` : '請手動複製', text: ok ? '' : text, background: '#26221e', color: 'white' });
