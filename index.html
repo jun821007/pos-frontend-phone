@@ -4046,7 +4046,7 @@
                     return `<article class="books-card">
                         <div class="books-card-top"><span>${booksEscape(r.date)}　${booksEscape(subj)}</span></div>
                         <div class="books-card-name">${booksEscape(r.name || r.subject)}</div>
-                        <div class="books-card-amt ${amtClass}">${r.itemId ? `<button type="button" class="underline decoration-dotted" onclick="editBooksLine('${booksLineKey(r)}')">${isOut ? '−' : '+'}${money(amt)}</button>` : (isOut ? '−' : '+') + money(amt)}</div>
+                        <div class="books-card-amt ${amtClass}">${isOut && booksLineEditable(r) ? `<button type="button" class="underline decoration-dotted" onclick="editBooksLine('${booksLineKey(r)}')">${'−' + money(amt)}</button>` : ((isOut ? '−' : '+') + money(amt))}</div>
                         ${booksLineOps(r) ? `<div class="mt-1">${booksLineOps(r)}</div>` : ''}
                         ${bits.length ? `<div class="books-card-meta">${booksEscape(bits.join('　'))}</div>` : ''}
                     </article>`;
@@ -4078,10 +4078,10 @@
                     <td>${booksEscape(r.orderId)}</td>
                     <td>${booksEscape(r.name)}${who ? `<div class="text-[11px] text-amber-200/80">${booksEscape(who)}</div>` : ''}</td>
                     <td>${booksEscape(r.memo ? r.subject + '（備查）' : r.subject)}</td>
-                    <td class="num">${r.itemId ? `<button type="button" class="underline decoration-dotted" onclick="editBooksLine('${booksLineKey(r)}')">${moneyCell(r.sale)}</button>` : moneyCell(r.sale)}</td>
+                    <td class="num">${moneyCell(r.sale)}</td>
                     <td class="num">${moneyCell(r.cost)}</td>
-                    <td class="num inc">${r.income === '' ? '' : (r.itemId ? `<button type="button" class="underline decoration-dotted" onclick="editBooksLine('${booksLineKey(r)}')">${money(r.income)}</button>` : money(r.income))}</td>
-                    <td class="num ${r.memo ? 'mute' : 'exp'}">${r.outgo === '' ? '' : (r.itemId ? `<button type="button" class="underline decoration-dotted" onclick="editBooksLine('${booksLineKey(r)}')">${money(r.outgo)}</button>` : money(r.outgo))}</td>
+                    <td class="num inc">${r.income === '' ? '' : money(r.income)}</td>
+                    <td class="num ${r.memo ? 'mute' : 'exp'}">${r.outgo === '' ? '' : (booksLineEditable(r) ? `<button type="button" class="underline decoration-dotted" onclick="editBooksLine('${booksLineKey(r)}')">${money(r.outgo)}</button>` : money(r.outgo))}</td>
                     <td>${booksEscape(r.person)}${booksLineOps(r)}</td>
                 </tr>`;
                 }).join('')
@@ -4155,8 +4155,13 @@
         function booksLineKey(r) {
             return encodeURIComponent(String(r.orderId || '') + '\t' + String(r.itemId || ''));
         }
+        function booksLineEditable(r) {
+            if (!(User && User.isAdmin) || !r || !r.itemId) return false;
+            if (r.kind === '收入' || r.subject === '寄賣代售') return false;
+            return r.kind === '支出' || r.kind === '備查';
+        }
         function booksLineOps(r) {
-            if (!(User && User.isAdmin) || !r || !r.itemId) return '';
+            if (!booksLineEditable(r)) return '';
             const key = booksLineKey(r);
             return `<span class="inline-flex gap-2 ml-2"><button type="button" class="text-amber-300 text-[11px]" onclick="editBooksLine('${key}')">修改</button><button type="button" class="text-red-300 text-[11px]" onclick="deleteBooksLine('${key}')">刪除</button></span>`;
         }
@@ -4167,47 +4172,30 @@
             return rows.find(r => booksLineKey(r) === key) || null;
         }
         async function editBooksLine(key) {
-            if (!(User && User.isAdmin)) return;
+            if (!booksLineEditable(booksFindLine(key))) return;
             const row = booksFindLine(key);
-            if (!row) return;
-            const nameLocked = ['accessory', 'repair', 'phone', 'new_phone', 'peer_phone', 'software_phone', 'direct_transfer'].includes(row.type);
-            const editName = String(row.name || '').replace(/\s*\(贈\)\s*/g, ' ').replace(/\s+x\d+\s*$/, '').replace(/\s+/g, ' ').trim();
-            const sale = Number(row.sale) || 0;
-            const cost = Number(row.cost) || 0;
+            const editName = String(row.name || '').replace(/\s+x\d+\s*$/, '').replace(/\s+/g, ' ').trim();
+            const cost = Number(row.cost) || Number(row.amount) || 0;
+            const qtyNote = row.type === 'restock' ? '數量不可改，只改金額、摘要。' : '只改這一筆的金額、摘要。';
             const { value: edited, isConfirmed } = await Swal.fire({
-                title: '修改這一筆',
+                title: '修改這一筆支出',
                 html: `<div class="text-left text-sm">
-                    <div class="text-[11px] text-slate-500 mb-2">數量不可改，只改售價、成本、摘要。配件出庫的庫存數量維持原出庫。</div>
-                    <label class="text-xs text-slate-500 block mb-1">摘要${nameLocked ? '（跟庫存連動，不能改）' : ''}</label>
-                    <input id="bk-name" class="swal2-input !my-0 !w-full" value="${booksEscape(editName)}" ${nameLocked ? 'disabled style="opacity:.5"' : ''}>
-                    <label class="text-xs text-slate-500 block mb-1 mt-3">售價</label>
-                    <input id="bk-sale" type="number" min="0" class="swal2-input !my-0 !w-full" value="${sale}">
-                    <label class="text-xs text-slate-500 block mb-1 mt-3">成本</label>
+                    <div class="text-[11px] text-slate-500 mb-2">${qtyNote}</div>
+                    <label class="text-xs text-slate-500 block mb-1">摘要</label>
+                    <input id="bk-name" class="swal2-input !my-0 !w-full" value="${booksEscape(editName)}">
+                    <label class="text-xs text-slate-500 block mb-1 mt-3">金額</label>
                     <input id="bk-cost" type="number" min="0" class="swal2-input !my-0 !w-full" value="${cost}">
-                    <div class="text-xs text-slate-500 mt-3">利潤 <span id="bk-profit"></span></div>
                 </div>`,
                 background: '#26221e', color: 'white', showCancelButton: true, confirmButtonText: '儲存',
-                didOpen: () => {
-                    const refresh = () => {
-                        const p = (Number(document.getElementById('bk-sale').value) || 0) - (Number(document.getElementById('bk-cost').value) || 0);
-                        const el = document.getElementById('bk-profit');
-                        el.textContent = p.toLocaleString();
-                        el.className = p >= 0 ? 'text-green-400' : 'text-red-400';
-                    };
-                    document.getElementById('bk-sale').addEventListener('input', refresh);
-                    document.getElementById('bk-cost').addEventListener('input', refresh);
-                    refresh();
-                },
                 preConfirm: () => {
-                    const saleVal = Number(document.getElementById('bk-sale').value);
                     const costVal = Number(document.getElementById('bk-cost').value);
-                    if (!Number.isFinite(saleVal) || saleVal < 0 || !Number.isFinite(costVal) || costVal < 0) {
-                        Swal.showValidationMessage('售價、成本要是 0 以上的數字');
+                    if (!Number.isFinite(costVal) || costVal < 0) {
+                        Swal.showValidationMessage('金額要是 0 以上的數字');
                         return false;
                     }
-                    const nm = nameLocked ? '' : String(document.getElementById('bk-name').value || '').replace(/\s+/g, ' ').trim();
-                    if (!nameLocked && !nm) { Swal.showValidationMessage('摘要不能空白'); return false; }
-                    return { sale: Math.round(saleVal), cost: Math.round(costVal), name: nm };
+                    const nm = String(document.getElementById('bk-name').value || '').replace(/\s+/g, ' ').trim();
+                    if (!nm) { Swal.showValidationMessage('摘要不能空白'); return false; }
+                    return { cost: Math.round(costVal), name: nm };
                 }
             });
             if (!isConfirmed || !edited) return;
@@ -4215,22 +4203,21 @@
             try {
                 const res = await API.handleTransaction({
                     action: 'books_update_line', orderId: row.orderId, itemId: row.itemId,
-                    salePrice: edited.sale, cost: edited.cost, name: edited.name || undefined, person: User.name
+                    cost: edited.cost, name: edited.name, person: User.name
                 });
                 if (!res || res.status !== 'success') throw new Error((res && res.msg) || '請重試');
                 await loadBooksReport({ silent: true });
-                Swal.fire({ icon: 'success', title: '已更新', text: '利潤 ' + Number(res.profit || 0).toLocaleString(), toast: true, position: 'top', timer: 1400, showConfirmButton: false, background: '#26221e', color: 'white' });
+                Swal.fire({ icon: 'success', title: '已更新', text: '金額 ' + Number(res.cost || 0).toLocaleString(), toast: true, position: 'top', timer: 1400, showConfirmButton: false, background: '#26221e', color: 'white' });
             } catch (e) {
                 Swal.fire({ icon: 'error', title: '沒有改成', text: e.message || '', background: '#26221e', color: 'white' });
             }
         }
         async function deleteBooksLine(key) {
-            if (!(User && User.isAdmin)) return;
             const row = booksFindLine(key);
-            if (!row) return;
+            if (!booksLineEditable(row)) return;
             const { value: password } = await Swal.fire({
-                title: '刪除這一筆',
-                html: `<div class="text-left text-sm">${booksEscape(row.name || row.subject)}<div class="text-[11px] text-slate-400 mt-2">不會刪整張單。配件出貨會回補庫存。調貨不回補。數量欄不會另外改。</div></div>`,
+                title: '刪除這一筆支出',
+                html: `<div class="text-left text-sm">${booksEscape(row.name || row.subject)}<div class="text-[11px] text-slate-400 mt-2">不會刪整張單。進貨會沖回庫存。調貨不回補。</div></div>`,
                 input: 'password', inputPlaceholder: '管理員密碼', showCancelButton: true, confirmButtonText: '刪除',
                 background: '#26221e', color: 'white'
             });
