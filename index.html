@@ -118,11 +118,37 @@
             #books-month, #fund-month { min-height: 36px; font-size: 16px; flex: 1 1 9rem; }
             #books-period-label, #fund-hint { font-size: 12px; line-height: 1.45; color: #a89f94; }
             .swal2-popup { width: calc(100vw - 12px) !important; max-width: 28rem; }
+            .swal2-popup.bk-cost-wide { width: calc(100vw - 12px) !important; max-width: 28rem !important; }
             .swal2-title { font-size: 1.15rem !important; }
             .swal2-html-container { font-size: 14px !important; }
             .swal2-input, .swal2-select { width: 92% !important; font-size: 16px !important; min-height: 44px; margin: 6px auto !important; }
+            .bk-cost-layout .swal2-input, .bk-cost-layout .swal2-select, .bk-vendor-row .swal2-input, .bk-vendor-row .swal2-select { width: 100% !important; margin-left: 0 !important; margin-right: 0 !important; }
             .swal2-actions { width: 100% !important; }
             .swal2-styled { min-height: 44px; font-size: 16px !important; }
+            .bk-cost-side { max-height: 42vh; }
+            .bk-vendor-row #bk-v-add { min-height: 44px; }
+        }
+        .swal2-popup.bk-cost-wide { width: min(96vw, 760px); max-width: 760px; }
+        .bk-cost-layout { display: flex; flex-direction: column; gap: 10px; text-align: left; width: 100%; }
+        .bk-cost-form { flex: 1; min-width: 0; }
+        .bk-cost-side { border: 1px solid #3d3731; border-radius: 10px; background: #1a1714; padding: 8px; }
+        .bk-cost-side-head { display: flex; align-items: center; justify-content: space-between; gap: 6px; margin-bottom: 6px; }
+        .bk-cost-side-head .ttl { font-size: 11px; font-weight: 700; letter-spacing: .08em; color: #a89f94; }
+        .bk-cost-tabs { display: flex; gap: 4px; }
+        .bk-cost-tabs button { padding: 4px 8px; border-radius: 6px; border: 1px solid #4a433c; background: #26221e; color: #a89f94; font-size: 11px; font-weight: 700; }
+        .bk-cost-tabs button.active { border-color: #e8a04a; color: #e8a04a; background: rgba(232,160,74,.12); }
+        .bk-cost-list { max-height: 220px; overflow-y: auto; -webkit-overflow-scrolling: touch; }
+        .bk-cost-row { display: block; width: 100%; text-align: left; padding: 8px 6px; border-bottom: 1px solid #26221e; background: transparent; color: #e8dfd4; cursor: pointer; }
+        .bk-cost-row:active, .bk-cost-row:hover { background: #26221e; }
+        .bk-cost-row .nm { font-size: 13px; font-weight: 700; line-height: 1.3; word-break: break-word; }
+        .bk-cost-row .meta { font-size: 11px; color: #a89f94; margin-top: 2px; font-variant-numeric: tabular-nums; }
+        .bk-cost-empty { padding: 14px 6px; font-size: 12px; color: #7a7168; text-align: center; }
+        .bk-vendor-row { text-align: left; }
+        .bk-vendor-row select.swal2-input { appearance: auto; }
+        @media (min-width: 640px) {
+            .bk-cost-layout { flex-direction: row; align-items: flex-start; }
+            .bk-cost-side { width: 240px; flex-shrink: 0; }
+            .bk-cost-list { max-height: 360px; }
         }
         .accordion-content { max-height: 0; overflow: hidden; transition: max-height 0.3s ease-out; background: #141210; border-bottom: 1px solid #26221e; }
         .accordion-content.open { max-height: 5000px; transition: max-height 0.5s ease-in; }
@@ -960,7 +986,7 @@
         let ItemRegistry = {};
         let OrderRegistry = {};
         let User = { name: '', isAdmin: false };
-        let UI = { tab: 'phone', sub: '', rsMode: 'inventory', rsCat: 'all', multiSelect: false, selectedPhones: new Set(), selectedAcc: new Set(), selectedPendingOrders: new Set(), pendingOrderMeta: {}, pendingOrdersByCustomer: {}, allPendingOrderIds: [], pendingTab: 'unpaid', statsCollapsed: { report: true, history: true }, categoryOrder: null, favAccessoryIds: null, phoneAccKitMap: null, kitMapEdit: -1, favSubCat: '', posPrefsLoaded: false, booksMode: 'month', lastBooksReport: null, lastFundData: null, booksContinuous: false, booksLooping: false, lastBooksEntryYmd: null, lastBooksVendor: '', lastBooksFoodNote: '飲料', booksSessionCount: 0, amendTarget: null, salaryTab: 'unpaid', salaryPaidRows: [], peerTransferMode: false };
+        let UI = { tab: 'phone', sub: '', rsMode: 'inventory', rsCat: 'all', multiSelect: false, selectedPhones: new Set(), selectedAcc: new Set(), selectedPendingOrders: new Set(), pendingOrderMeta: {}, pendingOrdersByCustomer: {}, allPendingOrderIds: [], pendingTab: 'unpaid', statsCollapsed: { report: true, history: true }, categoryOrder: null, favAccessoryIds: null, phoneAccKitMap: null, booksRepairVendors: ['台灣料商'], booksTransferVendors: [], kitMapEdit: -1, favSubCat: '', posPrefsLoaded: false, booksMode: 'month', lastBooksReport: null, lastFundData: null, booksContinuous: false, booksLooping: false, lastBooksEntryYmd: null, lastBooksVendor: '', lastBooksFoodNote: '飲料', booksSessionCount: 0, amendTarget: null, salaryTab: 'unpaid', salaryPaidRows: [], peerTransferMode: false, costMemoMonth: 0 };
         let cartFooterTranslateY = 0;
         const CART_FOOTER_DRAG_MAX_UP = 360;
         const CART_FOOTER_DRAG_MAX_DOWN = 0;
@@ -1368,6 +1394,23 @@
             if (Array.isArray(UI.favAccessoryIds)) {
                 try { localStorage.setItem('pos_fav_accessories', JSON.stringify(UI.favAccessoryIds)); } catch (e) {}
             }
+            if (Array.isArray(UI.booksRepairVendors)) {
+                try { localStorage.setItem('pos_books_repair_vendors', JSON.stringify(UI.booksRepairVendors)); } catch (e) {}
+            }
+            if (Array.isArray(UI.booksTransferVendors)) {
+                try { localStorage.setItem('pos_books_transfer_vendors', JSON.stringify(UI.booksTransferVendors)); } catch (e) {}
+            }
+        }
+        function cleanVendorNamesLocal(list) {
+            const out = [];
+            const seen = new Set();
+            (Array.isArray(list) ? list : []).forEach((x) => {
+                const n = String(x == null ? '' : x).trim();
+                if (!n || n.length > 40 || seen.has(n)) return;
+                seen.add(n);
+                out.push(n);
+            });
+            return out;
         }
         async function loadPosPrefs() {
             try {
@@ -1407,12 +1450,15 @@
                 UI.categoryOrder = categoryOrder;
                 UI.favAccessoryIds = favAccessoryIds;
                 UI.phoneAccKitMap = res.phoneAccKitMap || null;
+                UI.booksRepairVendors = cleanVendorNamesLocal(res.booksRepairVendors);
+                if (!UI.booksRepairVendors.length) UI.booksRepairVendors = ['台灣料商'];
+                UI.booksTransferVendors = cleanVendorNamesLocal(res.booksTransferVendors);
                 if (UI.phoneAccKitMap) {
                     try { localStorage.setItem('pos_phone_acc_kit_map', JSON.stringify(UI.phoneAccKitMap)); } catch (err) {}
                 }
                 UI.posPrefsLoaded = true;
                 cachePosPrefsLocally();
-                console.log('[pos-prefs] loaded', { categoryOrder: UI.categoryOrder.length, favs: UI.favAccessoryIds.length });
+                console.log('[pos-prefs] loaded', { categoryOrder: UI.categoryOrder.length, favs: UI.favAccessoryIds.length, repairVendors: UI.booksRepairVendors.length, transferVendors: UI.booksTransferVendors.length });
             } catch (e) {
                 console.error('loadPosPrefs failed:', e);
                 // 離線 fallback
@@ -1428,6 +1474,15 @@
                     const rawKit = localStorage.getItem('pos_phone_acc_kit_map');
                     UI.phoneAccKitMap = rawKit ? JSON.parse(rawKit) : null;
                 } catch (err) { UI.phoneAccKitMap = null; }
+                try {
+                    const rawRv = localStorage.getItem('pos_books_repair_vendors');
+                    UI.booksRepairVendors = cleanVendorNamesLocal(rawRv ? JSON.parse(rawRv) : ['台灣料商']);
+                    if (!UI.booksRepairVendors.length) UI.booksRepairVendors = ['台灣料商'];
+                } catch (err) { UI.booksRepairVendors = ['台灣料商']; }
+                try {
+                    const rawTv = localStorage.getItem('pos_books_transfer_vendors');
+                    UI.booksTransferVendors = cleanVendorNamesLocal(rawTv ? JSON.parse(rawTv) : []);
+                } catch (err) { UI.booksTransferVendors = []; }
                 UI.posPrefsLoaded = false;
             }
         }
@@ -4144,12 +4199,18 @@
             const shown = detFilter ? details.filter(r => r.subject === detFilter) : details;
             const subjCount = new Map();
             details.forEach(r => subjCount.set(r.subject, (subjCount.get(r.subject) || 0) + 1));
-            const subjOrder = [...BOOKS_PROFIT_KEYS.map(({ label }) => label + '純毛利'), ...BOOKS_EXPENSE_KEYS, ...BOOKS_MEMO_KEYS];
-            const subjList = [...subjCount.keys()].sort((a, b) => {
-                const ia = subjOrder.indexOf(a), ib = subjOrder.indexOf(b);
-                return (ia < 0 ? 999 : ia) - (ib < 0 ? 999 : ib) || a.localeCompare(b);
+            const incomeOrder = BOOKS_PROFIT_KEYS.map(({ label }) => label + '純毛利');
+            const outgoOrder = [...BOOKS_EXPENSE_KEYS, ...BOOKS_MEMO_KEYS];
+            const sortByOrder = (keys, order) => keys.sort((a, b) => {
+                const ia = order.indexOf(a), ib = order.indexOf(b);
+                return (ia < 0 ? 999 : ia) - (ib < 0 ? 999 : ib) || a.localeCompare(b, 'zh-TW');
             });
-            if (detFilter && !subjCount.has(detFilter)) subjList.push(detFilter);
+            const incomeSubjList = sortByOrder([...subjCount.keys()].filter(s => incomeOrder.includes(s) || /純毛利$/.test(s)), incomeOrder);
+            const outgoSubjList = sortByOrder([...subjCount.keys()].filter(s => !incomeSubjList.includes(s)), outgoOrder);
+            if (detFilter && !subjCount.has(detFilter)) {
+                if (incomeOrder.includes(detFilter) || /純毛利$/.test(detFilter)) incomeSubjList.push(detFilter);
+                else outgoSubjList.push(detFilter);
+            }
             const memoSubj = new Set(details.filter(r => r.memo).map(r => r.subject));
             BOOKS_MEMO_KEYS.forEach(k => memoSubj.add(k));
             const subjLabel = s => {
@@ -4157,9 +4218,11 @@
                 if (prof) return prof.label === '其他' ? '其他收入' : prof.label;
                 return memoSubj.has(s) ? s + '（備查）' : s;
             };
+            const optHtml = list => list.map(s => `<option value="${booksEscape(s)}"${s === detFilter ? ' selected' : ''}>${booksEscape(subjLabel(s))}（${subjCount.get(s) || 0}）</option>`).join('');
             const filterSelect = id => `<select id="${id}" onchange="setBooksDetFilter(this.value)" style="background:#26221e;color:#e8dfd4;border:1px solid #3d3731;border-radius:6px;padding:3px 8px;font-size:11px;max-width:100%;">
                     <option value="">全部科目（${details.length}）</option>
-                    ${subjList.map(s => `<option value="${booksEscape(s)}"${s === detFilter ? ' selected' : ''}>${booksEscape(subjLabel(s))}（${subjCount.get(s) || 0}）</option>`).join('')}
+                    <optgroup label="支出／備查">${optHtml(outgoSubjList)}</optgroup>
+                    <optgroup label="收入">${optHtml(incomeSubjList)}</optgroup>
                 </select>`;
             const shownIncome = shown.reduce((s, r) => s + (r.income === '' ? 0 : Number(r.income) || 0), 0);
             const shownOutgo = shown.reduce((s, r) => s + (r.outgo === '' ? 0 : Number(r.outgo) || 0), 0);
@@ -4492,6 +4555,211 @@
             Swal.fire({ icon: 'error', title: '僅管理員可入帳', background: '#26221e', color: 'white' });
             return false;
         }
+        function booksVendorsOf(kind) {
+            if (kind === 'repair') {
+                const list = cleanVendorNamesLocal(UI.booksRepairVendors);
+                return list.length ? list : ['台灣料商'];
+            }
+            return cleanVendorNamesLocal(UI.booksTransferVendors);
+        }
+        function booksVendorFieldHtml(kind) {
+            const list = booksVendorsOf(kind);
+            const last = String(UI.lastBooksVendor || '').trim();
+            let preferred = '';
+            if (kind === 'repair') preferred = list.includes('台灣料商') ? '台灣料商' : (list[0] || '');
+            else preferred = list.includes(last) ? last : (list[0] || '');
+            const opts = list.length
+                ? list.map(v => `<option value="${booksEscape(v)}"${v === preferred ? ' selected' : ''}>${booksEscape(v)}</option>`).join('')
+                : '<option value="">（尚無常用）</option>';
+            return `<div class="bk-vendor-row px-2 mt-1 mb-1">
+                <div class="text-xs text-slate-400 mb-1">${kind === 'repair' ? '料商' : '廠商'}（下拉常用）</div>
+                <select id="bk-v-sel" class="swal2-input !mx-0 !w-full">${opts}</select>
+                <div class="flex gap-2 mt-1 items-stretch">
+                    <input id="bk-v-new" class="swal2-input !m-0 flex-1" placeholder="新名稱" autocomplete="off">
+                    <button type="button" id="bk-v-add" class="shrink-0 px-3 rounded-lg bg-slate-700 border border-cyan-700 text-cyan-300 text-sm font-bold">新增</button>
+                </div>
+                <div class="text-[11px] text-slate-500 mt-1">手打後按「新增」才進常用，入帳不會自動加入</div>
+            </div>`;
+        }
+        function booksReadVendorValue() {
+            const neu = document.getElementById('bk-v-new');
+            const neuVal = neu ? String(neu.value || '').trim() : '';
+            if (neuVal) return neuVal;
+            const sel = document.getElementById('bk-v-sel');
+            if (sel) return String(sel.value || '').trim();
+            const legacy = document.getElementById('bk-v');
+            return legacy ? String(legacy.value || '').trim() : '';
+        }
+        function booksBindVendorAdd(kind) {
+            const btn = document.getElementById('bk-v-add');
+            if (!btn) return;
+            btn.onclick = async () => {
+                const name = String((document.getElementById('bk-v-new') || {}).value || '').trim()
+                    || String((document.getElementById('bk-v-sel') || {}).value || '').trim();
+                if (!name) {
+                    Swal.showValidationMessage('請先輸入或選擇廠商名稱再按新增');
+                    return;
+                }
+                Swal.resetValidationMessage();
+                const key = kind === 'repair' ? 'booksRepairVendors' : 'booksTransferVendors';
+                const cur = booksVendorsOf(kind);
+                if (cur.includes(name)) {
+                    const sel = document.getElementById('bk-v-sel');
+                    if (sel) sel.value = name;
+                    const neu = document.getElementById('bk-v-new');
+                    if (neu) neu.value = '';
+                    Swal.showValidationMessage('已在常用清單');
+                    setTimeout(() => Swal.resetValidationMessage(), 1200);
+                    return;
+                }
+                const next = cleanVendorNamesLocal([...cur, name]);
+                UI[key] = next;
+                cachePosPrefsLocally();
+                btn.disabled = true;
+                btn.textContent = '…';
+                try {
+                    const saved = await API.savePosPrefs({ [key]: next });
+                    if (saved && saved.status !== 'error') {
+                        if (Array.isArray(saved.booksRepairVendors)) UI.booksRepairVendors = cleanVendorNamesLocal(saved.booksRepairVendors);
+                        if (Array.isArray(saved.booksTransferVendors)) UI.booksTransferVendors = cleanVendorNamesLocal(saved.booksTransferVendors);
+                        cachePosPrefsLocally();
+                    }
+                } catch (e) {
+                    console.warn('save books vendor failed:', e);
+                }
+                const sel = document.getElementById('bk-v-sel');
+                if (sel) {
+                    const exists = [...sel.options].some(o => o.value === name);
+                    if (!exists) {
+                        const opt = document.createElement('option');
+                        opt.value = name;
+                        opt.textContent = name;
+                        sel.appendChild(opt);
+                    }
+                    sel.value = name;
+                }
+                const neu = document.getElementById('bk-v-new');
+                if (neu) neu.value = '';
+                btn.disabled = false;
+                btn.textContent = '新增';
+            };
+        }
+        function costMemoMonthBounds(offsetMonths) {
+            const ymd = ymdTaipei(new Date());
+            let y = Number(ymd.slice(0, 4));
+            let m = Number(ymd.slice(5, 7)) + (Number(offsetMonths) || 0);
+            while (m < 1) { m += 12; y -= 1; }
+            while (m > 12) { m -= 12; y += 1; }
+            const pad = n => String(n).padStart(2, '0');
+            const startYmd = `${y}-${pad(m)}-01`;
+            const last = new Date(y, m, 0).getDate();
+            const endYmd = `${y}-${pad(m)}-${pad(last)}`;
+            return { startYmd, endYmd, label: `${y}/${pad(m)}` };
+        }
+        function stripCostMemoName(name, subject) {
+            let n = String(name || '').trim();
+            if (subject === '維修料件') n = n.replace(/^\[維修料件\]\s*/i, '');
+            if (subject === '配件進貨') n = n.replace(/^\[配件進貨\]\s*/i, '');
+            return n.trim();
+        }
+        async function fetchCostMemoRows(subject, offsetMonths) {
+            const bounds = costMemoMonthBounds(offsetMonths);
+            const res = await API.getHistory(bounds.startYmd, bounds.endYmd);
+            const rows = Array.isArray(res) ? res : (res && Array.isArray(res.data) ? res.data : []);
+            const out = [];
+            (rows || []).forEach((i) => {
+                if (!i || i.status === 'Returned' || i.status === 'Deleted') return;
+                if (i.status && i.status !== 'Completed') return;
+                const subj = booksExpenseSubject(i);
+                if (subj !== subject) return;
+                const when = parseLedgerDate(i.time);
+                if (!when) return;
+                const qty = Math.max(1, Math.round(Number(i.quantity) || 1));
+                const total = Math.abs(Number(i.cost) || 0);
+                const unit = Math.round(total / qty);
+                out.push({
+                    date: formatBooksYmd(when),
+                    ts: when.getTime(),
+                    name: stripCostMemoName(i.itemName || i.name || '', subject),
+                    cost: unit,
+                    qty,
+                    total,
+                    vendor: String(i.customer || '').trim()
+                });
+            });
+            out.sort((a, b) => (b.ts || 0) - (a.ts || 0));
+            return { bounds, rows: out };
+        }
+        function costMemoPanelHtml(title) {
+            return `<div class="bk-cost-side">
+                <div class="bk-cost-side-head">
+                    <span class="ttl">${booksEscape(title)}</span>
+                    <div class="bk-cost-tabs">
+                        <button type="button" data-cost-month="0" class="active">本月</button>
+                        <button type="button" data-cost-month="-1">上月</button>
+                    </div>
+                </div>
+                <div id="bk-cost-list" class="bk-cost-list"><div class="bk-cost-empty">載入中…</div></div>
+            </div>`;
+        }
+        function renderCostMemoList(rows) {
+            const box = document.getElementById('bk-cost-list');
+            if (!box) return;
+            if (!rows || !rows.length) {
+                box.innerHTML = '<div class="bk-cost-empty">此期間沒有備查</div>';
+                return;
+            }
+            box.innerHTML = rows.map((r, idx) => {
+                const meta = `${booksEscape(r.date)}${r.vendor ? '　' + booksEscape(r.vendor) : ''}${r.qty > 1 ? '　×' + r.qty : ''}`;
+                return `<button type="button" class="bk-cost-row" data-cost-idx="${idx}">
+                    <div class="nm">${booksEscape(r.name || '（無品名）')}</div>
+                    <div class="meta">${meta}　$${Number(r.cost || 0).toLocaleString()}</div>
+                </button>`;
+            }).join('');
+        }
+        function bindCostMemoPanel(subject, onPick) {
+            let cache = { 0: null, '-1': null };
+            let loading = false;
+            const load = async (offset) => {
+                const key = String(offset);
+                const tabs = document.querySelectorAll('[data-cost-month]');
+                tabs.forEach(btn => btn.classList.toggle('active', String(btn.getAttribute('data-cost-month')) === key));
+                UI.costMemoMonth = offset;
+                if (cache[key]) {
+                    renderCostMemoList(cache[key].rows);
+                    return;
+                }
+                const box = document.getElementById('bk-cost-list');
+                if (box) box.innerHTML = '<div class="bk-cost-empty">載入中…</div>';
+                if (loading) return;
+                loading = true;
+                try {
+                    const data = await fetchCostMemoRows(subject, offset);
+                    cache[key] = data;
+                    if (String(UI.costMemoMonth) === key) renderCostMemoList(data.rows);
+                } catch (e) {
+                    if (box) box.innerHTML = `<div class="bk-cost-empty">載入失敗：${booksEscape(e.message || '請重試')}</div>`;
+                } finally {
+                    loading = false;
+                }
+            };
+            document.querySelectorAll('[data-cost-month]').forEach(btn => {
+                btn.onclick = () => load(Number(btn.getAttribute('data-cost-month')) || 0);
+            });
+            const list = document.getElementById('bk-cost-list');
+            if (list) {
+                list.onclick = (ev) => {
+                    const row = ev.target.closest('[data-cost-idx]');
+                    if (!row) return;
+                    const key = String(UI.costMemoMonth || 0);
+                    const data = cache[key];
+                    if (!data) return;
+                    const item = data.rows[Number(row.getAttribute('data-cost-idx'))];
+                    if (item && typeof onPick === 'function') onPick(item);
+                };
+            }
+            load(0);
+        }
         async function promptBooksEntry(kind) {
             const looping = !!UI.booksContinuous;
             const n = UI.booksSessionCount || 0;
@@ -4520,8 +4788,8 @@
             else if (kind === 'profit_share') html += '<input id="bk-n" class="swal2-input" placeholder="摘要（如：股東分潤／季度分紅）"><input id="bk-a" type="number" class="swal2-input" placeholder="金額">';
             else if (kind === 'loss') html += '<input id="bk-n" class="swal2-input" placeholder="摘要（如：拆壞螢幕）"><input id="bk-a" type="number" class="swal2-input" placeholder="損失金額">';
             else if (kind === 'buy_used' || kind === 'buy_new') html += '<div style="font-size:12px;color:#a89f94;text-align:left;padding:4px 8px 0">只記付了多少，不扣本期淨利。自己庫存賣掉會用庫存成本算毛利。</div><input id="bk-v" class="swal2-input" placeholder="來源／同行"><input id="bk-n" class="swal2-input" placeholder="型號／摘要"><input id="bk-a" type="number" class="swal2-input" placeholder="金額">';
-            else if (kind === 'repair') html += '<div style="font-size:12px;color:#a89f94;text-align:left;padding:4px 8px 0">只記付給料商多少，不扣本期淨利。維修單照常填成本。</div><input id="bk-v" class="swal2-input" placeholder="料商（選填）"><input id="bk-n" class="swal2-input" placeholder="品名"><input id="bk-c" type="number" class="swal2-input" placeholder="成本"><input id="bk-q" type="number" class="swal2-input" placeholder="數量" value="1">';
-            else html += `<input id="bk-v" class="swal2-input" placeholder="廠商" value="${booksEscape(UI.lastBooksVendor || '')}"><input id="bk-n" class="swal2-input" placeholder="品名"><input id="bk-c" type="number" class="swal2-input" placeholder="成本"><input id="bk-q" type="number" class="swal2-input" placeholder="數量" value="1">`;
+            else if (kind === 'repair') html += '<div style="font-size:12px;color:#a89f94;text-align:left;padding:4px 8px 0">只記付給料商多少，不扣本期淨利。維修單照常填成本。</div>' + booksVendorFieldHtml('repair') + '<input id="bk-n" class="swal2-input" placeholder="品名"><input id="bk-c" type="number" class="swal2-input" placeholder="成本"><input id="bk-q" type="number" class="swal2-input" placeholder="數量" value="1">';
+            else html += booksVendorFieldHtml('transfer') + '<input id="bk-n" class="swal2-input" placeholder="品名"><input id="bk-c" type="number" class="swal2-input" placeholder="成本"><input id="bk-q" type="number" class="swal2-input" placeholder="數量" value="1">';
             html += `<div id="bk-queue" class="text-left text-xs text-cyan-300 px-2 mt-2 leading-5"></div><button type="button" id="bk-add-btn" class="mt-2 w-full py-2 rounded bg-slate-600 text-white text-sm">＋ 新增（加入此筆並繼續填）</button>`;
             const queue = [];
             const gv = id => { const el = document.getElementById(id); return el ? String(el.value || '').trim() : ''; };
@@ -4549,7 +4817,7 @@
                 if (!name) { Swal.showValidationMessage('請填品名'); return null; }
                 if (!c || c <= 0) { Swal.showValidationMessage('請填成本'); return null; }
                 if (q <= 0) { Swal.showValidationMessage('數量需大於 0'); return null; }
-                return { d, name, c, q, vendor: gv('bk-v') };
+                return { d, name, c, q, vendor: booksReadVendorValue() };
             };
             const renderQueue = () => {
                 const box = document.getElementById('bk-queue');
@@ -4573,6 +4841,7 @@
                 allowOutsideClick: !looping,
                 allowEscapeKey: true,
                 didOpen: () => {
+                    if (kind === 'repair' || kind === 'transfer') booksBindVendorAdd(kind);
                     const focusEl = document.getElementById(kind === 'food' ? 'bk-a' : 'bk-n');
                     if (focusEl) focusEl.focus();
                     document.getElementById('bk-add-btn').onclick = () => {
@@ -4583,6 +4852,8 @@
                         ['bk-n', 'bk-a', 'bk-c'].forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
                         const q = document.getElementById('bk-q');
                         if (q) q.value = '1';
+                        const neu = document.getElementById('bk-v-new');
+                        if (neu) neu.value = '';
                         renderQueue();
                         if (focusEl) focusEl.focus();
                     };
@@ -7233,10 +7504,18 @@
                 // 庫存電池維修：顯示維修登記表單（型號、序號、更換物品、客戶、價格），然後寫入維修紀錄
                 const { value: v } = await Swal.fire({ 
                     title: '維修登記 - 庫存電池',
-                    html: '<input id="r1" class="swal2-input" placeholder="型號"><input id="r2" class="swal2-input" placeholder="序號"><input id="r3" class="swal2-input" placeholder="故障原因／更換物品"><input id="r4" class="swal2-input" placeholder="客戶"><input id="r5" class="swal2-input" placeholder="電話" type="tel" inputmode="tel"><input id="r6" class="swal2-input" type="number" placeholder="維修報價（成本已帶入庫存）">' + REPAIR_EXTRA_HTML, 
+                    width: 'min(96vw, 760px)',
+                    customClass: { popup: 'bk-cost-wide' },
+                    html: `<div class="bk-cost-layout"><div class="bk-cost-form"><input id="r1" class="swal2-input" placeholder="型號"><input id="r2" class="swal2-input" placeholder="序號"><input id="r3" class="swal2-input" placeholder="故障原因／更換物品"><input id="r4" class="swal2-input" placeholder="客戶"><input id="r5" class="swal2-input" placeholder="電話" type="tel" inputmode="tel"><input id="r6" class="swal2-input" type="number" placeholder="維修報價（成本已帶入庫存）">${REPAIR_EXTRA_HTML}</div>${costMemoPanelHtml('維修料件備查')}</div>`, 
                     background: '#26221e', 
                     color: 'white',
-                    didOpen: () => { initRepairPhotoPaste(); },
+                    didOpen: () => {
+                        initRepairPhotoPaste();
+                        bindCostMemoPanel('維修料件', (row) => {
+                            const r3 = document.getElementById('r3');
+                            if (r3 && row.name) r3.value = row.name;
+                        });
+                    },
                     showLoaderOnConfirm: true,
                     preConfirm: async () => {
                         try {
@@ -7286,10 +7565,21 @@
             } else {
                 // 一般維修：輸入型號、序號（IMEI）、更換物品、客戶、成本、價格
                 const { value: v } = await Swal.fire({ 
-                    html: '<input id="r1" class="swal2-input" placeholder="型號"><input id="r2" class="swal2-input" placeholder="序號"><input id="r3" class="swal2-input" placeholder="故障原因／更換物品"><input id="r4" class="swal2-input" placeholder="客戶"><input id="r5" class="swal2-input" placeholder="電話" type="tel" inputmode="tel"><input id="r6" class="swal2-input" type="number" placeholder="維修成本"><input id="r7" class="swal2-input" type="number" placeholder="維修報價">' + REPAIR_EXTRA_HTML, 
+                    title: '維修登記',
+                    width: 'min(96vw, 760px)',
+                    customClass: { popup: 'bk-cost-wide' },
+                    html: `<div class="bk-cost-layout"><div class="bk-cost-form"><input id="r1" class="swal2-input" placeholder="型號"><input id="r2" class="swal2-input" placeholder="序號"><input id="r3" class="swal2-input" placeholder="故障原因／更換物品"><input id="r4" class="swal2-input" placeholder="客戶"><input id="r5" class="swal2-input" placeholder="電話" type="tel" inputmode="tel"><input id="r6" class="swal2-input" type="number" placeholder="維修成本"><input id="r7" class="swal2-input" type="number" placeholder="維修報價">${REPAIR_EXTRA_HTML}</div>${costMemoPanelHtml('維修料件備查')}</div>`, 
                     background: '#26221e', 
                     color: 'white',
-                    didOpen: () => { initRepairPhotoPaste(); },
+                    didOpen: () => {
+                        initRepairPhotoPaste();
+                        bindCostMemoPanel('維修料件', (row) => {
+                            const r3 = document.getElementById('r3');
+                            const r6 = document.getElementById('r6');
+                            if (r3 && row.name) r3.value = row.name;
+                            if (r6 && row.cost != null) r6.value = String(row.cost);
+                        });
+                    },
                     showLoaderOnConfirm: true,
                     preConfirm: async () => {
                         try {
@@ -8002,9 +8292,19 @@
         async function modalDirectTransfer() {
             const { value: v } = await Swal.fire({
                 title: '跟廠商調貨',
-                html: '<div class="text-[12px] text-slate-400 text-left px-2 mb-1">你跟別家調來再賣（不扣自己庫存）。別人跟你調：配件進車後點結帳區人名反橘。</div><input id="dt1" class="swal2-input" placeholder="調貨廠商"><input id="dt2" class="swal2-input" placeholder="品項"><input id="dt3" class="swal2-input" type="number" placeholder="成本"><input id="dt4" class="swal2-input" type="number" placeholder="售價">',
+                width: 'min(96vw, 760px)',
+                customClass: { popup: 'bk-cost-wide' },
+                html: `<div class="bk-cost-layout"><div class="bk-cost-form"><div class="text-[12px] text-slate-400 text-left px-2 mb-1">你跟別家調來再賣（不扣自己庫存）。別人跟你調：配件進車後點結帳區人名反橘。</div><input id="dt1" class="swal2-input" placeholder="調貨廠商"><input id="dt2" class="swal2-input" placeholder="品項"><input id="dt3" class="swal2-input" type="number" placeholder="成本"><input id="dt4" class="swal2-input" type="number" placeholder="售價"></div>${costMemoPanelHtml('配件進貨備查')}</div>`,
                 background: '#26221e',
                 color: 'white',
+                didOpen: () => {
+                    bindCostMemoPanel('配件進貨', (row) => {
+                        const dt2 = document.getElementById('dt2');
+                        const dt3 = document.getElementById('dt3');
+                        if (dt2 && row.name) dt2.value = row.name;
+                        if (dt3 && row.cost != null) dt3.value = String(row.cost);
+                    });
+                },
                 preConfirm: () => [
                     document.getElementById('dt1').value,
                     document.getElementById('dt2').value,
