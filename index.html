@@ -4660,7 +4660,13 @@
             let n = String(name || '').trim();
             if (subject === '維修料件') n = n.replace(/^\[維修料件\]\s*/i, '');
             if (subject === '配件進貨') n = n.replace(/^\[配件進貨\]\s*/i, '');
+            if (subject === '調貨配件') n = n.replace(/^\[調貨配件\]\s*/i, '');
             return n.trim();
+        }
+        function costMemoSubjectsOf(subjectOrList) {
+            if (Array.isArray(subjectOrList)) return subjectOrList.map(String).filter(Boolean);
+            const one = String(subjectOrList || '').trim();
+            return one ? [one] : [];
         }
         async function fetchCostMemoRows(subject, offsetMonths) {
             const bounds = costMemoMonthBounds(offsetMonths);
@@ -4680,6 +4686,7 @@
                 out.push({
                     date: formatBooksYmd(when),
                     ts: when.getTime(),
+                    subject: subj,
                     name: stripCostMemoName(i.itemName || i.name || '', subject),
                     cost: unit,
                     qty,
@@ -4690,7 +4697,11 @@
             out.sort((a, b) => (b.ts || 0) - (a.ts || 0));
             return { bounds, rows: out };
         }
-        function costMemoPanelHtml(title) {
+        function costMemoPanelHtml(title, subjectOrList) {
+            const subjects = costMemoSubjectsOf(subjectOrList);
+            const subTabs = subjects.length > 1
+                ? `<div class="bk-cost-tabs bk-cost-subj-tabs" style="flex-wrap:wrap;margin-bottom:6px">${subjects.map((s, i) => `<button type="button" data-cost-subj="${booksEscape(s)}" class="${i === 0 ? 'active' : ''}">${booksEscape(s)}</button>`).join('')}</div>`
+                : '';
             return `<div class="bk-cost-side">
                 <div class="bk-cost-side-head">
                     <span class="ttl">${booksEscape(title)}</span>
@@ -4699,66 +4710,94 @@
                         <button type="button" data-cost-month="-1">上月</button>
                     </div>
                 </div>
+                ${subTabs}
                 <div id="bk-cost-list" class="bk-cost-list"><div class="bk-cost-empty">載入中…</div></div>
             </div>`;
         }
-        function renderCostMemoList(rows) {
+        function renderCostMemoList(rows, showSubject) {
             const box = document.getElementById('bk-cost-list');
             if (!box) return;
             if (!rows || !rows.length) {
-                box.innerHTML = '<div class="bk-cost-empty">此期間沒有備查</div>';
+                box.innerHTML = '<div class="bk-cost-empty">此期間沒有紀錄</div>';
                 return;
             }
             box.innerHTML = rows.map((r, idx) => {
-                const meta = `${booksEscape(r.date)}${r.vendor ? '　' + booksEscape(r.vendor) : ''}${r.qty > 1 ? '　×' + r.qty : ''}`;
+                const tag = showSubject && r.subject ? booksEscape(r.subject) + '　' : '';
+                const meta = `${tag}${booksEscape(r.date)}${r.vendor ? '　' + booksEscape(r.vendor) : ''}${r.qty > 1 ? '　×' + r.qty : ''}`;
                 return `<button type="button" class="bk-cost-row" data-cost-idx="${idx}">
                     <div class="nm">${booksEscape(r.name || '（無品名）')}</div>
                     <div class="meta">${meta}　$${Number(r.cost || 0).toLocaleString()}</div>
                 </button>`;
             }).join('');
         }
-        function bindCostMemoPanel(subject, onPick) {
-            let cache = { 0: null, '-1': null };
+        function bindCostMemoPanel(subjectOrList, onPick) {
+            const subjects = costMemoSubjectsOf(subjectOrList);
+            if (!subjects.length) return;
+            let activeSubject = subjects[0];
+            let monthOffset = 0;
+            const cache = {};
             let loading = false;
-            const load = async (offset) => {
-                const key = String(offset);
-                const tabs = document.querySelectorAll('[data-cost-month]');
-                tabs.forEach(btn => btn.classList.toggle('active', String(btn.getAttribute('data-cost-month')) === key));
-                UI.costMemoMonth = offset;
+            const cacheKey = () => activeSubject + '|' + String(monthOffset);
+            const syncTabs = () => {
+                document.querySelectorAll('[data-cost-month]').forEach(btn => {
+                    btn.classList.toggle('active', String(btn.getAttribute('data-cost-month')) === String(monthOffset));
+                });
+                document.querySelectorAll('[data-cost-subj]').forEach(btn => {
+                    btn.classList.toggle('active', String(btn.getAttribute('data-cost-subj')) === activeSubject);
+                });
+            };
+            const load = async () => {
+                syncTabs();
+                UI.costMemoMonth = monthOffset;
+                const key = cacheKey();
                 if (cache[key]) {
-                    renderCostMemoList(cache[key].rows);
+                    renderCostMemoList(cache[key].rows, subjects.length > 1);
                     return;
                 }
                 const box = document.getElementById('bk-cost-list');
                 if (box) box.innerHTML = '<div class="bk-cost-empty">載入中…</div>';
                 if (loading) return;
                 loading = true;
+                const wantSubject = activeSubject;
+                const wantMonth = monthOffset;
                 try {
-                    const data = await fetchCostMemoRows(subject, offset);
-                    cache[key] = data;
-                    if (String(UI.costMemoMonth) === key) renderCostMemoList(data.rows);
+                    const data = await fetchCostMemoRows(wantSubject, wantMonth);
+                    cache[wantSubject + '|' + String(wantMonth)] = data;
+                    if (activeSubject === wantSubject && monthOffset === wantMonth) {
+                        renderCostMemoList(data.rows, subjects.length > 1);
+                    }
                 } catch (e) {
-                    if (box) box.innerHTML = `<div class="bk-cost-empty">載入失敗：${booksEscape(e.message || '請重試')}</div>`;
+                    if (box && activeSubject === wantSubject && monthOffset === wantMonth) {
+                        box.innerHTML = `<div class="bk-cost-empty">載入失敗：${booksEscape(e.message || '請重試')}</div>`;
+                    }
                 } finally {
                     loading = false;
                 }
             };
             document.querySelectorAll('[data-cost-month]').forEach(btn => {
-                btn.onclick = () => load(Number(btn.getAttribute('data-cost-month')) || 0);
+                btn.onclick = () => {
+                    monthOffset = Number(btn.getAttribute('data-cost-month')) || 0;
+                    load();
+                };
+            });
+            document.querySelectorAll('[data-cost-subj]').forEach(btn => {
+                btn.onclick = () => {
+                    activeSubject = String(btn.getAttribute('data-cost-subj') || subjects[0]);
+                    load();
+                };
             });
             const list = document.getElementById('bk-cost-list');
             if (list) {
                 list.onclick = (ev) => {
                     const row = ev.target.closest('[data-cost-idx]');
                     if (!row) return;
-                    const key = String(UI.costMemoMonth || 0);
-                    const data = cache[key];
+                    const data = cache[cacheKey()];
                     if (!data) return;
                     const item = data.rows[Number(row.getAttribute('data-cost-idx'))];
                     if (item && typeof onPick === 'function') onPick(item);
                 };
             }
-            load(0);
+            load();
         }
         async function promptBooksEntry(kind) {
             const looping = !!UI.booksContinuous;
@@ -8294,11 +8333,11 @@
                 title: '跟廠商調貨',
                 width: 'min(96vw, 760px)',
                 customClass: { popup: 'bk-cost-wide' },
-                html: `<div class="bk-cost-layout"><div class="bk-cost-form"><div class="text-[12px] text-slate-400 text-left px-2 mb-1">你跟別家調來再賣（不扣自己庫存）。別人跟你調：配件進車後點結帳區人名反橘。</div><input id="dt1" class="swal2-input" placeholder="調貨廠商"><input id="dt2" class="swal2-input" placeholder="品項"><input id="dt3" class="swal2-input" type="number" placeholder="成本"><input id="dt4" class="swal2-input" type="number" placeholder="售價"></div>${costMemoPanelHtml('配件進貨備查')}</div>`,
+                html: `<div class="bk-cost-layout"><div class="bk-cost-form"><div class="text-[12px] text-slate-400 text-left px-2 mb-1">你跟別家調來再賣（不扣自己庫存）。別人跟你調：配件進車後點結帳區人名反橘。</div><input id="dt1" class="swal2-input" placeholder="調貨廠商"><input id="dt2" class="swal2-input" placeholder="品項"><input id="dt3" class="swal2-input" type="number" placeholder="成本"><input id="dt4" class="swal2-input" type="number" placeholder="售價"></div>${costMemoPanelHtml('成本備查', ['配件進貨', '調貨配件'])}</div>`,
                 background: '#26221e',
                 color: 'white',
                 didOpen: () => {
-                    bindCostMemoPanel('配件進貨', (row) => {
+                    bindCostMemoPanel(['配件進貨', '調貨配件'], (row) => {
                         const dt2 = document.getElementById('dt2');
                         const dt3 = document.getElementById('dt3');
                         if (dt2 && row.name) dt2.value = row.name;
