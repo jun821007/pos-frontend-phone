@@ -1823,7 +1823,9 @@
             Cart.push({
                 type: 'new_phone', name, dealerName: isConsign ? owner : (i.sourceChannel || '自有'),
                 cost, price: value.sale, imei: i.imei || '', quantity: 1,
-                itemId: sid, originalPrice: value.sale, isGift: false, ...extra
+                itemId: sid, originalPrice: value.sale, isGift: false,
+                model: i.model || '', capacity: i.capacity || '', color: i.color || '',
+                ...extra
             });
             renderCart();
             const activeNewCat = document.querySelector('#sub-cat-scroll .pill-btn.active');
@@ -7035,7 +7037,10 @@
                         customerPhone: normalizeTaiwanPhone(item.customerPhone||''),
                         repairNotes: item.repairNotes||'',
                         photoUrls: item.photoUrls||'',
-                        deferredPickup: !!item.deferredPickup
+                        deferredPickup: !!item.deferredPickup,
+                        model: item.model||'',
+                        capacity: item.capacity||'',
+                        color: item.color||''
                     };
                 });
                 Swal.fire({ title: '結帳處理中...', html: '正在寫入資料，請勿關閉視窗', allowOutsideClick: false, didOpen: () => { Swal.showLoading(); } }); 
@@ -7361,7 +7366,7 @@
             const addOne = (v) => {
                 const spec = [v[5],v[6],v[7]].filter(Boolean).join(' ');
                 const cust = resolveFormCustomer(v[4]);
-                Cart.push({type:'new_phone',name:'新機'+(spec?' '+spec:''),dealerName:v[0],cost:Number(v[1]),price:Number(v[3]),imei:v[2],customer:cust,quantity:1,itemId:'NP-'+Date.now()+'-'+Math.random().toString(36).slice(2,9)});
+                Cart.push({type:'new_phone',name:'新機'+(spec?' '+spec:''),dealerName:v[0],cost:Number(v[1]),price:Number(v[3]),imei:v[2],customer:cust,quantity:1,itemId:'NP-'+Date.now()+'-'+Math.random().toString(36).slice(2,9),model:v[5]||'',capacity:v[6]||'',color:v[7]||''});
                 applyFormCustomerToCheckout(cust);
                 renderCart();
             };
@@ -8467,7 +8472,9 @@
             Cart.push({
                 type: 'new_phone', name, dealerName: isConsign ? owner : (phone.sourceChannel || '自有'),
                 cost, price: sale, imei: phone.imei || '', quantity: 1,
-                itemId: sid, originalPrice: sale, isGift: false, ...extra
+                itemId: sid, originalPrice: sale, isGift: false,
+                model: phone.model || '', capacity: phone.capacity || '', color: phone.color || '',
+                ...extra
             });
             return true;
         }
