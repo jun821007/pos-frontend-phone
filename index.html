@@ -115,6 +115,9 @@
             .books-menu button { padding: 14px 16px; font-size: 16px; min-height: 48px; }
             .books-sheet th, .books-sheet td { padding: 10px 8px; font-size: 14px; }
             .pill-btn { min-height: 36px; padding: 6px 12px; margin-right: 0; }
+            .multi-select-actions { width: 100%; row-gap: 8px; column-gap: 8px; padding: 2px 0 4px; }
+            .multi-select-actions .multi-act-btn { min-height: 40px; padding: 8px 14px; font-size: 13px; }
+            #multi-count { font-size: 13px; min-height: 40px; display: inline-flex; align-items: center; }
             #books-month, #fund-month { min-height: 36px; font-size: 16px; flex: 1 1 9rem; }
             #books-period-label, #fund-hint { font-size: 12px; line-height: 1.45; color: #a89f94; }
             .swal2-popup { width: calc(100vw - 12px) !important; max-width: 28rem; }
@@ -306,17 +309,19 @@
                         <div onclick="switchMainTab('accessory')" id="tab-accessory" class="main-tab">🔌 配件</div>
                         <div onclick="switchMainTab('service')" id="tab-service" class="main-tab">🛠️ 服務</div>
                     </div>
-                    <div class="flex items-center gap-2">
-                        <div id="sub-cat-scroll" class="flex gap-2 overflow-x-auto no-scrollbar py-1 flex-1"></div>
-                        <div id="multi-select-bar" class="hidden items-center gap-2 shrink-0 flex">
-                            <button onclick="toggleMultiSelectMode()" id="btn-multiselect" class="pill-btn border-yellow-500 text-yellow-400 shrink-0">☑ 多選</button>
-                            <div id="multi-select-confirm" class="hidden items-center gap-2 flex">
-                                <span id="multi-count" class="text-xs text-slate-400 shrink-0">0</span>
-                                <button onclick="confirmMultiAdd()" id="btn-multi-add" class="bg-yellow-500 text-black font-bold px-3 py-1.5 rounded-xl text-xs shrink-0">加入</button>
-                                <button onclick="copySelectedNewSerials()" id="btn-copy-new-serial" class="hidden bg-slate-700 text-white font-bold px-3 py-1.5 rounded-xl text-xs shrink-0">複製序號</button>
-                                <button onclick="batchChangeSelectedPhoneStatus()" id="btn-batch-phone-status" class="bg-blue-600 text-white font-bold px-3 py-1.5 rounded-xl text-xs shrink-0">批次改狀態</button>
-                                <button onclick="cancelMultiSelect()" class="text-slate-400 text-xs shrink-0">取消</button>
+                    <div class="pos-subrow flex flex-col gap-2">
+                        <div class="flex items-center gap-2 min-w-0">
+                            <div id="sub-cat-scroll" class="flex gap-2 overflow-x-auto no-scrollbar py-1 flex-1 min-w-0"></div>
+                            <div id="multi-select-bar" class="hidden items-center gap-2 shrink-0 flex">
+                                <button onclick="toggleMultiSelectMode()" id="btn-multiselect" class="pill-btn border-yellow-500 text-yellow-400 shrink-0">☑ 多選</button>
                             </div>
+                        </div>
+                        <div id="multi-select-confirm" class="hidden multi-select-actions items-center gap-2 flex flex-wrap">
+                            <span id="multi-count" class="text-xs text-slate-400 shrink-0 px-1">0</span>
+                            <button onclick="confirmMultiAdd()" id="btn-multi-add" class="multi-act-btn bg-yellow-500 text-black font-bold px-3 py-1.5 rounded-xl text-xs shrink-0">加入</button>
+                            <button onclick="copySelectedNewSerials()" id="btn-copy-new-serial" class="multi-act-btn hidden bg-slate-700 text-white font-bold px-3 py-1.5 rounded-xl text-xs shrink-0">複製序號</button>
+                            <button onclick="batchChangeSelectedPhoneStatus()" id="btn-batch-phone-status" class="multi-act-btn bg-blue-600 text-white font-bold px-3 py-1.5 rounded-xl text-xs shrink-0">批次改狀態</button>
+                            <button onclick="cancelMultiSelect()" class="multi-act-btn text-slate-300 text-xs shrink-0 px-2 py-1.5 rounded-xl border border-slate-600">取消</button>
                         </div>
                     </div>
                     <div id="fav-sub-scroll" class="hidden flex gap-2 overflow-x-auto no-scrollbar py-1"></div>
@@ -8379,7 +8384,12 @@
             const addBtn = document.getElementById('btn-multi-add');
             if (!bar) return;
             const phoneLike = UI.tab === 'phone' || UI.tab === 'new';
-            if (!phoneLike && UI.tab !== 'accessory') { bar.classList.add('hidden'); return; }
+            const canMulti = phoneLike || UI.tab === 'accessory';
+            if (!canMulti) {
+                bar.classList.add('hidden');
+                if (confirm) confirm.classList.add('hidden');
+                return;
+            }
             bar.classList.remove('hidden');
             if (batch) batch.classList.toggle('hidden', !phoneLike);
             if (addBtn) addBtn.classList.remove('hidden');

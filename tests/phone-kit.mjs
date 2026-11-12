@@ -71,6 +71,51 @@ assert.match(tight.warnings.join(' '), /庫存 1/);
 const serial = newPhoneSerialBlocks([
   { modelName: 'iPhone 15', capacity: '128', color: '黑', imei: 'SN1', stock_id: 'A' }
 ]);
-assert.equal(serial.text, 'iPhone 15 128 黑\n序號:SN1');
+assert.equal(serial.text, '黑1\niPhone 15 128 黑\n序號:SN1');
+
+const grouped = newPhoneSerialBlocks([
+  { modelName: 'iPad 11 Wifi', capacity: '128g', color: '銀', imei: 'SFLKFX21K2D' },
+  { modelName: 'iPad 11 Wifi', capacity: '128g', color: '藍', imei: 'SK4G1CC4R07' },
+  { modelName: 'iPad 11 Wifi', capacity: '128g', color: '黃', imei: 'SK9KV4V6517' },
+  { modelName: 'iPad 11 Wifi', capacity: '128g', color: '黃', imei: 'SJ3MQXHL95T' },
+  { modelName: 'iPad 11 Wifi', capacity: '128g', color: '藍', imei: 'SFHQKQVJF7P' }
+]);
+assert.equal(grouped.text, [
+  '銀1 藍2 黃2',
+  'iPad 11 Wifi 128g 銀',
+  '序號:SFLKFX21K2D',
+  '',
+  'iPad 11 Wifi 128g 藍',
+  '序號:SK4G1CC4R07',
+  'iPad 11 Wifi 128g 藍',
+  '序號:SFHQKQVJF7P',
+  '',
+  'iPad 11 Wifi 128g 黃',
+  '序號:SK9KV4V6517',
+  'iPad 11 Wifi 128g 黃',
+  '序號:SJ3MQXHL95T'
+].join('\n'));
+
+const multiModel = newPhoneSerialBlocks([
+  { modelName: 'iPad 11 Wifi', capacity: '128g', color: '銀', imei: 'AAA' },
+  { modelName: 'iPhone 15', capacity: '256', color: '黑', imei: 'BBB' },
+  { modelName: 'iPad 11 Wifi', capacity: '128g', color: '藍', imei: 'CCC' },
+  { modelName: 'iPhone 15', capacity: '256', color: '白', imei: 'DDD' }
+]);
+assert.equal(multiModel.text, [
+  '銀1 藍1',
+  'iPad 11 Wifi 128g 銀',
+  '序號:AAA',
+  '',
+  'iPad 11 Wifi 128g 藍',
+  '序號:CCC',
+  '',
+  '黑1 白1',
+  'iPhone 15 256 黑',
+  '序號:BBB',
+  '',
+  'iPhone 15 256 白',
+  '序號:DDD'
+].join('\n'));
 
 console.log('phone kit checks ok');

@@ -184,13 +184,53 @@
 
   function newPhoneSerialBlocks(phones) {
     const missing = [];
-    const blocks = (phones || []).map((phone) => {
+    const rows = [];
+    (phones || []).forEach((phone) => {
+      const model = String((phone && (phone.modelName || phone.model)) || '').trim();
+      const capacity = String((phone && phone.capacity) || '').trim();
+      const color = String((phone && phone.color) || '').trim() || '未填色';
       const serial = String((phone && (phone.imei || phone.serialNumber)) || '').trim();
-      const head = [phone && (phone.modelName || phone.model) || '', phone && phone.capacity || '', phone && phone.color || ''].filter(Boolean).join(' ');
+      const head = [model, capacity, color === '未填色' ? '' : color].filter(Boolean).join(' ');
       if (!serial) missing.push((phone && phone.stock_id) || head || '未編號');
-      return head + '\n序號:' + serial;
+      rows.push({
+        model,
+        capacity,
+        color,
+        serial,
+        head,
+        majorKey: model + '\u0000' + capacity
+      });
     });
-    return { text: blocks.join('\n'), missing };
+
+    const majorOrder = [];
+    const majorMap = new Map();
+    rows.forEach((row) => {
+      if (!majorMap.has(row.majorKey)) {
+        majorOrder.push(row.majorKey);
+        majorMap.set(row.majorKey, []);
+      }
+      majorMap.get(row.majorKey).push(row);
+    });
+
+    const sections = majorOrder.map((majorKey) => {
+      const items = majorMap.get(majorKey) || [];
+      const colorOrder = [];
+      const colorMap = new Map();
+      items.forEach((row) => {
+        if (!colorMap.has(row.color)) {
+          colorOrder.push(row.color);
+          colorMap.set(row.color, []);
+        }
+        colorMap.get(row.color).push(row);
+      });
+      const summary = colorOrder.map((color) => color + String((colorMap.get(color) || []).length)).join(' ');
+      const groups = colorOrder.map((color) => (
+        (colorMap.get(color) || []).map((row) => row.head + '\n序號:' + row.serial).join('\n')
+      ));
+      return summary + '\n' + groups.join('\n\n');
+    });
+
+    return { text: sections.join('\n\n'), missing };
   }
 
   return { compact, cableKindForModel, parseKeyword, findKitRow, resolvePhoneKit, buildPhoneKitAdds, newPhoneSerialBlocks };
