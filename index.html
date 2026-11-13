@@ -163,6 +163,7 @@
         .phone-row.is-selected { background: rgba(232, 160, 74, 0.14); border-left-color: #e8a04a; }
         .phone-row-check { display: none; width: 22px; flex-shrink: 0; margin-top: 3px; color: #7a7168; font-size: 16px; text-align: center; }
         .phone-list.is-multiselect .phone-row-check { display: block; }
+        .phone-list.is-multiselect .phone-row { -webkit-user-select: none; user-select: none; }
         .phone-row.is-selected .phone-row-check { color: #e8a04a; }
         .phone-row.in-cart { background: rgba(232, 160, 74, 0.22); border-left-color: #e8a04a; }
         .phone-row.in-cart .phone-row-name, .phone-row.in-cart .phone-row-id { color: #f5b860; }
@@ -997,7 +998,7 @@
         let ItemRegistry = {};
         let OrderRegistry = {};
         let User = { name: '', isAdmin: false };
-        let UI = { tab: 'phone', sub: '', rsMode: 'inventory', rsCat: 'all', multiSelect: false, selectedPhones: new Set(), selectedAcc: new Set(), selectedPendingOrders: new Set(), pendingOrderMeta: {}, pendingOrdersByCustomer: {}, allPendingOrderIds: [], pendingTab: 'unpaid', statsCollapsed: { report: true, history: true }, categoryOrder: null, favAccessoryIds: null, phoneAccKitMap: null, booksRepairVendors: ['台灣料商'], booksTransferVendors: [], kitMapEdit: -1, favSubCat: '', posPrefsLoaded: false, booksMode: 'month', lastBooksReport: null, lastFundData: null, booksContinuous: false, booksLooping: false, lastBooksEntryYmd: null, lastBooksVendor: '', lastBooksFoodNote: '飲料', booksSessionCount: 0, amendTarget: null, salaryTab: 'unpaid', salaryPaidRows: [], peerTransferMode: false, costMemoMonth: 0 };
+        let UI = { tab: 'phone', sub: '', rsMode: 'inventory', rsCat: 'all', multiSelect: false, multiSelectAnchorId: null, selectedPhones: new Set(), selectedAcc: new Set(), selectedPendingOrders: new Set(), pendingOrderMeta: {}, pendingOrdersByCustomer: {}, allPendingOrderIds: [], pendingTab: 'unpaid', statsCollapsed: { report: true, history: true }, categoryOrder: null, favAccessoryIds: null, phoneAccKitMap: null, booksRepairVendors: ['台灣料商'], booksTransferVendors: [], kitMapEdit: -1, favSubCat: '', posPrefsLoaded: false, booksMode: 'month', lastBooksReport: null, lastFundData: null, booksContinuous: false, booksLooping: false, lastBooksEntryYmd: null, lastBooksVendor: '', lastBooksFoodNote: '飲料', booksSessionCount: 0, amendTarget: null, salaryTab: 'unpaid', salaryPaidRows: [], peerTransferMode: false, costMemoMonth: 0 };
         let cartFooterTranslateY = 0;
         const CART_FOOTER_DRAG_MAX_UP = 360;
         const CART_FOOTER_DRAG_MAX_DOWN = 0;
@@ -1601,7 +1602,7 @@
                     if (i.imei) specs += `<span class="spec-tag">序 ${salaryEsc(i.imei)}</span>`;
                     specs += `<span class="spec-tag">成本 $${(Number(i.cost) || 0).toLocaleString()}</span>`;
                     if (i.stockType === '寄賣' && i.owner) specs += `<span class="spec-tag">件主 ${salaryEsc(i.owner)}</span>`;
-                    grid.innerHTML += `<div onclick="triggerAddToCart('${salaryEsc(sid)}')" class="phone-row${selected ? ' is-selected' : ''}${inCart ? ' in-cart' : ''}${reserved ? ' is-reserved' : ''}" id="card-${salaryEsc(sid)}" data-id="${salaryEsc(sid)}">
+                    grid.innerHTML += `<div onclick="triggerAddToCart('${salaryEsc(sid)}', event)" class="phone-row${selected ? ' is-selected' : ''}${inCart ? ' in-cart' : ''}${reserved ? ' is-reserved' : ''}" id="card-${salaryEsc(sid)}" data-id="${salaryEsc(sid)}">
                         <div class="phone-row-check"><i class="fa-solid fa-circle-check"></i></div>
                         <div class="phone-row-main">
                             <div class="phone-row-top"><span class="phone-row-id">#${salaryEsc(i.stock_id)}</span><div class="phone-row-name">${salaryEsc(i.name)}</div><span class="ns-status${reserved ? ' is-reserved' : ''}">${salaryEsc(stockStatus)}</span></div>
@@ -1622,7 +1623,7 @@
                     const soldCost = soldCostOf(i);
                     specs += `<span class="spec-tag">成本 $${soldCost.toLocaleString()}</span>`;
                     if (Number.isFinite(Number(i.purchaseCost)) && Number(i.purchaseCost) !== soldCost) specs += `<span class="spec-tag">收購 $${Number(i.purchaseCost).toLocaleString()}</span>`;
-                    grid.innerHTML += `<div onclick="triggerAddToCart('${sid}')" class="phone-row${selected ? ' is-selected' : ''}${inCart ? ' in-cart' : ''}" id="card-${sid}" data-id="${sid}">
+                    grid.innerHTML += `<div onclick="triggerAddToCart('${sid}', event)" class="phone-row${selected ? ' is-selected' : ''}${inCart ? ' in-cart' : ''}" id="card-${sid}" data-id="${sid}">
                         <div class="phone-row-check"><i class="fa-solid fa-circle-check"></i></div>
                         <div class="phone-row-main">
                             <div class="phone-row-top"><span class="phone-row-id">#${i.stock_id}</span><div class="phone-row-name">${i.name}</div></div>
@@ -1852,8 +1853,8 @@
             if (i.hasBatteryReplace === false && i.hasOtherReplace === false && Number.isFinite(purchase)) return purchase;
             return Number(i.cost) || 0;
         }
-        async function triggerAddToCart(id) {
-            if (UI.multiSelect && (UI.tab === 'phone' || UI.tab === 'new')) { togglePhoneSelect(id); return; }
+        async function triggerAddToCart(id, evt) {
+            if (UI.multiSelect && (UI.tab === 'phone' || UI.tab === 'new')) { togglePhoneSelect(id, evt); return; }
             if (UI.multiSelect && UI.tab === 'accessory') { toggleAccSelect('a:' + String(id)); return; }
             const i = DB.inv.find(x => String(x.id) === String(id));
             if(!i) { Swal.fire({icon:'error', title:'找不到商品', text:`ID: ${id}`, background:'#26221e', color:'white'}); return; }
@@ -2280,25 +2281,59 @@
             return alloc;
         }
         async function copyTextToClipboard(text) {
+            const value = String(text ?? '');
             try {
-                if (navigator.clipboard && navigator.clipboard.writeText) {
-                    await navigator.clipboard.writeText(text);
+                if (navigator.clipboard && window.isSecureContext && navigator.clipboard.writeText) {
+                    await navigator.clipboard.writeText(value);
                     return true;
                 }
             } catch (e) {}
             try {
                 const ta = document.createElement('textarea');
-                ta.value = text;
-                ta.style.position = 'fixed';
-                ta.style.left = '-9999px';
+                ta.value = value;
+                ta.setAttribute('readonly', '');
+                ta.style.cssText = 'position:fixed;top:0;left:0;width:2px;height:2px;padding:0;border:0;opacity:0;';
                 document.body.appendChild(ta);
+                ta.focus();
                 ta.select();
+                ta.setSelectionRange(0, value.length);
                 const ok = document.execCommand('copy');
                 document.body.removeChild(ta);
-                return !!ok;
-            } catch (e) {
-                return false;
+                if (ok) return true;
+            } catch (e) {}
+            return false;
+        }
+        async function copyTextOneTap(text, successTitle) {
+            const value = String(text ?? '');
+            if (!value.trim()) return false;
+            if (await copyTextToClipboard(value)) {
+                Swal.fire({ icon: 'success', title: successTitle || '已複製', toast: true, position: 'top', timer: 1500, showConfirmButton: false, background: '#26221e', color: 'white' });
+                return true;
             }
+            // await／彈窗後常會丟掉「使用者手勢」，再給一顆確認鍵完成一鍵複製
+            const go = await Swal.fire({
+                icon: 'info',
+                title: '點一下完成複製',
+                text: '瀏覽器擋了自動寫入剪貼簿，按確認即可複製',
+                confirmButtonText: '複製到剪貼簿',
+                showCancelButton: true,
+                cancelButtonText: '取消',
+                background: '#26221e',
+                color: 'white'
+            });
+            if (!go.isConfirmed) return false;
+            if (await copyTextToClipboard(value)) {
+                Swal.fire({ icon: 'success', title: successTitle || '已複製', toast: true, position: 'top', timer: 1500, showConfirmButton: false, background: '#26221e', color: 'white' });
+                return true;
+            }
+            await Swal.fire({
+                icon: 'info',
+                title: '請手動複製',
+                html: `<textarea class="swal2-textarea !w-full" rows="10">${booksEscape(value)}</textarea>`,
+                background: '#26221e',
+                color: 'white'
+            });
+            return false;
         }
         async function copyOrderSummary(kind, orderId) {
             const o = OrderRegistry[orderId];
@@ -2402,14 +2437,12 @@
                     Swal.fire({ icon: 'info', title: '此單沒有新機', background: '#26221e', color: 'white' });
                     return;
                 }
-                Swal.fire({ title: '讀取序號中', background: '#26221e', color: 'white', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
                 let looked = [];
                 try {
                     const res = await API.getNewPhoneSerials(newItems.map((it) => it.itemId));
                     if (res && res.status === 'error') throw new Error(res.msg || '查詢失敗');
                     looked = Array.isArray(res && res.list) ? res.list : [];
                 } catch (e) {
-                    Swal.close();
                     Swal.fire({ icon: 'error', title: '讀取序號失敗', text: e.message || '請重試', background: '#26221e', color: 'white' });
                     return;
                 }
@@ -2429,7 +2462,6 @@
                     };
                 });
                 const built = PhoneKit.newPhoneSerialBlocks(phones);
-                Swal.close();
                 if (built.missing.length) {
                     const go = await Swal.fire({
                         icon: 'warning',
@@ -2448,9 +2480,7 @@
                     Swal.fire({ icon: 'warning', title: '找不到序號', background: '#26221e', color: 'white' });
                     return;
                 }
-                const ok = await copyTextToClipboard(text);
-                if (ok) Swal.fire({ icon: 'success', title: '已複製序號', toast: true, position: 'top', timer: 1500, showConfirmButton: false, background: '#26221e', color: 'white' });
-                else Swal.fire({ icon: 'info', title: '請手動複製', text, background: '#26221e', color: 'white' });
+                await copyTextOneTap(text, '已複製序號');
                 return;
             }
             if (kind === 'settle') {
@@ -8476,6 +8506,7 @@
             if (!UI.multiSelect) {
                 UI.selectedPhones = new Set();
                 UI.selectedAcc = new Set();
+                UI.multiSelectAnchorId = null;
             }
             const grid = document.getElementById('item-grid');
             if (grid && (UI.tab === 'phone' || UI.tab === 'new' || UI.tab === 'accessory')) grid.classList.toggle('is-multiselect', UI.multiSelect);
@@ -8487,16 +8518,37 @@
             UI.multiSelect = false;
             UI.selectedPhones = new Set();
             UI.selectedAcc = new Set();
+            UI.multiSelectAnchorId = null;
             const grid = document.getElementById('item-grid');
             if (grid) grid.classList.remove('is-multiselect');
             refreshPhoneSelection();
             refreshAccSelection();
             renderMultiSelectBar();
         }
-        function togglePhoneSelect(id) {
+        function visiblePhoneRowIds() {
+            return [...document.querySelectorAll('#item-grid .phone-row[data-id]')]
+                .map((el) => String(el.getAttribute('data-id') || el.dataset.id || '').trim())
+                .filter(Boolean);
+        }
+        function togglePhoneSelect(id, evt) {
             const sid = String(id);
+            const shift = !!(evt && evt.shiftKey);
+            if (shift && UI.multiSelectAnchorId) {
+                const ids = visiblePhoneRowIds();
+                const a = ids.indexOf(String(UI.multiSelectAnchorId));
+                const b = ids.indexOf(sid);
+                if (a >= 0 && b >= 0) {
+                    const lo = Math.min(a, b);
+                    const hi = Math.max(a, b);
+                    for (let i = lo; i <= hi; i++) UI.selectedPhones.add(ids[i]);
+                    refreshPhoneSelection();
+                    renderMultiSelectBar();
+                    return;
+                }
+            }
             if (UI.selectedPhones.has(sid)) UI.selectedPhones.delete(sid);
             else UI.selectedPhones.add(sid);
+            UI.multiSelectAnchorId = sid;
             refreshPhoneSelection();
             renderMultiSelectBar();
         }
@@ -8618,8 +8670,7 @@
             }
             const text = PhoneKit.newPhoneSerialBlocks(phones.filter(p => String(p.imei || '').trim())).text;
             if (!text.trim()) return;
-            const ok = await copyTextToClipboard(text);
-            Swal.fire({ icon: ok ? 'success' : 'info', title: ok ? '已複製序號' : '請手動複製', text: ok ? '' : text, background: '#26221e', color: 'white' });
+            await copyTextOneTap(text, '已複製序號');
         }
         function emptyPhoneKitMap() {
             return { rows: [], chargerId: '', cableCLId: '', cableCCId: '' };
