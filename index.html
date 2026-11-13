@@ -997,6 +997,49 @@
         function isOrderPeerMarked(orderId) { return !!loadPeerMarks()[orderId]; }
         let ItemRegistry = {};
         let OrderRegistry = {};
+        const NewPhoneSerialCache = new Map(); // itemId -> { imei, modelName, capacity, color, ... }
+        let newPhoneSerialPrefetchTimer = null;
+        async function prefetchNewPhoneSerialIds(ids) {
+            const need = [...new Set((ids || []).map((x) => String(x || '').trim()).filter(Boolean))]
+                .filter((id) => !NewPhoneSerialCache.has(id));
+            if (!need.length) return;
+            const res = await API.getNewPhoneSerials(need);
+            if (res && res.status === 'error') throw new Error(res.msg || '查詢失敗');
+            (Array.isArray(res && res.list) ? res.list : []).forEach((row) => {
+                if (row && row.itemId) NewPhoneSerialCache.set(String(row.itemId), row);
+            });
+            need.forEach((id) => {
+                if (!NewPhoneSerialCache.has(id)) NewPhoneSerialCache.set(id, { itemId: id, imei: '' });
+            });
+        }
+        function schedulePrefetchNewPhoneSerialsFromRegistry() {
+            if (newPhoneSerialPrefetchTimer) clearTimeout(newPhoneSerialPrefetchTimer);
+            newPhoneSerialPrefetchTimer = setTimeout(() => {
+                const ids = [];
+                Object.values(OrderRegistry || {}).forEach((o) => {
+                    (o.items || []).forEach((it) => {
+                        if (it && it.type === 'new_phone' && it.itemId) ids.push(String(it.itemId));
+                    });
+                });
+                prefetchNewPhoneSerialIds(ids).catch(() => {});
+            }, 80);
+        }
+        function buildNewPhoneSerialPhones(newItems) {
+            return (newItems || []).map((it) => {
+                const hit = NewPhoneSerialCache.get(String(it.itemId || '')) || {};
+                const fallbackName = stripLedgerName(it.itemName || it.name || '')
+                    .replace(/^新機\s*/i, '')
+                    .replace(/\s*#NS:\S+/i, '')
+                    .trim();
+                return {
+                    modelName: hit.modelName || hit.model || fallbackName,
+                    capacity: hit.capacity || '',
+                    color: hit.color || '',
+                    imei: hit.imei || it.imei || '',
+                    stock_id: hit.stock_id || it.stock_id || it.itemId || ''
+                };
+            });
+        }
         let User = { name: '', isAdmin: false };
         let UI = { tab: 'phone', sub: '', rsMode: 'inventory', rsCat: 'all', multiSelect: false, multiSelectAnchorId: null, selectedPhones: new Set(), selectedAcc: new Set(), selectedPendingOrders: new Set(), pendingOrderMeta: {}, pendingOrdersByCustomer: {}, allPendingOrderIds: [], pendingTab: 'unpaid', statsCollapsed: { report: true, history: true }, categoryOrder: null, favAccessoryIds: null, phoneAccKitMap: null, booksRepairVendors: ['台灣料商'], booksTransferVendors: [], kitMapEdit: -1, favSubCat: '', posPrefsLoaded: false, booksMode: 'month', lastBooksReport: null, lastFundData: null, booksContinuous: false, booksLooping: false, lastBooksEntryYmd: null, lastBooksVendor: '', lastBooksFoodNote: '飲料', booksSessionCount: 0, amendTarget: null, salaryTab: 'unpaid', salaryPaidRows: [], peerTransferMode: false, costMemoMonth: 0 };
         let cartFooterTranslateY = 0;
@@ -2437,30 +2480,19 @@
                     Swal.fire({ icon: 'info', title: '此單沒有新機', background: '#26221e', color: 'white' });
                     return;
                 }
-                let looked = [];
-                try {
-                    const res = await API.getNewPhoneSerials(newItems.map((it) => it.itemId));
-                    if (res && res.status === 'error') throw new Error(res.msg || '查詢失敗');
-                    looked = Array.isArray(res && res.list) ? res.list : [];
-                } catch (e) {
-                    Swal.fire({ icon: 'error', title: '讀取序號失敗', text: e.message || '請重試', background: '#26221e', color: 'white' });
-                    return;
+                const ids = newItems.map((it) => String(it.itemId || '')).filter(Boolean);
+                const needFetch = ids.some((id) => !NewPhoneSerialCache.has(id));
+                // 多選複製不需等 API，點擊手勢還在所以能直接寫剪貼簿。
+                // 已結帳要查序號；若快取已有就同步複製，跟多選一樣不會跳第二下。
+                if (needFetch) {
+                    try {
+                        await prefetchNewPhoneSerialIds(ids);
+                    } catch (e) {
+                        Swal.fire({ icon: 'error', title: '讀取序號失敗', text: e.message || '請重試', background: '#26221e', color: 'white' });
+                        return;
+                    }
                 }
-                const byId = new Map(looked.map((row) => [String(row.itemId || ''), row]));
-                const phones = newItems.map((it) => {
-                    const hit = byId.get(String(it.itemId || '')) || {};
-                    const fallbackName = stripLedgerName(it.itemName || it.name || '')
-                        .replace(/^新機\s*/i, '')
-                        .replace(/\s*#NS:\S+/i, '')
-                        .trim();
-                    return {
-                        modelName: hit.modelName || hit.model || fallbackName,
-                        capacity: hit.capacity || '',
-                        color: hit.color || '',
-                        imei: hit.imei || it.imei || '',
-                        stock_id: hit.stock_id || it.stock_id || it.itemId || ''
-                    };
-                });
+                const phones = buildNewPhoneSerialPhones(newItems);
                 const built = PhoneKit.newPhoneSerialBlocks(phones);
                 if (built.missing.length) {
                     const go = await Swal.fire({
@@ -2479,6 +2511,13 @@
                 if (!text.trim()) {
                     Swal.fire({ icon: 'warning', title: '找不到序號', background: '#26221e', color: 'white' });
                     return;
+                }
+                if (!needFetch && !built.missing.length) {
+                    const ok = await copyTextToClipboard(text);
+                    if (ok) {
+                        Swal.fire({ icon: 'success', title: '已複製序號', toast: true, position: 'top', timer: 1500, showConfirmButton: false, background: '#26221e', color: 'white' });
+                        return;
+                    }
                 }
                 await copyTextOneTap(text, '已複製序號');
                 return;
@@ -2698,7 +2737,14 @@
                 || document.getElementById(groupId);
             if (!el) return;
             const acc = el.querySelector('.order-accordion-content') || el.querySelector('.accordion-content');
-            if (acc) acc.classList.toggle('open');
+            if (acc) {
+                acc.classList.toggle('open');
+                if (acc.classList.contains('open')) {
+                    const o = OrderRegistry[orderId];
+                    const ids = (o && o.items || []).filter((it) => it.type === 'new_phone' && it.itemId).map((it) => String(it.itemId));
+                    if (ids.length) prefetchNewPhoneSerialIds(ids).catch(() => {});
+                }
+            }
         }
 
         function renderExpenseRow(i) {
@@ -5548,6 +5594,7 @@
             document.getElementById('today-pot').innerText = stats.pot.toLocaleString();
             document.getElementById('today-exp').innerText = stats.exp.toLocaleString();
             document.getElementById('today-gift').innerText = stats.gift.toLocaleString();
+            schedulePrefetchNewPhoneSerialsFromRegistry();
         }
 
         function switchPendingTab(tab) {
@@ -5882,6 +5929,7 @@
             }
             div.innerHTML = html;
             if (tokens.length && !html.trim()) div.innerHTML = '<div class="text-center text-slate-500 py-8">沒有符合搜尋條件的異動</div>';
+            schedulePrefetchNewPhoneSerialsFromRegistry();
         }
         
         function toggleAcc(id) { document.getElementById(id).classList.toggle('open'); }
