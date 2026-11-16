@@ -8671,6 +8671,10 @@
                 </div>`;
             };
             const html = `
+                <div class="flex gap-2 items-center mb-2">
+                    <input id="multi-new-same" type="number" class="swal2-input !my-0 flex-1 !text-sm" placeholder="同一售價">
+                    <button type="button" id="multi-new-fill" class="text-xs px-2 py-2 rounded bg-slate-600 text-white shrink-0">套用全部</button>
+                </div>
                 ${own.length ? `<div class="text-left text-xs text-amber-300 mb-1">自有 ${own.length} 台</div><div class="max-h-36 overflow-y-auto">${own.map((p, i) => rowHtml(p, i, 'o')).join('')}</div>` : ''}
                 ${consign.length ? `<div class="text-left text-xs text-orange-300 mt-2 mb-1">寄賣 ${consign.length} 台</div>
                     <div class="flex justify-center gap-4 text-sm mb-1">
@@ -8682,6 +8686,26 @@
                 title: `新機 ${phones.length} 台`,
                 html, background: '#26221e', color: 'white',
                 showCancelButton: true, confirmButtonText: '加入購物車', cancelButtonText: '取消',
+                didOpen: () => {
+                    const fillAll = () => {
+                        const v = document.getElementById('multi-new-same')?.value;
+                        if (v === '' || v == null) return;
+                        own.forEach((_, i) => {
+                            const el = document.getElementById('multi-new-o-' + i);
+                            if (el) el.value = String(v);
+                        });
+                        consign.forEach((_, i) => {
+                            const el = document.getElementById('multi-new-c-' + i);
+                            if (el) el.value = String(v);
+                        });
+                    };
+                    const fill = document.getElementById('multi-new-fill');
+                    if (fill) fill.onclick = fillAll;
+                    const same = document.getElementById('multi-new-same');
+                    if (same) same.addEventListener('keydown', (e) => {
+                        if (e.key === 'Enter') { e.preventDefault(); fillAll(); }
+                    });
+                },
                 preConfirm: () => {
                     const readSale = (id) => Number(document.getElementById(id)?.value) || 0;
                     const ownSales = own.map((_, i) => readSale('multi-new-o-' + i));
