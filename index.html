@@ -2184,7 +2184,7 @@
         function isGiftAccessory(it) {
             const sale = Number(it.salePrice) || 0;
             const cost = Number(it.cost) || 0;
-            return it.type === 'accessory' && sale === 0 && cost > 0;
+            return (it.type === 'accessory' || it.type === 'direct_transfer') && sale === 0 && cost > 0;
         }
         function isDefectLedger(it) {
             return !!(it && (it.type === 'defect' || it.isDefect === true));
@@ -2195,6 +2195,7 @@
             const cost = Number(it.cost) || 0;
             if (cost <= 0) return false;
             if (it.type === 'accessory' && sale === 0) return true;
+            if (it.type === 'direct_transfer' && sale === 0) return true;
             if (it.type === 'repair' && sale === 0) return true;
             if (it.type === 'shipping' && sale === 0) return true;
             return false;
@@ -6910,7 +6911,7 @@
                     if (item.stock_id) nameLine += ' <span class="text-slate-400 text-xs">#' + item.stock_id + '</span>'; 
                 } 
                 nameLine += ' <span class="text-yellow-500 text-xs">x' + item.quantity + '</span>'; 
-                const showGiftBtn = (item.type === 'accessory' || item.type === 'repair' || item.type === 'shipping') && !isDeferredRepair;
+                const showGiftBtn = (item.type === 'accessory' || item.type === 'repair' || item.type === 'shipping' || item.type === 'direct_transfer') && !isDeferredRepair;
                 const priceLine = isDeferredRepair ? `<div class="text-xs text-amber-300">報價 $${item.price}（取件收款）</div>` : `<div class="text-xs text-slate-500">$${item.price}</div>`;
                 c.innerHTML += `<div class="bg-slate-800 p-2 rounded-lg flex justify-between items-center text-sm"><div class="flex-1"><div class="text-white font-bold">${nameLine}</div>${priceLine}</div><div class="flex items-center gap-2">${showGiftBtn ? `<button onclick="toggleGift(${idx})" class="text-xs border px-1 rounded ${g}">贈</button>` : ''}<button onclick="Cart.splice(${idx},1);renderCart()" class="text-slate-500 px-2"><i class="fa-solid fa-trash"></i></button></div></div>`; 
             }); 
@@ -8490,37 +8491,68 @@
                 title: '跟廠商調貨',
                 width: 'min(96vw, 760px)',
                 customClass: { popup: 'bk-cost-wide' },
-                html: `<div class="bk-cost-layout"><div class="bk-cost-form"><div class="text-[12px] text-slate-400 text-left px-2 mb-1">你跟別家調來再賣（不扣自己庫存）。別人跟你調：配件進車後點結帳區人名反橘。</div><input id="dt1" class="swal2-input" placeholder="調貨廠商"><input id="dt2" class="swal2-input" placeholder="品項"><input id="dt3" class="swal2-input" type="number" placeholder="成本"><input id="dt4" class="swal2-input" type="number" placeholder="售價"></div>${costMemoPanelHtml('成本備查', ['配件進貨', '調貨配件'])}</div>`,
+                html: `<div class="bk-cost-layout"><div class="bk-cost-form"><div class="text-[12px] text-slate-400 text-left px-2 mb-1">你跟別家調來再賣（不扣自己庫存）。別人跟你調：配件進車後點結帳區人名反橘。</div><input id="dt1" class="swal2-input" placeholder="調貨廠商"><input id="dt2" class="swal2-input" placeholder="品項"><input id="dt3" class="swal2-input" type="number" placeholder="成本"><div class="flex items-center gap-2 px-0 mt-1"><input id="dt4" class="swal2-input !my-0 flex-1" type="number" placeholder="售價"><button type="button" id="dt-gift-btn" class="text-xs px-3 py-2 rounded bg-red-900/50 text-red-400 border border-red-700 shrink-0">贈</button></div></div>${costMemoPanelHtml('成本備查', ['配件進貨', '調貨配件'])}</div>`,
                 background: '#26221e',
                 color: 'white',
                 didOpen: () => {
+                    window._dtGift = false;
+                    const giftBtn = document.getElementById('dt-gift-btn');
+                    if (giftBtn) giftBtn.onclick = () => {
+                        window._dtGift = true;
+                        const dt4 = document.getElementById('dt4');
+                        if (dt4) dt4.value = '0';
+                        Swal.clickConfirm();
+                    };
                     bindCostMemoPanel(['配件進貨', '調貨配件'], (row) => {
+                        const dt1 = document.getElementById('dt1');
                         const dt2 = document.getElementById('dt2');
                         const dt3 = document.getElementById('dt3');
+                        if (dt1 && row.vendor) dt1.value = row.vendor;
                         if (dt2 && row.name) dt2.value = row.name;
                         if (dt3 && row.cost != null) dt3.value = String(row.cost);
                     });
                 },
-                preConfirm: () => [
-                    document.getElementById('dt1').value,
-                    document.getElementById('dt2').value,
-                    document.getElementById('dt3').value,
-                    document.getElementById('dt4').value
-                ]
+                preConfirm: () => {
+                    const dealer = String(document.getElementById('dt1')?.value || '').trim();
+                    const name = String(document.getElementById('dt2')?.value || '').trim();
+                    const costRaw = document.getElementById('dt3')?.value;
+                    const priceRaw = document.getElementById('dt4')?.value;
+                    const isGift = !!window._dtGift || priceRaw === '0';
+                    if (!dealer) { Swal.showValidationMessage('請填調貨廠商'); return false; }
+                    if (!name) { Swal.showValidationMessage('請填品項'); return false; }
+                    if (costRaw === '' || costRaw == null || isNaN(Number(costRaw)) || Number(costRaw) < 0) {
+                        Swal.showValidationMessage('請填成本');
+                        return false;
+                    }
+                    if (!isGift && (priceRaw === '' || priceRaw == null || isNaN(Number(priceRaw)) || Number(priceRaw) <= 0)) {
+                        Swal.showValidationMessage('請填售價（贈品按贈）');
+                        return false;
+                    }
+                    return {
+                        dealer,
+                        name,
+                        cost: Math.round(Number(costRaw) || 0),
+                        price: isGift ? 0 : Math.round(Number(priceRaw) || 0),
+                        isGift
+                    };
+                }
             });
-            if (v && v[0] && v[1] && v[2] && v[3]) {
-                Cart.push({
-                    type: 'direct_transfer',
-                    name: '調貨: ' + v[1],
-                    dealerName: v[0],
-                    cost: Number(v[2]) || 0,
-                    price: Number(v[3]) || 0,
-                    quantity: 1,
-                    itemId: 'DT-' + Date.now() + '-' + Math.random().toString(36).slice(2, 9),
-                    isDirectTransfer: true
-                });
-                renderCart();
-            }
+            window._dtGift = false;
+            if (!v) return;
+            const baseName = v.name.replace(/\s*\(贈\)\s*/g, ' ').trim();
+            Cart.push({
+                type: 'direct_transfer',
+                name: '調貨: ' + baseName + (v.isGift ? ' (贈)' : ''),
+                dealerName: v.dealer,
+                cost: v.cost,
+                price: v.price,
+                quantity: 1,
+                itemId: 'DT-' + Date.now() + '-' + Math.random().toString(36).slice(2, 9),
+                originalPrice: v.isGift ? v.cost : v.price,
+                isGift: !!v.isGift,
+                isDirectTransfer: true
+            });
+            renderCart();
         }
         
         function renderMultiSelectBar() {
