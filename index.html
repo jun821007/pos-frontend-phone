@@ -11,7 +11,7 @@
     <link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-32.png">
     <link rel="icon" type="image/png" sizes="16x16" href="icons/favicon-16.png">
     <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
-    <title>POS</title>
+    <title>內部POS系統</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
         tailwind.config = {
@@ -288,7 +288,7 @@
     <aside class="hidden md:flex w-44 bg-slate-900 flex-col py-4 px-2 border-r border-slate-800 z-20 shrink-0 gap-1">
         <div class="flex items-center gap-2 px-2 py-2 mb-3 border-b border-slate-800/80">
             <span class="text-xl text-yellow-500 shrink-0"><i class="fa-solid fa-cube"></i></span>
-            <span class="text-xs font-bold tracking-wide text-slate-500 leading-tight">POS</span>
+            <span class="text-xs font-bold tracking-wide text-slate-500 leading-tight">內部 POS</span>
         </div>
         <button type="button" id="d-nav-pos" onclick="switchView('pos')" class="nav-btn w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-yellow-400 bg-slate-800 transition hover:opacity-95"><i class="fa-solid fa-cash-register w-5 text-center text-lg shrink-0"></i><span class="nav-label text-sm font-semibold">收銀</span></button>
         <button type="button" id="d-nav-report" onclick="openReport()" class="nav-btn w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-slate-500 hover:text-yellow-400 transition"><i class="fa-solid fa-file-invoice-dollar w-5 text-center text-lg shrink-0"></i><span class="nav-label text-sm font-semibold">今日</span></button>
@@ -1098,12 +1098,11 @@
         }
 
         window.onload = () => { 
-            // 標題固定 POS，不要改成別的產品名
-            document.title = 'POS';
+            document.title = '內部POS系統 ' + POS_VERSION + ' (Stable)';
             const loginVer = document.getElementById('login-version');
             if (loginVer) loginVer.textContent = 'POS';
             const settingVer = document.getElementById('setting-version');
-            if (settingVer) settingVer.textContent = 'POS ' + POS_VERSION;
+            if (settingVer) settingVer.textContent = POS_VERSION + ' Stable';
             initCartFooterDrag();
             applyStatsPanelState('report');
             applyStatsPanelState('history');
