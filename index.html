@@ -11,7 +11,7 @@
     <link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-32.png">
     <link rel="icon" type="image/png" sizes="16x16" href="icons/favicon-16.png">
     <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
-    <title>內部POS系統</title>
+    <title>POS</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
         tailwind.config = {
@@ -288,14 +288,14 @@
     <aside class="hidden md:flex w-44 bg-slate-900 flex-col py-4 px-2 border-r border-slate-800 z-20 shrink-0 gap-1">
         <div class="flex items-center gap-2 px-2 py-2 mb-3 border-b border-slate-800/80">
             <span class="text-xl text-yellow-500 shrink-0"><i class="fa-solid fa-cube"></i></span>
-            <span class="text-xs font-bold tracking-wide text-slate-500 leading-tight">內部 POS</span>
+            <span class="text-xs font-bold tracking-wide text-slate-500 leading-tight">POS</span>
         </div>
         <button type="button" id="d-nav-pos" onclick="switchView('pos')" class="nav-btn w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-yellow-400 bg-slate-800 transition hover:opacity-95"><i class="fa-solid fa-cash-register w-5 text-center text-lg shrink-0"></i><span class="nav-label text-sm font-semibold">收銀</span></button>
         <button type="button" id="d-nav-report" onclick="openReport()" class="nav-btn w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-slate-500 hover:text-yellow-400 transition"><i class="fa-solid fa-file-invoice-dollar w-5 text-center text-lg shrink-0"></i><span class="nav-label text-sm font-semibold">今日</span></button>
         <button type="button" id="d-nav-history" onclick="openHistory()" class="nav-btn w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-slate-500 hover:text-yellow-400 transition"><i class="fa-solid fa-chart-pie w-5 text-center text-lg shrink-0"></i><span class="nav-label text-sm font-semibold">歷史</span></button>
         <button type="button" id="d-nav-pending" onclick="openPending()" class="nav-btn w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-slate-500 hover:text-yellow-400 transition"><i class="fa-solid fa-wallet w-5 text-center text-lg shrink-0"></i><span class="nav-label text-sm font-semibold">未結</span></button>
         <button type="button" id="d-nav-restock" onclick="switchView('restock')" class="nav-btn w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-slate-500 hover:text-yellow-400 transition"><i class="fa-solid fa-dolly w-5 text-center text-lg shrink-0"></i><span class="nav-label text-sm font-semibold">進貨</span></button>
-        <button type="button" id="d-nav-restockalert" onclick="openRestockAlert()" class="nav-btn w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-slate-500 hover:text-yellow-400 transition"><i class="fa-solid fa-bell w-5 text-center text-lg shrink-0"></i><span class="nav-label text-sm font-semibold">補貨</span></button>
+        <button type="button" id="d-nav-restockalert" onclick="openRestockAlert()" style="display:none" class="nav-btn w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-slate-500 hover:text-yellow-400 transition"><i class="fa-solid fa-bell w-5 text-center text-lg shrink-0"></i><span class="nav-label text-sm font-semibold">補貨</span></button>
         <button type="button" id="d-nav-books" onclick="openBooks()" style="display:none" class="nav-btn w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-slate-500 hover:text-yellow-400 transition"><i class="fa-solid fa-book w-5 text-center text-lg shrink-0"></i><span class="nav-label text-sm font-semibold">記帳</span></button>
         <button type="button" id="d-nav-salary" onclick="openSalary()" style="display:none" class="nav-btn w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-slate-500 hover:text-yellow-400 transition"><i class="fa-solid fa-sack-dollar w-5 text-center text-lg shrink-0"></i><span class="nav-label text-sm font-semibold">薪資</span></button>
         <button type="button" id="d-nav-setting" onclick="switchView('setting')" class="nav-btn w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-slate-500 hover:text-yellow-400 transition"><i class="fa-solid fa-gear w-5 text-center text-lg shrink-0"></i><span class="nav-label text-sm font-semibold">設定</span></button>
@@ -737,7 +737,7 @@
         </div>
     </main>
 
-    <nav class="md:hidden fixed bottom-0 w-full h-16 bg-slate-950 border-t border-slate-800 flex z-50"><div onclick="switchView('pos')" id="m-nav-pos" class="mobile-nav-item active"><i class="fa-solid fa-cash-register"></i>收銀</div><div onclick="openReport()" id="m-nav-report" class="mobile-nav-item"><i class="fa-solid fa-file-invoice-dollar"></i>今日</div><div onclick="openPending()" id="m-nav-pending" class="mobile-nav-item"><i class="fa-solid fa-wallet"></i>未結</div><div onclick="openHistory()" id="m-nav-history" class="mobile-nav-item"><i class="fa-solid fa-chart-pie"></i>歷史</div><div onclick="switchView('restock')" id="m-nav-restock" class="mobile-nav-item"><i class="fa-solid fa-dolly"></i>進貨</div><div onclick="openRestockAlert()" id="m-nav-restockalert" class="mobile-nav-item"><i class="fa-solid fa-bell"></i>補貨</div><div onclick="openBooks()" id="m-nav-books" class="mobile-nav-item" style="display:none"><i class="fa-solid fa-book"></i>記帳</div><div onclick="openSalary()" id="m-nav-salary" class="mobile-nav-item" style="display:none"><i class="fa-solid fa-sack-dollar"></i>薪資</div><div onclick="switchView('setting')" id="m-nav-setting" class="mobile-nav-item"><i class="fa-solid fa-gear"></i>設定</div></nav>
+    <nav class="md:hidden fixed bottom-0 w-full h-16 bg-slate-950 border-t border-slate-800 flex z-50"><div onclick="switchView('pos')" id="m-nav-pos" class="mobile-nav-item active"><i class="fa-solid fa-cash-register"></i>收銀</div><div onclick="openReport()" id="m-nav-report" class="mobile-nav-item"><i class="fa-solid fa-file-invoice-dollar"></i>今日</div><div onclick="openPending()" id="m-nav-pending" class="mobile-nav-item"><i class="fa-solid fa-wallet"></i>未結</div><div onclick="openHistory()" id="m-nav-history" class="mobile-nav-item"><i class="fa-solid fa-chart-pie"></i>歷史</div><div onclick="switchView('restock')" id="m-nav-restock" class="mobile-nav-item"><i class="fa-solid fa-dolly"></i>進貨</div><div onclick="openRestockAlert()" id="m-nav-restockalert" class="mobile-nav-item" style="display:none"><i class="fa-solid fa-bell"></i>補貨</div><div onclick="openBooks()" id="m-nav-books" class="mobile-nav-item" style="display:none"><i class="fa-solid fa-book"></i>記帳</div><div onclick="openSalary()" id="m-nav-salary" class="mobile-nav-item" style="display:none"><i class="fa-solid fa-sack-dollar"></i>薪資</div><div onclick="switchView('setting')" id="m-nav-setting" class="mobile-nav-item"><i class="fa-solid fa-gear"></i>設定</div></nav>
 
     <script src="phone-kit.js"></script>
     <script>
@@ -1098,11 +1098,12 @@
         }
 
         window.onload = () => { 
-            document.title = '內部POS系統 ' + POS_VERSION + ' (Stable)';
+            // 標題固定 POS，不要改成別的產品名
+            document.title = 'POS';
             const loginVer = document.getElementById('login-version');
             if (loginVer) loginVer.textContent = 'POS';
             const settingVer = document.getElementById('setting-version');
-            if (settingVer) settingVer.textContent = POS_VERSION + ' Stable';
+            if (settingVer) settingVer.textContent = 'POS ' + POS_VERSION;
             initCartFooterDrag();
             applyStatsPanelState('report');
             applyStatsPanelState('history');
@@ -3007,8 +3008,8 @@
         const RA_SOON_DAYS = 7;
         const RA_COVER_DAYS = 14;
         function openRestockAlert() {
-            switchView('restockalert');
-            loadRestockAlert();
+            // 暫時隱藏補貨入口；功能保留，之後要開再拿掉 nav 的 display:none
+            return;
         }
         function setRestockAlertTab(tab) {
             UI.raTab = tab === 'hot' ? 'hot' : 'need';
