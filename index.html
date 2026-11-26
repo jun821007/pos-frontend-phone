@@ -116,10 +116,20 @@
         .books-card-meta { margin-top: 6px; font-size: 12px; color: #7a7168; line-height: 1.4; }
         #books-tables, #fund-tables { -webkit-overflow-scrolling: touch; }
         @media (min-width: 768px) {
+            /* 網頁版可反白複製；手機維持 select-none 較不易誤觸 */
+            body.select-none {
+                -webkit-user-select: text;
+                user-select: text;
+            }
             .books-m { display: none; }
             .books-d { display: block; overflow-x: auto; }
             .books-page { padding: 1rem; }
             .books-toolbar { gap: 10px; }
+            .books-sheet, .books-sheet th, .books-sheet td,
+            .books-hero-card, #books-period-label, #books-tables {
+                -webkit-user-select: text;
+                user-select: text;
+            }
         }
         @media (max-width: 767px) {
             .books-hint { display: none; }
