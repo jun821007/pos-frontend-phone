@@ -93,6 +93,13 @@
         .books-hero-card.inc b { color: #e8a04a; }
         .books-hero-card.exp b { color: #e08a7a; }
         .books-hero-card.net b { color: #7dba84; }
+        @media (min-width: 768px) {
+            .books-hero { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin-bottom: 16px; }
+            .books-hero.has-avg { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+            .books-hero-card { padding: 14px 16px; }
+            .books-hero-card.net { grid-column: auto; }
+            .books-hero-card b { font-size: 1.45rem; }
+        }
         .books-sec { font-size: 11px; font-weight: 700; letter-spacing: .16em; color: #a89f94; margin: 12px 0 6px; }
         .books-kv { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; padding: 11px 4px; border-bottom: 1px solid #26221e; font-size: 15px; }
         .books-kv .lab { color: #e8dfd4; }
@@ -4442,14 +4449,16 @@
                 </tr>`;
                 }).join('')
                 : `<tr><td colspan="9" class="mute">${emptyText}</td></tr>`;
-            box.innerHTML = `
-                <div class="books-m">
-                    <div class="books-hero">
+            const hasAvg = !isYear && report.mode === 'month' && Number(report.avgDays) > 0;
+            const heroHtml = `<div class="books-hero${hasAvg ? ' has-avg' : ''}">
                         <div class="books-hero-card inc"><span>${isYear ? '年純毛利' : '純毛利'}</span><b>${money(report.profitTotal)}</b></div>
                         <div class="books-hero-card exp"><span>${isYear ? '年支出' : '支出'}</span><b>${money(report.expenseTotal)}</b></div>
                         <div class="books-hero-card net"><span>${isYear ? '年淨利' : '本期淨利'}</span><b>${money(report.net)}</b></div>
-                        ${(!isYear && report.mode === 'month' && Number(report.avgDays) > 0) ? `<div class="books-hero-card net"><span>日均淨利（÷${Number(report.avgDays)} 天）</span><b>${money(report.avgNet)}</b></div>` : ''}
-                    </div>
+                        ${hasAvg ? `<div class="books-hero-card net"><span>日均淨利（÷${Number(report.avgDays)} 天）</span><b>${money(report.avgNet)}</b></div>` : ''}
+                    </div>`;
+            box.innerHTML = `
+                <div class="books-m">
+                    ${heroHtml}
                     ${isYear ? `<div class="books-sec">各月收入（純毛利）</div>${mMonthly}<div class="books-kv tot"><span class="lab">年純毛利合計</span><span class="num inc">${money(report.profitTotal)}</span></div>` : ''}
                     <div class="books-sec">收入</div>
                     ${mProfit}
@@ -4465,6 +4474,7 @@
                     ${isYear ? `<div class="books-kv mute"><span class="lab mute">一年不列逐筆明細，請改選一個月</span><span></span></div>` : `<div class="books-sec">明細　收購／料錢／維修料件為備查</div><div class="mb-2">${filterSelect('books-det-filter-m')}</div>${filterSummary}${mCards}`}
                 </div>
                 <div class="books-d">
+                    ${heroHtml}
                     <div class="mb-5">
                         <div class="flex items-center justify-between mb-2"><div class="text-xs font-bold tracking-[0.2em] text-slate-400">損益彙總</div><div class="text-[11px] text-slate-500">單位：元</div></div>
                         <table class="books-sheet"><colgroup><col><col style="width:9rem"></colgroup>
