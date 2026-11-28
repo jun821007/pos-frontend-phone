@@ -32,8 +32,8 @@
             }
         };
     </script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/js/all.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <script defer src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/js/all.min.js"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <style>
         html { background-color: #1a1714; min-height: 100%; min-height: -webkit-fill-available; }
         body { background-color: transparent; color: #f3ebe3; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; -webkit-tap-highlight-color: transparent; padding-top: env(safe-area-inset-top); padding-bottom: env(safe-area-inset-bottom); min-height: 100vh; min-height: -webkit-fill-available; }
@@ -798,8 +798,8 @@
               throw error;
             }
           },
-          getInventory: async () => {
-            const res = await fetch(`${API_BASE_URL}/inventory`);
+          getInventory: async (force) => {
+            const res = await fetch(`${API_BASE_URL}/inventory${force ? '?force=1' : ''}`);
             return await res.json();
           },
           checkoutOrder: async (data) => {
@@ -1260,38 +1260,92 @@
             updateAmendBanner();
             fetchData(); 
         }
-        async function fetchData() { 
-            try {
-                console.log('開始載入庫存資料...');
-                const d = await API.getInventory();
-                console.log('收到資料:', d);
-                if (d.status === 'error') { 
-                    document.getElementById('sync-status').innerHTML = '<span class="text-red-500">● 同步失敗</span>'; 
-                    if (typeof Swal !== 'undefined') Swal.fire({ icon: 'error', title: '載入失敗', text: d.msg || '請重新整理', background: '#26221e', color: 'white' }); 
-                    return; 
+        const INV_CACHE_KEY = 'pos_inv_cache_v2';
+        const INV_CACHE_MAX_AGE_MS = 6 * 60 * 60 * 1000;
+        function applyInventoryPayload(d, opts) {
+            const fromCache = !!(opts && opts.fromCache);
+            DB.inv = d.inventory || [];
+            DB.sales = d.todaySales || [];
+            pruneBlacklistFromLedger();
+            DB.companyTemplates = d.companyTemplates || [];
+            if (UI.tab === 'phone') switchMainTab('phone');
+            else if (UI.tab === 'new') {
+                const a = document.querySelector('#sub-cat-scroll .pill-btn.active');
+                filterItems('stocktype', a ? a.innerText : '自有');
+            } else if (UI.tab === 'accessory') {
+                const a = document.querySelector('#sub-cat-scroll .pill-btn.active');
+                if (a) {
+                    const t = a.innerText;
+                    if (t.includes('常用')) { renderFavSubNav(); renderFavAccessoryGrid(); }
+                    else if (t === '公司貨') renderCompanyAccessoryGrid();
+                    else if (t === '調貨') renderDirectTransferGrid();
+                    else filterItems(null, t);
                 }
-                DB.inv = d.inventory || []; 
-                DB.sales = d.todaySales || []; 
-                pruneBlacklistFromLedger();
-                DB.companyTemplates = d.companyTemplates || []; 
-                await loadPosPrefs();
+            }
+            const reportView = document.getElementById('view-report');
+            if (reportView && !reportView.classList.contains('hidden')) renderReport();
+            const sync = document.getElementById('sync-status');
+            if (sync) {
+                sync.innerHTML = fromCache
+                    ? '<span class="text-yellow-500">● 快取中</span>'
+                    : '<span class="text-green-500">● 已同步</span>';
+            }
+        }
+        function readInventoryCache() {
+            try {
+                const raw = localStorage.getItem(INV_CACHE_KEY);
+                if (!raw) return null;
+                const cached = JSON.parse(raw);
+                if (!cached || !cached.data || !cached.at) return null;
+                if (Date.now() - Number(cached.at) > INV_CACHE_MAX_AGE_MS) return null;
+                return cached;
+            } catch (e) {
+                return null;
+            }
+        }
+        function writeInventoryCache(d) {
+            try {
+                localStorage.setItem(INV_CACHE_KEY, JSON.stringify({ at: Date.now(), data: d }));
+            } catch (e) {}
+        }
+        async function fetchData(opts) {
+            const forceNetwork = !!(opts && opts.force);
+            try {
+                if (!forceNetwork) {
+                    const cached = readInventoryCache();
+                    if (cached && cached.data && !cached.data.status) {
+                        applyInventoryPayload(cached.data, { fromCache: true });
+                        if (!UI.posPrefsLoaded) void loadPosPrefs();
+                    }
+                }
+                console.log('開始載入庫存資料...');
+                const [d] = await Promise.all([
+                    API.getInventory(forceNetwork),
+                    UI.posPrefsLoaded ? Promise.resolve() : loadPosPrefs()
+                ]);
+                console.log('收到資料:', d);
+                if (d.status === 'error') {
+                    document.getElementById('sync-status').innerHTML = '<span class="text-red-500">● 同步失敗</span>';
+                    if (typeof Swal !== 'undefined') Swal.fire({ icon: 'error', title: '載入失敗', text: d.msg || '請重新整理', background: '#26221e', color: 'white' });
+                    return;
+                }
+                applyInventoryPayload(d, { fromCache: false });
+                writeInventoryCache(d);
                 console.log('庫存資料筆數:', DB.inv.length);
-                console.log('手機資料:', DB.inv.filter(i => i.type === 'phone').length);
-                console.log('配件資料:', DB.inv.filter(i => i.type === 'accessory').length);
-                document.getElementById('sync-status').innerHTML = '<span class="text-green-500">● 已同步</span>'; 
-                if(UI.tab === 'phone') switchMainTab('phone'); 
-                else if(UI.tab === 'new') { const a = document.querySelector('#sub-cat-scroll .pill-btn.active'); filterItems('stocktype', a ? a.innerText : '自有'); }
-                else if(UI.tab === 'accessory') { const a = document.querySelector('#sub-cat-scroll .pill-btn.active'); if(a) { const t = a.innerText; if(t.includes('常用')) { renderFavSubNav(); renderFavAccessoryGrid(); } else if(t === '公司貨') renderCompanyAccessoryGrid(); else if(t === '調貨') renderDirectTransferGrid(); else filterItems(null, t); } }
-                renderReport(); 
-            } catch(e) { 
-                console.error('Data Parse Error', e); 
-                document.getElementById('sync-status').innerHTML = '<span class="text-red-500">● 連線失敗</span>'; 
+            } catch (e) {
+                console.error('Data Parse Error', e);
+                if (!DB.inv || !DB.inv.length) {
+                    document.getElementById('sync-status').innerHTML = '<span class="text-red-500">● 連線失敗</span>';
+                }
             }
         }
         function softRefresh() {
-            Swal.fire({title: '同步中...', toast: true, position: 'top-end', showConfirmButton: false, didOpen: () => { Swal.showLoading(); }});
-            fetchData();
-            setTimeout(() => Swal.close(), 800);
+            if (typeof Swal !== 'undefined') {
+                Swal.fire({title: '同步中...', toast: true, position: 'top-end', showConfirmButton: false, didOpen: () => { Swal.showLoading(); }});
+            }
+            fetchData({ force: true }).finally(() => {
+                if (typeof Swal !== 'undefined') setTimeout(() => Swal.close(), 400);
+            });
         }
 
         function switchView(v) { 
